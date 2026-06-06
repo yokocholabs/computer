@@ -84,28 +84,31 @@ async def read_file(
     if not full.is_file():
         return f"Error: file not found: {path}"
 
-    size = full.stat().st_size
-    if size > 500_000:
-        return f"Error: file too large ({size} bytes, max 500KB)"
+    def _read():
+        size = full.stat().st_size
+        if size > 500_000:
+            return f"Error: file too large ({size} bytes, max 500KB)"
 
-    lines = full.read_text(errors="replace").splitlines()
-    total = len(lines)
+        lines = full.read_text(errors="replace").splitlines()
+        total = len(lines)
 
-    if start_line > 0 or end_line > 0:
-        s = max(1, start_line) - 1  # Convert to 0-indexed
-        e = min(total, end_line) if end_line > 0 else total
-        selected = lines[s:e]
-        numbered = [f"{i + s + 1}: {line}" for i, line in enumerate(selected)]
-        header = f"File: {path} | Lines {s + 1}-{e} of {total}\n"
-        return header + "\n".join(numbered)
-    else:
-        # Cap at 800 lines, show line numbers
-        capped = lines[:800]
-        numbered = [f"{i + 1}: {line}" for i, line in enumerate(capped)]
-        header = f"File: {path} | Total lines: {total}"
-        if total > 800:
-            header += " (showing first 800)"
-        return header + "\n" + "\n".join(numbered)
+        if start_line > 0 or end_line > 0:
+            s = max(1, start_line) - 1  # Convert to 0-indexed
+            e = min(total, end_line) if end_line > 0 else total
+            selected = lines[s:e]
+            numbered = [f"{i + s + 1}: {line}" for i, line in enumerate(selected)]
+            header = f"File: {path} | Lines {s + 1}-{e} of {total}\n"
+            return header + "\n".join(numbered)
+        else:
+            # Cap at 800 lines, show line numbers
+            capped = lines[:800]
+            numbered = [f"{i + 1}: {line}" for i, line in enumerate(capped)]
+            header = f"File: {path} | Total lines: {total}"
+            if total > 800:
+                header += " (showing first 800)"
+            return header + "\n" + "\n".join(numbered)
+
+    return await asyncio.to_thread(_read)
 
 
 async def list_directory(
@@ -122,49 +125,52 @@ async def list_directory(
     if not full.is_dir():
         return f"Error: not a directory: {path}"
 
-    ignore = {
-        ".git",
-        "node_modules",
-        "__pycache__",
-        ".venv",
-        "venv",
-        ".next",
-        "build",
-        "dist",
-        ".cptr",
-        ".svelte-kit",
-    }
-    entries = []
+    def _list():
+        ignore = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            ".next",
+            "build",
+            "dist",
+            ".cptr",
+            ".svelte-kit",
+        }
+        entries = []
 
-    if recursive:
-        for root, dirs, files in os.walk(full):
-            dirs[:] = sorted(d for d in dirs if d not in ignore)
-            rel = Path(root).relative_to(full)
-            for f in sorted(files):
-                fpath = Path(root) / f
-                try:
-                    sz = fpath.stat().st_size
-                except OSError:
-                    sz = 0
-                entries.append(f"{rel / f}  ({_human_size(sz)})")
-    else:
-        for item in sorted(full.iterdir()):
-            if item.name in ignore:
-                continue
-            if item.is_dir():
-                try:
-                    count = sum(1 for _ in item.rglob("*") if _.is_file())
-                except (PermissionError, OSError):
-                    count = 0
-                entries.append(f"{item.name}/  ({count} files)")
-            else:
-                try:
-                    sz = item.stat().st_size
-                except OSError:
-                    sz = 0
-                entries.append(f"{item.name}  ({_human_size(sz)})")
+        if recursive:
+            for root, dirs, files in os.walk(full):
+                dirs[:] = sorted(d for d in dirs if d not in ignore)
+                rel = Path(root).relative_to(full)
+                for f in sorted(files):
+                    fpath = Path(root) / f
+                    try:
+                        sz = fpath.stat().st_size
+                    except OSError:
+                        sz = 0
+                    entries.append(f"{rel / f}  ({_human_size(sz)})")
+        else:
+            for item in sorted(full.iterdir()):
+                if item.name in ignore:
+                    continue
+                if item.is_dir():
+                    try:
+                        count = sum(1 for _ in item.rglob("*") if _.is_file())
+                    except (PermissionError, OSError):
+                        count = 0
+                    entries.append(f"{item.name}/  ({count} files)")
+                else:
+                    try:
+                        sz = item.stat().st_size
+                    except OSError:
+                        sz = 0
+                    entries.append(f"{item.name}  ({_human_size(sz)})")
 
-    res = "\n".join(entries) if entries else "(empty directory)"
+        return "\n".join(entries) if entries else "(empty directory)"
+
+    res = await asyncio.to_thread(_list)
     return _truncate_output(res, max_chars=CHAT_TOOL_MAX_CHARS)
 
 
@@ -244,28 +250,31 @@ async def _search_rg(
 
 async def _search_python(query: str, full: Path, case_insensitive: bool) -> str:
     """Fallback search using pure Python (when ripgrep not installed)."""
-    results = []
-    ignore = {".git", "node_modules", "__pycache__", ".venv", "venv"}
-    q = query.lower() if case_insensitive else query
+    def _walk_and_search():
+        results = []
+        ignore = {".git", "node_modules", "__pycache__", ".venv", "venv"}
+        q = query.lower() if case_insensitive else query
 
-    for root, dirs, files in os.walk(full):
-        dirs[:] = [d for d in dirs if d not in ignore]
-        for fname in files:
-            fpath = Path(root) / fname
-            try:
-                text = fpath.read_text(errors="replace")
-            except (OSError, PermissionError):
-                continue
-            for i, line in enumerate(text.splitlines(), 1):
-                target = line.lower() if case_insensitive else line
-                if q in target:
-                    rel = fpath.relative_to(full)
-                    results.append(f"{rel}:{i}: {line.strip()}")
-                    if len(results) >= 50:
-                        results.append("... (truncated at 50 matches)")
-                        return "\n".join(results)
+        for root, dirs, files in os.walk(full):
+            dirs[:] = [d for d in dirs if d not in ignore]
+            for fname in files:
+                fpath = Path(root) / fname
+                try:
+                    text = fpath.read_text(errors="replace")
+                except (OSError, PermissionError):
+                    continue
+                for i, line in enumerate(text.splitlines(), 1):
+                    target = line.lower() if case_insensitive else line
+                    if q in target:
+                        rel = fpath.relative_to(full)
+                        results.append(f"{rel}:{i}: {line.strip()}")
+                        if len(results) >= 50:
+                            results.append("... (truncated at 50 matches)")
+                            return "\n".join(results)
 
-    return "\n".join(results) if results else "No matches found."
+        return "\n".join(results) if results else "No matches found."
+
+    return await asyncio.to_thread(_walk_and_search)
 
 
 async def create_file(
@@ -288,8 +297,12 @@ async def create_file(
     full = _resolve_path(path, workspace)
     if full.is_file() and not overwrite:
         return f"Error: file already exists: {path}. Use overwrite=true or edit_file to modify."
-    full.parent.mkdir(parents=True, exist_ok=True)
-    full.write_text(content)
+
+    def _write():
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(content)
+
+    await asyncio.to_thread(_write)
     return f"Created {path} ({len(content)} bytes, {len(content.splitlines())} lines)"
 
 
@@ -299,8 +312,12 @@ async def write_file(path: str, content: str, *, workspace: str) -> str:
     :param content: File contents to write.
     """
     full = _resolve_path(path, workspace)
-    full.parent.mkdir(parents=True, exist_ok=True)
-    full.write_text(content)
+
+    def _write():
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(content)
+
+    await asyncio.to_thread(_write)
     return f"Wrote {len(content)} bytes to {path}"
 
 
@@ -324,39 +341,46 @@ async def edit_file(
     if not full.is_file():
         return f"Error: file not found: {path}"
 
-    content = full.read_text(errors="replace")
+    def _edit():
+        content = full.read_text(errors="replace")
 
-    if start_line > 0 or end_line > 0:
-        lines = content.splitlines(keepends=True)
-        total = len(lines)
-        s = max(1, start_line) - 1
-        e = min(total, end_line) if end_line > 0 else total
-        region = "".join(lines[s:e])
+        if start_line > 0 or end_line > 0:
+            lines = content.splitlines(keepends=True)
+            total = len(lines)
+            s = max(1, start_line) - 1
+            e = min(total, end_line) if end_line > 0 else total
+            region = "".join(lines[s:e])
 
-        if target not in region:
-            return f"Error: target text not found in lines {s + 1}-{e} of {path}"
+            if target not in region:
+                return f"Error: target text not found in lines {s + 1}-{e} of {path}"
 
-        count = region.count(target)
-        if count > 1:
-            return (
-                f"Error: target text found {count} times in lines {s + 1}-{e}. "
-                f"Narrow the line range or use a more specific target."
-            )
+            count = region.count(target)
+            if count > 1:
+                return (
+                    f"Error: target text found {count} times in lines {s + 1}-{e}. "
+                    f"Narrow the line range or use a more specific target."
+                )
 
-        new_region = region.replace(target, replacement, 1)
-        new_content = "".join(lines[:s]) + new_region + "".join(lines[e:])
-    else:
-        count = content.count(target)
-        if count == 0:
-            return f"Error: target text not found in {path}"
-        if count > 1:
-            return (
-                f"Error: target text found {count} times in {path}. "
-                f"Use start_line/end_line to disambiguate."
-            )
-        new_content = content.replace(target, replacement, 1)
+            new_region = region.replace(target, replacement, 1)
+            new_content = "".join(lines[:s]) + new_region + "".join(lines[e:])
+        else:
+            count = content.count(target)
+            if count == 0:
+                return f"Error: target text not found in {path}"
+            if count > 1:
+                return (
+                    f"Error: target text found {count} times in {path}. "
+                    f"Use start_line/end_line to disambiguate."
+                )
+            new_content = content.replace(target, replacement, 1)
 
-    full.write_text(new_content)
+        full.write_text(new_content)
+        return None  # success sentinel
+
+    result = await asyncio.to_thread(_edit)
+    if result is not None:
+        return result
+
     target_lines = len(target.splitlines())
     replacement_lines = len(replacement.splitlines())
     return (
@@ -387,31 +411,34 @@ async def multi_edit_file(
     if not isinstance(edit_list, list) or not edit_list:
         return "Error: edits must be a non-empty JSON array"
 
-    content = full.read_text(errors="replace")
-    applied = 0
+    def _apply():
+        content = full.read_text(errors="replace")
+        applied = 0
 
-    for i, edit in enumerate(edit_list):
-        target = edit.get("target", "")
-        replacement = edit.get("replacement", "")
+        for i, edit in enumerate(edit_list):
+            target = edit.get("target", "")
+            replacement = edit.get("replacement", "")
 
-        if not target:
-            return f"Error: edit {i + 1} missing 'target'"
+            if not target:
+                return f"Error: edit {i + 1} missing 'target'"
 
-        if target not in content:
-            return f"Error: target not found for edit {i + 1}: {target[:100]}..."
+            if target not in content:
+                return f"Error: target not found for edit {i + 1}: {target[:100]}..."
 
-        count = content.count(target)
-        if count > 1:
-            return (
-                f"Error: edit {i + 1} target found {count} times. "
-                f"Each target must be unique in the file."
-            )
+            count = content.count(target)
+            if count > 1:
+                return (
+                    f"Error: edit {i + 1} target found {count} times. "
+                    f"Each target must be unique in the file."
+                )
 
-        content = content.replace(target, replacement, 1)
-        applied += 1
+            content = content.replace(target, replacement, 1)
+            applied += 1
 
-    full.write_text(content)
-    return f"Applied {applied} edits to {path}"
+        full.write_text(content)
+        return f"Applied {applied} edits to {path}"
+
+    return await asyncio.to_thread(_apply)
 
 
 async def run_command(

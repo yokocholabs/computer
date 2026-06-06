@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import List, Optional
 
@@ -77,14 +78,18 @@ async def list_chats(
     if not chats_dir.exists():
         return {"chats": [], "total": 0, "has_more": False}
 
-    # Collect chat IDs and their relative folder paths
-    chat_entries: list[dict] = []
-    for json_file in chats_dir.rglob("*.json"):
-        chat_id = json_file.stem
-        rel_folder = str(json_file.parent.relative_to(chats_dir))
-        if rel_folder == ".":
-            rel_folder = ""
-        chat_entries.append({"id": chat_id, "folder": rel_folder})
+    # Scan filesystem for chat JSON files in a thread
+    def _scan_chat_files() -> list[dict]:
+        entries = []
+        for json_file in chats_dir.rglob("*.json"):
+            chat_id = json_file.stem
+            rel_folder = str(json_file.parent.relative_to(chats_dir))
+            if rel_folder == ".":
+                rel_folder = ""
+            entries.append({"id": chat_id, "folder": rel_folder})
+        return entries
+
+    chat_entries = await asyncio.to_thread(_scan_chat_files)
 
     if not chat_entries:
         return {"chats": [], "total": 0, "has_more": False}
@@ -296,7 +301,7 @@ async def delete_chat(chat_id: str, request: Request):
     workspace = chat.meta.get("workspace", "") if chat.meta else ""
     if workspace:
         marker = Path(workspace) / ".cptr" / "chats" / f"{chat_id}.json"
-        marker.unlink(missing_ok=True)
+        await asyncio.to_thread(marker.unlink, True)  # missing_ok=True
 
     await Chat.delete(chat_id)
     return {"ok": True}
@@ -344,10 +349,10 @@ async def send_message(body: SendMessageRequest, request: Request):
         )
         # Ensure .cptr/chats/ dir exists (export will write the full JSON)
         chats_dir = Path(body.workspace) / ".cptr" / "chats"
-        chats_dir.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(lambda: chats_dir.mkdir(parents=True, exist_ok=True))
 
         # Auto-add .cptr to .gitignore if this is a git repo
-        _ensure_gitignore(body.workspace)
+        await asyncio.to_thread(_ensure_gitignore, body.workspace)
 
     # Check if the chat has an in-progress assistant message.
     # If so, queue this message instead of starting a new task.

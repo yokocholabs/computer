@@ -115,9 +115,30 @@ async def delete_workspace(request: Request, path: str = Query(...)):
 @router.get("/welcome")
 async def get_welcome(request: Request):
     """Return data for the welcome/landing page."""
+    import asyncio
+
+    system_info = await asyncio.to_thread(_collect_system_info)
+
+    # Recent workspaces from DB (most recently used first)
+    user_id = await _get_user_id(request)
+    recent: list[dict] = []
+    if user_id:
+        workspaces = await Workspace.get_by_user(user_id)
+        # Sort by updated_at descending (most recent first)
+        workspaces.sort(key=lambda ws: ws.updated_at or 0, reverse=True)
+        recent = [{"name": ws.name, "path": ws.path} for ws in workspaces[:10]]
+
+    system_info["recent"] = recent
+    return system_info
+
+
+def _collect_system_info() -> dict:
+    """Gather all system info synchronously. Called via asyncio.to_thread()."""
     import platform
     import socket
     import shutil
+    import subprocess
+    import tempfile
     import time
     from importlib.metadata import version as pkg_version
 
@@ -138,8 +159,6 @@ async def get_welcome(request: Request):
     # Memory (cross-platform)
     try:
         if platform.system() == "Darwin":
-            import subprocess
-
             result = subprocess.run(
                 ["sysctl", "-n", "hw.memsize"],
                 capture_output=True,
@@ -207,8 +226,6 @@ async def get_welcome(request: Request):
     # Uptime
     try:
         if platform.system() == "Darwin":
-            import subprocess
-
             result = subprocess.run(
                 ["sysctl", "-n", "kern.boottime"],
                 capture_output=True,
@@ -238,8 +255,6 @@ async def get_welcome(request: Request):
 
     # CPU usage
     try:
-        import subprocess
-
         if platform.system() == "Linux":
             with open("/proc/stat") as f:
                 line = f.readline()
@@ -269,8 +284,6 @@ async def get_welcome(request: Request):
 
     # Network interfaces
     try:
-        import subprocess
-
         interfaces = []
         if platform.system() == "Darwin":
             result = subprocess.run(
@@ -321,8 +334,6 @@ async def get_welcome(request: Request):
     # Top processes (by CPU)
     processes = []
     try:
-        import subprocess
-
         if platform.system() == "Darwin":
             result = subprocess.run(
                 ["ps", "-Arco", "pid,pcpu,pmem,comm"],
@@ -401,8 +412,6 @@ async def get_welcome(request: Request):
         pass
 
     # Suggested directories
-    import tempfile
-
     home = str(Path.home())
     candidates = [
         home,
@@ -433,15 +442,6 @@ async def get_welcome(request: Request):
             suggestions.append({"name": p.name or c, "path": c})
             seen.add(c)
 
-    # Recent workspaces from DB (most recently used first)
-    user_id = await _get_user_id(request)
-    recent: list[dict] = []
-    if user_id:
-        workspaces = await Workspace.get_by_user(user_id)
-        # Sort by updated_at descending (most recent first)
-        workspaces.sort(key=lambda ws: ws.updated_at or 0, reverse=True)
-        recent = [{"name": ws.name, "path": ws.path} for ws in workspaces[:10]]
-
     return {
         "hostname": hostname,
         "platform": platform.system(),
@@ -449,5 +449,4 @@ async def get_welcome(request: Request):
         "system": system,
         "processes": processes,
         "suggestions": suggestions,
-        "recent": recent,
     }

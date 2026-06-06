@@ -6,6 +6,7 @@ This function rebuilds the file from DB state.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -65,11 +66,13 @@ async def export_chat_to_file(chat_id: str) -> None:
         },
     }
 
-    chats_dir = Path(workspace) / ".cptr" / "chats"
-    chats_dir.mkdir(parents=True, exist_ok=True)
-    target = chats_dir / f"{chat_id}.json"
+    def _write():
+        chats_dir = Path(workspace) / ".cptr" / "chats"
+        chats_dir.mkdir(parents=True, exist_ok=True)
+        target = chats_dir / f"{chat_id}.json"
+        target.write_text(json.dumps(chat_data, indent=2, ensure_ascii=False))
 
     try:
-        target.write_text(json.dumps(chat_data, indent=2, ensure_ascii=False))
+        await asyncio.to_thread(_write)
     except Exception:
         logger.exception(f"Failed to export chat {chat_id}")

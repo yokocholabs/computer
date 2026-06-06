@@ -1,7 +1,13 @@
-"""Endpoints for browsing directories and managing files within the workspace."""
+"""Endpoints for browsing directories and managing files within the workspace.
+
+Security: these endpoints accept arbitrary absolute paths with no sandboxing.
+Authenticated users get full filesystem access. This is intentional for the
+single-user model. Not safe for shared or public instances. See README.md.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,9 +42,8 @@ async def list_directory(path: str = Query(..., description="Absolute path to li
     if not target.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {path}")
 
-    entries: list[FileEntry] = []
-
-    try:
+    def _scan() -> list[FileEntry]:
+        entries: list[FileEntry] = []
         for item in target.iterdir():
             try:
                 st = item.stat()
@@ -60,14 +65,16 @@ async def list_directory(path: str = Query(..., description="Absolute path to li
                     )
                 )
             except (PermissionError, OSError):
-                # Skip items we can't stat
                 entries.append(FileEntry(name=item.name, type="file"))
+        # Sort: directories first, then files, alphabetical within each group
+        type_order = {"directory": 0, "symlink": 1, "file": 2}
+        entries.sort(key=lambda e: (type_order.get(e.type, 2), e.name.lower()))
+        return entries
+
+    try:
+        entries = await asyncio.to_thread(_scan)
     except PermissionError:
         raise HTTPException(status_code=403, detail=f"Permission denied: {path}")
-
-    # Sort: directories first, then files, alphabetical within each group
-    type_order = {"directory": 0, "symlink": 1, "file": 2}
-    entries.sort(key=lambda e: (type_order.get(e.type, 2), e.name.lower()))
 
     return DirectoryListing(path=str(target), entries=entries)
 
@@ -236,32 +243,35 @@ async def read_file(path: str = Query(..., description="Absolute path to file"))
     if not target.is_file():
         raise HTTPException(status_code=400, detail=f"Not a file: {path}")
 
-    size = target.stat().st_size
+    def _read() -> FileContent:
+        size = target.stat().st_size
 
-    if size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large ({size} bytes). Max is {MAX_FILE_SIZE} bytes.",
+        if size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large ({size} bytes). Max is {MAX_FILE_SIZE} bytes.",
+            )
+
+        is_text = _is_text_file(target)
+
+        if is_text:
+            try:
+                content = target.read_text(encoding="utf-8", errors="replace")
+            except (OSError, PermissionError) as e:
+                raise HTTPException(status_code=403, detail=str(e))
+        else:
+            content = None
+
+        return FileContent(
+            path=str(target),
+            name=target.name,
+            size=size,
+            binary=not is_text,
+            content=content,
+            language=_detect_language(target.name) if is_text else None,
         )
 
-    is_text = _is_text_file(target)
-
-    if is_text:
-        try:
-            content = target.read_text(encoding="utf-8", errors="replace")
-        except (OSError, PermissionError) as e:
-            raise HTTPException(status_code=403, detail=str(e))
-    else:
-        content = None
-
-    return FileContent(
-        path=str(target),
-        name=target.name,
-        size=size,
-        binary=not is_text,
-        content=content,
-        language=_detect_language(target.name) if is_text else None,
-    )
+    return await asyncio.to_thread(_read)
 
 
 # ── File writing ─────────────────────────────────────────────────
@@ -281,13 +291,15 @@ async def write_file(req: WriteFileRequest):
     if target.exists() and not target.is_file():
         raise HTTPException(status_code=400, detail=f"Not a file: {req.path}")
 
-    try:
+    def _write() -> dict:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(req.content, encoding="utf-8")
+        return {"status": "saved", "path": str(target), "size": target.stat().st_size}
+
+    try:
+        return await asyncio.to_thread(_write)
     except (OSError, PermissionError) as e:
         raise HTTPException(status_code=403, detail=str(e))
-
-    return {"status": "saved", "path": str(target), "size": target.stat().st_size}
 
 
 # ── File search ──────────────────────────────────────────────────
@@ -339,64 +351,64 @@ async def search_files(
     if not root.exists() or not root.is_dir():
         raise HTTPException(status_code=404, detail=f"Path not found: {path}")
 
-    query_lower = query.strip().lower().replace("\\", "/")
-    # Collect all matches first, then rank
-    matches: list[tuple[int, int, SearchResult]] = []  # (score, path_len, result)
-    max_collect = limit * 10  # collect more than needed for ranking
+    def _walk_and_rank() -> list[SearchResult]:
+        query_lower = query.strip().lower().replace("\\", "/")
+        matches: list[tuple[int, int, SearchResult]] = []
+        max_collect = limit * 10
 
-    def walk(directory: Path, depth: int = 0):
-        if depth > 8 or len(matches) >= max_collect:
-            return
-        try:
-            for item in sorted(directory.iterdir(), key=lambda p: p.name.lower()):
-                if item.name in SEARCH_IGNORE_DIRS or item.name.startswith("."):
-                    continue
-                if len(matches) >= max_collect:
-                    return
+        def walk(directory: Path, depth: int = 0):
+            if depth > 8 or len(matches) >= max_collect:
+                return
+            try:
+                for item in sorted(directory.iterdir(), key=lambda p: p.name.lower()):
+                    if item.name in SEARCH_IGNORE_DIRS or item.name.startswith("."):
+                        continue
+                    if len(matches) >= max_collect:
+                        return
 
-                name_lower = item.name.lower()
-                if query_lower and query_lower in name_lower:
-                    # Score: 0 = exact, 1 = starts-with, 2 = contains
-                    if name_lower == query_lower:
-                        score = 0
-                    elif name_lower.startswith(query_lower):
-                        score = 1
-                    else:
-                        score = 2
-                    matches.append(
-                        (
-                            score,
-                            len(item.name),
-                            SearchResult(
-                                path=str(item),
-                                name=item.name,
-                                type="directory" if item.is_dir() else "file",
-                            ),
+                    name_lower = item.name.lower()
+                    if query_lower and query_lower in name_lower:
+                        if name_lower == query_lower:
+                            score = 0
+                        elif name_lower.startswith(query_lower):
+                            score = 1
+                        else:
+                            score = 2
+                        matches.append(
+                            (
+                                score,
+                                len(item.name),
+                                SearchResult(
+                                    path=str(item),
+                                    name=item.name,
+                                    type="directory" if item.is_dir() else "file",
+                                ),
+                            )
                         )
-                    )
-                elif not query_lower:
-                    # Empty query: return top-level files
-                    matches.append(
-                        (
-                            2,
-                            len(item.name),
-                            SearchResult(
-                                path=str(item),
-                                name=item.name,
-                                type="directory" if item.is_dir() else "file",
-                            ),
+                    elif not query_lower:
+                        matches.append(
+                            (
+                                2,
+                                len(item.name),
+                                SearchResult(
+                                    path=str(item),
+                                    name=item.name,
+                                    type="directory" if item.is_dir() else "file",
+                                ),
+                            )
                         )
-                    )
 
-                if item.is_dir():
-                    walk(item, depth + 1)
-        except (PermissionError, OSError):
-            pass
+                    if item.is_dir():
+                        walk(item, depth + 1)
+            except (PermissionError, OSError):
+                pass
 
-    walk(root)
-    # Sort by score (lower = better), then by name length (shorter = better)
-    matches.sort(key=lambda m: (m[0], m[1]))
-    return SearchResponse(results=[m[2] for m in matches[:limit]])
+        walk(root)
+        matches.sort(key=lambda m: (m[0], m[1]))
+        return [m[2] for m in matches[:limit]]
+
+    results = await asyncio.to_thread(_walk_and_rank)
+    return SearchResponse(results=results)
 
 
 # ── File management ──────────────────────────────────────────────
@@ -415,12 +427,15 @@ async def create_item(req: CreateRequest):
     if target.exists():
         raise HTTPException(status_code=409, detail=f"Already exists: {req.path}")
 
-    try:
+    def _create():
         if req.type == "directory":
             target.mkdir(parents=True, exist_ok=True)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.touch()
+
+    try:
+        await asyncio.to_thread(_create)
     except (OSError, PermissionError) as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -449,7 +464,7 @@ async def move_item(req: MoveRequest):
         raise HTTPException(status_code=409, detail=f"Destination exists: {dst}")
 
     try:
-        src.rename(dst)
+        await asyncio.to_thread(src.rename, dst)
     except (OSError, PermissionError) as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -470,11 +485,14 @@ async def delete_item(req: DeleteRequest):
     if not target.exists():
         raise HTTPException(status_code=404, detail=f"Not found: {req.path}")
 
-    try:
+    def _delete():
         if target.is_dir():
             shutil.rmtree(target)
         else:
             target.unlink()
+
+    try:
+        await asyncio.to_thread(_delete)
     except (OSError, PermissionError) as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -498,7 +516,7 @@ async def upload_file(
     target = target_dir / file.filename
     try:
         content = await file.read()
-        target.write_bytes(content)
+        await asyncio.to_thread(target.write_bytes, content)
     except (OSError, PermissionError) as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -574,23 +592,25 @@ async def archive_files(req: ArchiveRequest):
     if not req.paths:
         raise HTTPException(status_code=400, detail="No paths provided")
 
-    buf = io.BytesIO()
+    def _build_archive() -> io.BytesIO:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for raw_path in req.paths:
+                target = Path(raw_path).resolve()
+                if not target.exists():
+                    continue
 
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for raw_path in req.paths:
-            target = Path(raw_path).resolve()
-            if not target.exists():
-                continue
+                if target.is_file():
+                    zf.write(target, target.name)
+                elif target.is_dir():
+                    for child in target.rglob("*"):
+                        if child.is_file():
+                            arcname = str(child.relative_to(target.parent))
+                            zf.write(child, arcname)
+        buf.seek(0)
+        return buf
 
-            if target.is_file():
-                zf.write(target, target.name)
-            elif target.is_dir():
-                for child in target.rglob("*"):
-                    if child.is_file():
-                        arcname = str(child.relative_to(target.parent))
-                        zf.write(child, arcname)
-
-    buf.seek(0)
+    buf = await asyncio.to_thread(_build_archive)
 
     # Derive a sensible filename
     if len(req.paths) == 1:
