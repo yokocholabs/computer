@@ -219,7 +219,7 @@
 		</div>
 
 		<!-- Settings - pinned bottom -->
-		<div class="relative px-1.5 pb-1.5 shrink-0">
+		<div class="relative px-1.5 pb-0.5 shrink-0">
 
 			<button
 				bind:this={menuButtonEl}

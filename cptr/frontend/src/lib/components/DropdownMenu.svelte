@@ -131,7 +131,7 @@
 				<div class="h-px bg-gray-100/50 dark:bg-white/3 mx-1 my-0.5"></div>
 			{:else}
 				<button
-					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs transition-colors duration-75
+					class="flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs transition-colors duration-75
 						{item.active ? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
 					onclick={() => { item.onclick(); onclose(); }}
 				>

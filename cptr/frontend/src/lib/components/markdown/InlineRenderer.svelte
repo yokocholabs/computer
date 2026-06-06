@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Token } from 'marked';
+	import { openFileTab } from '$lib/stores';
 
 	interface Props {
 		items: Token[];
@@ -53,13 +54,31 @@
 		>{('text' in item) ? item.text : item.raw}</code>
 
 	{:else if item.type === 'link'}
-		<a href={('href' in item) ? item.href : '#'} target="_blank" rel="noopener noreferrer">
-			{#if 'tokens' in item && item.tokens}
-				<svelte:self items={item.tokens} />
-			{:else}
-				{('text' in item) ? item.text : item.raw}
-			{/if}
-		</a>
+		{@const href = ('href' in item) ? item.href : ''}
+		{#if href?.startsWith('file:///')}
+			{@const filePath = decodeURIComponent(href.replace('file://', ''))}
+			{@const fileName = filePath.split('/').pop() || filePath}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<button
+				class="inline-flex items-center gap-1 px-1.5 py-px rounded-md text-[13px] leading-snug font-medium cursor-pointer border-none bg-blue-500/10 text-blue-500 dark:text-blue-400 hover:bg-blue-500/12 transition-colors align-baseline"
+				title={filePath}
+				onclick={(e) => { e.preventDefault(); openFileTab(filePath); }}
+			>
+				<svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M9 1.5H4a1.5 1.5 0 0 0-1.5 1.5v10A1.5 1.5 0 0 0 4 14.5h8a1.5 1.5 0 0 0 1.5-1.5V6L9 1.5Z" />
+					<path d="M9 1.5V6h4.5" />
+				</svg>
+				{fileName}
+			</button>
+		{:else}
+			<a href={href || '#'} target="_blank" rel="noopener noreferrer">
+				{#if 'tokens' in item && item.tokens}
+					<svelte:self items={item.tokens} />
+				{:else}
+					{('text' in item) ? item.text : item.raw}
+				{/if}
+			</a>
+		{/if}
 
 	{:else if item.type === 'image'}
 		<img
@@ -82,3 +101,5 @@
 		{/if}
 	{/if}
 {/each}
+
+
