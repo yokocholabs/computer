@@ -39,17 +39,17 @@
 	{#if items.length === 0}
 		<div class="px-3 py-2 text-xs text-gray-400 dark:text-gray-600">No files found</div>
 	{:else}
-		<div class="text-[10px] font-medium text-gray-400 dark:text-gray-600 px-2.5 pt-1.5 pb-0.5">
+		<div class="text-[10px] text-gray-400 dark:text-gray-600 px-2.5 pt-1.5 pb-0.5">
 			Files
 		</div>
 		<div bind:this={listEl}>
 			{#each items as item, i (item.id)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<button
-					class="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-left transition-colors duration-75
+					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-left transition-colors duration-75
 						{i === selectedIndex
-						? 'bg-gray-50 dark:bg-white/8 text-gray-900 dark:text-white'
-						: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/4'}"
+						? 'bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white'
+						: 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
 					onmousedown={(e) => {
 						e.preventDefault();
 						onselect(i);
@@ -64,9 +64,7 @@
 						<Icon name={fileIconName(item.label, item.type)} size={12} />
 					</span>
 					<span class="flex-1 min-w-0 flex items-baseline gap-1.5 overflow-hidden">
-						<span class="text-xs font-medium truncate text-gray-900 dark:text-gray-200"
-							>{item.label}</span
-						>
+						<span class="truncate">{item.label}</span>
 						{#if relativePath(item.id)}
 							<span class="text-[10px] text-gray-400 dark:text-gray-600 truncate shrink-0"
 								>{relativePath(item.id)}</span
