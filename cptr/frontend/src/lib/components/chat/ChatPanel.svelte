@@ -24,7 +24,12 @@
 	import { socketStore } from '$lib/stores/socket.svelte';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { get } from 'svelte/store';
-	import { currentWorkspace, toolApprovalMode, streamingBehavior, selectedModelId } from '$lib/stores';
+	import {
+		currentWorkspace,
+		toolApprovalMode,
+		streamingBehavior,
+		selectedModelId
+	} from '$lib/stores';
 
 	import ChatInput from './ChatInput.svelte';
 	import UserMessage from './UserMessage.svelte';
@@ -107,8 +112,8 @@
 		const effectiveId =
 			currentMessageId && msgMap.has(currentMessageId)
 				? currentMessageId
-				: allMessages.length > 0
-					? allMessages[allMessages.length - 1].id
+				: displayMessages.length > 0
+					? displayMessages[displayMessages.length - 1].id
 					: null;
 
 		if (!effectiveId) return [];
@@ -203,8 +208,11 @@
 
 	// ── Load chat from DB ───────────────────────────────────────
 
+	let loadGeneration = 0;
+
 	async function loadChat(id: string) {
 		chatId = id;
+		const gen = ++loadGeneration;
 		// Only show loading spinner on initial load (no messages yet).
 		// On reloads (e.g. after cancel/done), keep the DOM intact to preserve scroll position.
 		const isInitialLoad = allMessages.length === 0;
@@ -215,10 +223,12 @@
 
 		try {
 			const data = await getChat(id);
+			// Discard stale response if a newer loadChat was called while we waited
+			if (gen !== loadGeneration) return;
 			allMessages = data.messages;
 			currentMessageId = data.chat.current_message_id;
 		} finally {
-			if (isInitialLoad) loading = false;
+			if (isInitialLoad && gen === loadGeneration) loading = false;
 		}
 
 		// On reloads, restore scroll position after the DOM re-renders.
@@ -347,6 +357,12 @@
 				cancelledMessageId = null;
 				return;
 			}
+
+			// Mark done optimistically, but keep the streamed content visible until
+			// the DB reload returns. This avoids a transient blank message if the
+			// final `done` socket event beats the commit/read path.
+			msg.done = true;
+			allMessages = [...allMessages];
 			loadChat(data.chat_id);
 		}
 	}

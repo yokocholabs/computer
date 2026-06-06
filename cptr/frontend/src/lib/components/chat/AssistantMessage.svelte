@@ -196,6 +196,20 @@
 
 	type DisplayItem = ToolGroup | MessageItem | ArtifactItem;
 
+	const outputText = $derived.by((): string => {
+		return (output || [])
+			.filter((i: any) => i.type === 'message')
+			.flatMap((i: any) => i.content || [])
+			.map((c: any) => c.text || '')
+			.join('');
+	});
+
+	const unrenderedContent = $derived.by((): string => {
+		if (!content) return '';
+		if (!outputText) return content;
+		return content.startsWith(outputText) ? content.slice(outputText.length) : '';
+	});
+
 	const displayItems = $derived.by((): DisplayItem[] => {
 		if (!output?.length) return [];
 
@@ -317,6 +331,9 @@
 					class="inline-block w-[2px] h-3.5 bg-gray-400 dark:bg-gray-500 ml-0.5 animate-pulse align-text-bottom"
 				></span>
 			{:else}
+				{#if done && displayItems.length === 0 && content}
+					<MarkdownRenderer {content} />
+				{/if}
 				{#each displayItems as displayItem, groupIdx}
 					{#if displayItem.type === 'message_item'}
 						<MarkdownRenderer
@@ -805,15 +822,11 @@
 						</div>
 					{/if}
 				{/each}
-				{#if !done}
-					{@const flushedText = (output || [])
-						.filter((i: any) => i.type === 'message')
-						.flatMap((i: any) => i.content || [])
-						.map((c: any) => c.text)
-						.join('')}
-					{@const pendingText = content.slice(flushedText.length)}
-					{#if pendingText}
-						<MarkdownRenderer content={pendingText} />
+				{#if done && unrenderedContent && displayItems.length > 0}
+					<MarkdownRenderer content={unrenderedContent} />
+				{:else if !done}
+					{#if unrenderedContent}
+						<MarkdownRenderer content={unrenderedContent} />
 					{/if}
 					<span
 						class="inline-block w-[2px] h-3.5 bg-gray-400 dark:bg-gray-500 ml-0.5 animate-pulse align-text-bottom"

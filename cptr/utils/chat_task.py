@@ -547,6 +547,7 @@ async def run_chat_task(
         }
         output_items.append(item)
         text_buffer = ""
+        _sync_state()
         return item
 
     def _sync_state():
@@ -660,6 +661,11 @@ async def run_chat_task(
                             await emit(output=artifact_item)
                             _sync_state()
 
+                        # Persist intermediate state so content survives crashes/errors
+                        await ChatMessage.update(
+                            message_id, content=content, output=output_items
+                        )
+
                         # Append to messages for next iteration
                         _append_tool_to_messages(messages, event, result, provider)
                         restart = True
@@ -678,6 +684,7 @@ async def run_chat_task(
                         if flushed_item:
                             await emit(output=flushed_item)
                         await emit(output=item)
+                        _task_state.pop(message_id, None)
                         await emit(done=True)
                         return
 
@@ -698,6 +705,7 @@ async def run_chat_task(
                         usage=usage,
                         done=True,
                     )
+                    _task_state.pop(message_id, None)
                     await emit(done=True)
                     return
 
@@ -706,7 +714,9 @@ async def run_chat_task(
                     pass
 
             if not restart:
-                _flush_text()
+                flushed_item = _flush_text()
+                if flushed_item:
+                    await emit(output=flushed_item)
                 logger.info(
                     "[task %s] save (end): content=%d chars, output=%d items, types=%s",
                     message_id[:8],
@@ -720,6 +730,7 @@ async def run_chat_task(
                     output=output_items,
                     done=True,
                 )
+                _task_state.pop(message_id, None)
                 await emit(done=True)
                 return
 
@@ -731,14 +742,17 @@ async def run_chat_task(
             done=True,
             meta={"error": "max iterations reached"},
         )
+        _task_state.pop(message_id, None)
         await emit(done=True)
 
     except asyncio.CancelledError:
         _flush_text()
         await ChatMessage.update(message_id, content=content, output=output_items, done=True)
+        _task_state.pop(message_id, None)
         await emit(done=True)
     except Exception as e:
         logger.exception(f"Chat task error for message {message_id}")
+        _flush_text()
         await ChatMessage.update(
             message_id,
             content=content,
@@ -746,6 +760,7 @@ async def run_chat_task(
             done=True,
             meta={"error": str(e)},
         )
+        _task_state.pop(message_id, None)
         await emit(done=True)
     finally:
         _tasks.pop(message_id, None)

@@ -8,12 +8,14 @@ type hints + docstrings via inspect. The LLM never sees the
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import inspect
 import json
 import os
+import re
 import uuid
 from pathlib import Path
-from typing import get_type_hints
+from typing import Callable, Optional, Pattern, get_type_hints
 from cptr.env import CHAT_TOOL_COMMAND_MAX_CHARS, CHAT_TOOL_MAX_CHARS
 
 
@@ -250,6 +252,22 @@ async def _search_rg(
 
 async def _search_python(query: str, full: Path, case_insensitive: bool) -> str:
     """Fallback search using pure Python (when ripgrep not installed)."""
+
+    def _read_text_for_search(fpath: Path) -> str | None:
+        """Read a file for searching, skipping binary-looking files.
+
+        Match ripgrep's default binary handling closely enough for the fallback:
+        files containing NUL bytes are treated as binary and are not decoded or
+        returned as replacement-character text.
+        """
+        try:
+            data = fpath.read_bytes()
+        except (OSError, PermissionError):
+            return None
+        if b"\0" in data:
+            return None
+        return data.decode(errors="replace")
+
     def _walk_and_search():
         results = []
         ignore = {".git", "node_modules", "__pycache__", ".venv", "venv"}
@@ -259,9 +277,8 @@ async def _search_python(query: str, full: Path, case_insensitive: bool) -> str:
             dirs[:] = [d for d in dirs if d not in ignore]
             for fname in files:
                 fpath = Path(root) / fname
-                try:
-                    text = fpath.read_text(errors="replace")
-                except (OSError, PermissionError):
+                text = _read_text_for_search(fpath)
+                if text is None:
                     continue
                 for i, line in enumerate(text.splitlines(), 1):
                     target = line.lower() if case_insensitive else line
