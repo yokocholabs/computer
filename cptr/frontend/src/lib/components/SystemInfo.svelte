@@ -50,7 +50,9 @@
 		const parts: string[] = [];
 		if (sys.cpu_usage != null) parts.push(`cpu ${sys.cpu_usage}%`);
 		if (sys.memory_total) {
-			const memPct = Math.round(((sys.memory_total - (sys.memory_available ?? 0)) / sys.memory_total) * 100);
+			const memPct = Math.round(
+				((sys.memory_total - (sys.memory_available ?? 0)) / sys.memory_total) * 100
+			);
 			parts.push(`mem ${memPct}%`);
 		}
 		if (sys.disk_total) {
@@ -68,10 +70,15 @@
 			<div>
 				<div class="flex items-center justify-between mb-1">
 					<span class="text-[11px] text-gray-500 dark:text-gray-500">{$t('system.cpu')}</span>
-					<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono">{sys.cpu_usage}%</span>
+					<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
+						>{sys.cpu_usage}%</span
+					>
 				</div>
 				<div class="h-1.5 rounded-full bg-gray-100 dark:bg-white/6 overflow-hidden">
-					<div class="h-full rounded-full bg-gray-400 dark:bg-gray-500 transition-all" style="width: {sys.cpu_usage}%"></div>
+					<div
+						class="h-full rounded-full bg-gray-400 dark:bg-gray-500 transition-all"
+						style="width: {sys.cpu_usage}%"
+					></div>
 				</div>
 			</div>
 		{/if}
@@ -82,10 +89,15 @@
 			<div>
 				<div class="flex items-center justify-between mb-1">
 					<span class="text-[11px] text-gray-500 dark:text-gray-500">{$t('system.memory')}</span>
-					<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono">{formatBytes(memUsed)} / {formatBytes(sys.memory_total)}</span>
+					<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
+						>{formatBytes(memUsed)} / {formatBytes(sys.memory_total)}</span
+					>
 				</div>
 				<div class="h-1.5 rounded-full bg-gray-100 dark:bg-white/6 overflow-hidden">
-					<div class="h-full rounded-full bg-gray-400 dark:bg-gray-500 transition-all" style="width: {memPct}%"></div>
+					<div
+						class="h-full rounded-full bg-gray-400 dark:bg-gray-500 transition-all"
+						style="width: {memPct}%"
+					></div>
 				</div>
 			</div>
 		{/if}
@@ -95,10 +107,15 @@
 			<div>
 				<div class="flex items-center justify-between mb-1">
 					<span class="text-[11px] text-gray-500 dark:text-gray-500">{$t('system.disk')}</span>
-					<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono">{formatBytes(sys.disk_used ?? 0)} / {formatBytes(sys.disk_total)}</span>
+					<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
+						>{formatBytes(sys.disk_used ?? 0)} / {formatBytes(sys.disk_total)}</span
+					>
 				</div>
 				<div class="h-1.5 rounded-full bg-gray-100 dark:bg-white/6 overflow-hidden">
-					<div class="h-full rounded-full bg-gray-400 dark:bg-gray-500 transition-all" style="width: {diskPct}%"></div>
+					<div
+						class="h-full rounded-full bg-gray-400 dark:bg-gray-500 transition-all"
+						style="width: {diskPct}%"
+					></div>
 				</div>
 			</div>
 		{/if}
@@ -115,7 +132,9 @@
 		</div>
 
 		{#if sys.network?.length}
-			<div class="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-gray-400 dark:text-gray-600">
+			<div
+				class="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-gray-400 dark:text-gray-600"
+			>
 				{#each sys.network as iface}
 					<span>{iface.name} {iface.ip}</span>
 				{/each}
@@ -131,7 +150,9 @@
 				</div>
 				{#each processes as proc}
 					<div class="flex items-center gap-2 text-gray-500 dark:text-gray-500 py-px">
-						<span class="w-14 text-right text-gray-700 dark:text-gray-300">{proc.cpu.toFixed(1)}%</span>
+						<span class="w-14 text-right text-gray-700 dark:text-gray-300"
+							>{proc.cpu.toFixed(1)}%</span
+						>
 						<span class="w-12 text-right">{proc.mem.toFixed(1)}%</span>
 						<span class="flex-1 truncate">{proc.name}</span>
 					</div>

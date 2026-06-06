@@ -25,7 +25,7 @@
 		onpagechange,
 		sortBy = 'updated_at',
 		sortDir = 'desc',
-		onsort,
+		onsort
 	}: Props = $props();
 
 	let menuChatId = $state<string | null>(null);
@@ -58,13 +58,29 @@
 </script>
 
 {#snippet chevronUp()}
-	<svg class="w-2 h-2" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+	<svg
+		class="w-2 h-2"
+		viewBox="0 0 10 6"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
 		<path d="M1 5L5 1L9 5" />
 	</svg>
 {/snippet}
 
 {#snippet chevronDown()}
-	<svg class="w-2 h-2" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+	<svg
+		class="w-2 h-2"
+		viewBox="0 0 10 6"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
 		<path d="M1 1L5 5L9 1" />
 	</svg>
 {/snippet}
@@ -73,7 +89,9 @@
 	<div class="w-full mt-4 pt-2">
 		<!-- Sort header -->
 		{#if onsort}
-			<div class="flex items-center text-[10px] font-medium text-gray-400 dark:text-gray-600 mb-1 px-2 select-none">
+			<div
+				class="flex items-center text-[10px] font-medium text-gray-400 dark:text-gray-600 mb-1 px-2 select-none"
+			>
 				<button
 					class="flex-1 flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
 					onclick={() => onsort?.('title')}
@@ -114,10 +132,14 @@
 				role="button"
 				tabindex="0"
 				onclick={() => onopen(chat.id)}
-				onkeydown={(e) => { if (e.key === 'Enter') onopen(chat.id); }}
+				onkeydown={(e) => {
+					if (e.key === 'Enter') onopen(chat.id);
+				}}
 			>
 				<span class="flex-1 text-xs text-gray-500 dark:text-gray-500 truncate">{chat.title}</span>
-				<span class="text-[10px] text-gray-300 dark:text-gray-700 shrink-0">{formatTime(chat.updated_at)}</span>
+				<span class="text-[10px] text-gray-300 dark:text-gray-700 shrink-0"
+					>{formatTime(chat.updated_at)}</span
+				>
 				<button
 					class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 transition-all duration-75"
 					onclick={(e) => openMenu(e, chat.id)}
@@ -142,7 +164,13 @@
 		anchor={menuAnchor}
 		align="end"
 		items={[
-			{ label: 'Delete', icon: 'trash', onclick: () => { if (menuChatId) ondelete(menuChatId); } },
+			{
+				label: 'Delete',
+				icon: 'trash',
+				onclick: () => {
+					if (menuChatId) ondelete(menuChatId);
+				}
+			}
 		]}
 		onclose={closeMenu}
 	/>

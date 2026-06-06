@@ -3,6 +3,7 @@
 Revision ID: 001
 Create Date: 2026-05-28
 """
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -74,7 +75,13 @@ def upgrade() -> None:
     op.create_table(
         "chat_message",
         sa.Column("id", sa.Text, primary_key=True),
-        sa.Column("chat_id", sa.Text, sa.ForeignKey("chat.id", ondelete="CASCADE"), nullable=False, index=True),
+        sa.Column(
+            "chat_id",
+            sa.Text,
+            sa.ForeignKey("chat.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("parent_id", sa.Text, nullable=True),
         sa.Column("role", sa.Text, nullable=False),
         sa.Column("content", sa.Text, nullable=False),
@@ -97,6 +104,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.BigInteger, nullable=True),
         sa.UniqueConstraint("user_id", "path", name="uq_workspace_user_path"),
     )
+
 
 def downgrade() -> None:
     op.drop_table("workspaces")

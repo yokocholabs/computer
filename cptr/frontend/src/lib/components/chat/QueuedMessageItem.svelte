@@ -12,7 +12,15 @@
 <div class="flex items-center gap-2 px-2 py-1">
 	<!-- Queue indicator: reply/forward arrow -->
 	<div class="shrink-0 text-gray-400 dark:text-gray-600">
-		<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+		<svg
+			class="w-3 h-3"
+			fill="none"
+			stroke="currentColor"
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
 			<path d="M13.25 19.25L16.75 15.75L13.25 12.25" />
 			<path d="M16.75 15.75H10.75C8.54086 15.75 6.75 13.9591 6.75 11.75V7.5" />
 		</svg>
@@ -30,7 +38,15 @@
 			title="Send now"
 			onclick={() => onsendnow(id)}
 		>
-			<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				class="w-3 h-3"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
 			</svg>
 		</button>
@@ -41,8 +57,18 @@
 			title="Edit"
 			onclick={() => onedit(id)}
 		>
-			<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+			<svg
+				class="w-3 h-3"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path
+					d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+				/>
 			</svg>
 		</button>
 		<!-- Remove -->
@@ -52,7 +78,15 @@
 			title="Remove"
 			onclick={() => ondelete(id)}
 		>
-			<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				class="w-3 h-3"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M6 18L18 6M6 6l12 12" />
 			</svg>
 		</button>

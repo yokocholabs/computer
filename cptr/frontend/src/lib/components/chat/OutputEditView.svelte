@@ -234,7 +234,9 @@
 				<div class="flex gap-2 group">
 					<!-- Role label -->
 					<div class="flex items-start pt-1.5">
-						<div class="text-[11px] font-semibold uppercase tracking-wide min-w-[4.5rem] text-gray-400 dark:text-gray-500">
+						<div
+							class="text-[11px] font-semibold uppercase tracking-wide min-w-[4.5rem] text-gray-400 dark:text-gray-500"
+						>
 							{getItemLabel(di)}
 						</div>
 					</div>
@@ -268,10 +270,18 @@
 						{:else if di.type === 'function_call'}
 							<div class="text-sm p-1.5 text-gray-500 dark:text-gray-400">
 								{#if di.item.arguments}
-									<pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto pb-0.5">{formatArgs(di.item.arguments)}</pre>
+									<pre
+										class="text-xs font-mono whitespace-pre-wrap overflow-x-auto pb-0.5">{formatArgs(
+											di.item.arguments
+										)}</pre>
 								{/if}
 								{#if di.outputItem}
-									<pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto mt-1 max-h-32 overflow-y-auto">{JSON.stringify(di.outputItem.output, null, 2)}</pre>
+									<pre
+										class="text-xs font-mono whitespace-pre-wrap overflow-x-auto mt-1 max-h-32 overflow-y-auto">{JSON.stringify(
+											di.outputItem.output,
+											null,
+											2
+										)}</pre>
 								{/if}
 							</div>
 						{/if}
@@ -283,8 +293,19 @@
 							class="invisible group-hover:visible p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition rounded-lg"
 							onclick={() => deleteIndices(di.indices)}
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="2"
+								stroke="currentColor"
+								class="w-4 h-4"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+								/>
 							</svg>
 						</button>
 					</div>
@@ -292,9 +313,7 @@
 			{/each}
 
 			{#if displayItems.length === 0}
-				<div class="text-sm text-gray-400 dark:text-gray-500 italic px-1">
-					No output items
-				</div>
+				<div class="text-sm text-gray-400 dark:text-gray-500 italic px-1">No output items</div>
 			{/if}
 		</div>
 	{/if}

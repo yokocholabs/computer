@@ -7,8 +7,7 @@ import 'tippy.js/dist/tippy.css';
  *    or: <button use:tooltip={{ content: 'New terminal', placement: 'bottom' }}>
  */
 export function tooltip(node: HTMLElement, params: string | Partial<TippyProps>) {
-	const opts: Partial<TippyProps> =
-		typeof params === 'string' ? { content: params } : params;
+	const opts: Partial<TippyProps> = typeof params === 'string' ? { content: params } : params;
 
 	const instance = tippy(node, {
 		arrow: false,
@@ -17,7 +16,7 @@ export function tooltip(node: HTMLElement, params: string | Partial<TippyProps>)
 		placement: 'bottom',
 		theme: 'cptr',
 		touch: false,
-		...opts,
+		...opts
 	});
 
 	return {
@@ -27,6 +26,6 @@ export function tooltip(node: HTMLElement, params: string | Partial<TippyProps>)
 		},
 		destroy() {
 			instance.destroy();
-		},
+		}
 	};
 }

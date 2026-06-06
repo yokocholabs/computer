@@ -15,7 +15,7 @@ function connect() {
 	socket = io({
 		reconnection: true,
 		reconnectionDelay: 1000,
-		withCredentials: true,
+		withCredentials: true
 	});
 
 	socket.on('connect', () => {

@@ -15,6 +15,7 @@ class Config(Base):
     Keys use dot-notation: auth.signup_enabled, ai.default_model, etc.
     Values are JSON (booleans, strings, numbers, objects, arrays).
     """
+
     __tablename__ = "config"
 
     key = Column(Text, primary_key=True)
@@ -41,9 +42,7 @@ class Config(Base):
     async def get_namespace(namespace: str) -> dict:
         """Get all config keys under a namespace (e.g. 'auth' → 'auth.*')."""
         async with await get_db() as db:
-            result = await db.execute(
-                select(Config).where(Config.key.like(f"{namespace}.%"))
-            )
+            result = await db.execute(select(Config).where(Config.key.like(f"{namespace}.%")))
             return {row.key: row.value for row in result.scalars().all()}
 
     @staticmethod

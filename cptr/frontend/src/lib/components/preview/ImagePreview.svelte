@@ -76,16 +76,34 @@
 
 	<div class="zoom-toolbar">
 		<button class="zoom-btn" onclick={zoomOut} aria-label="Zoom out">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-				<path fill-rule="evenodd" d="M4 10a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H4.75A.75.75 0 0 1 4 10Z" clip-rule="evenodd" />
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox="0 0 20 20"
+				fill="currentColor"
+				width="14"
+				height="14"
+			>
+				<path
+					fill-rule="evenodd"
+					d="M4 10a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H4.75A.75.75 0 0 1 4 10Z"
+					clip-rule="evenodd"
+				/>
 			</svg>
 		</button>
 		<button class="zoom-level" onclick={resetView} aria-label="Reset zoom">
 			{Math.round(zoomLevel * 100)}%
 		</button>
 		<button class="zoom-btn" onclick={zoomIn} aria-label="Zoom in">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-				<path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox="0 0 20 20"
+				fill="currentColor"
+				width="14"
+				height="14"
+			>
+				<path
+					d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"
+				/>
 			</svg>
 		</button>
 	</div>
@@ -99,17 +117,13 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		background: repeating-conic-gradient(
-			var(--color-gray-100) 0% 25%,
-			transparent 0% 50%
-		) 50% / 16px 16px;
+		background: repeating-conic-gradient(var(--color-gray-100) 0% 25%, transparent 0% 50%) 50% /
+			16px 16px;
 	}
 
 	:global(.dark) .image-preview {
-		background: repeating-conic-gradient(
-			rgba(255, 255, 255, 0.04) 0% 25%,
-			transparent 0% 50%
-		) 50% / 16px 16px;
+		background: repeating-conic-gradient(rgba(255, 255, 255, 0.04) 0% 25%, transparent 0% 50%) 50% /
+			16px 16px;
 	}
 
 	.image-content {

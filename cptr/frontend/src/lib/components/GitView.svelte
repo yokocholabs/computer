@@ -65,7 +65,7 @@
 		error = '';
 
 		try {
-			const status = await getGitStatus(root) as GitStatus;
+			const status = (await getGitStatus(root)) as GitStatus;
 			if (seq !== loadSeq || root !== workspacePath) return;
 
 			gitStatus = status;
@@ -75,35 +75,37 @@
 			}
 
 			const previousExpansion = new Map(reviewFiles.map((file) => [file.key, file.expanded]));
-			const nextFiles = await Promise.all((status.files ?? []).map(async (file) => {
-				const params = new URLSearchParams({
-					root,
-					file: file.path,
-					staged: String(file.staged),
-				});
-				if (file.status === 'untracked') params.set('untracked', 'true');
+			const nextFiles = await Promise.all(
+				(status.files ?? []).map(async (file) => {
+					const params = new URLSearchParams({
+						root,
+						file: file.path,
+						staged: String(file.staged)
+					});
+					if (file.status === 'untracked') params.set('untracked', 'true');
 
-				let diffFiles: DiffFile[] = [];
-				try {
-					const diff = await getGitDiff(params.toString()) as { files?: DiffFile[] };
-					diffFiles = diff.files ?? [];
-				} catch {
-					diffFiles = [];
-				}
+					let diffFiles: DiffFile[] = [];
+					try {
+						const diff = (await getGitDiff(params.toString())) as { files?: DiffFile[] };
+						diffFiles = diff.files ?? [];
+					} catch {
+						diffFiles = [];
+					}
 
-				const counts = countDiff(diffFiles);
-				const key = fileKey(file);
-				return {
-					key,
-					path: file.path,
-					status: file.status,
-					staged: file.staged,
-					diffFiles,
-					additions: counts.additions,
-					deletions: counts.deletions,
-					expanded: previousExpansion.get(key) ?? true,
-				};
-			}));
+					const counts = countDiff(diffFiles);
+					const key = fileKey(file);
+					return {
+						key,
+						path: file.path,
+						status: file.status,
+						staged: file.staged,
+						diffFiles,
+						additions: counts.additions,
+						deletions: counts.deletions,
+						expanded: previousExpansion.get(key) ?? true
+					};
+				})
+			);
 
 			if (seq !== loadSeq || root !== workspacePath) return;
 			reviewFiles = nextFiles;
@@ -149,7 +151,6 @@
 		reviewFiles = reviewFiles.map((file) => ({ ...file, expanded: expand }));
 	}
 
-
 	function openFile(path: string) {
 		const fullPath = workspacePath.replace(/\/$/, '') + '/' + path;
 		openFileTab(fullPath);
@@ -187,7 +188,7 @@
 		const match = header.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
 		return {
 			oldStart: match ? Number(match[1]) : 0,
-			newStart: match ? Number(match[2]) : 0,
+			newStart: match ? Number(match[2]) : 0
 		};
 	}
 
@@ -260,10 +261,14 @@
 	}
 </script>
 
-<div class="flex h-full flex-col overflow-hidden bg-white text-gray-900 dark:bg-black dark:text-gray-100">
+<div
+	class="flex h-full flex-col overflow-hidden bg-white text-gray-900 dark:bg-black dark:text-gray-100"
+>
 	{#if loading && !gitStatus}
 		<div class="flex h-full items-center justify-center">
-			<div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400"></div>
+			<div
+				class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400"
+			></div>
 		</div>
 	{:else if error && !gitStatus}
 		<div class="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -277,22 +282,34 @@
 			<p class="text-xs text-gray-400 dark:text-gray-600">Not a git repository</p>
 		</div>
 	{:else}
-		<header class="flex h-9 shrink-0 items-center gap-2 border-b border-gray-200 px-3 dark:border-white/6">
+		<header
+			class="flex h-9 shrink-0 items-center gap-2 border-b border-gray-200 px-3 dark:border-white/6"
+		>
 			<div class="flex min-w-0 flex-1 items-center gap-1.5">
 				<Icon name="git-branch" size={14} class="shrink-0 text-gray-400 dark:text-gray-600" />
-				<span class="truncate font-mono text-xs font-medium text-gray-700 dark:text-gray-300">{gitStatus.branch || 'HEAD'}</span>
+				<span class="truncate font-mono text-xs font-medium text-gray-700 dark:text-gray-300"
+					>{gitStatus.branch || 'HEAD'}</span
+				>
 				{#if gitStatus.upstream}
 					<Icon name="chevron-right" size={12} class="shrink-0 text-gray-300 dark:text-gray-700" />
-					<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">{gitStatus.upstream}</span>
+					<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600"
+						>{gitStatus.upstream}</span
+					>
 				{/if}
 				{#if gitStatus.ahead > 0}
-					<span class="font-mono text-[10px] text-gray-400 dark:text-gray-600">+{gitStatus.ahead}</span>
+					<span class="font-mono text-[10px] text-gray-400 dark:text-gray-600"
+						>+{gitStatus.ahead}</span
+					>
 				{/if}
 				{#if gitStatus.behind > 0}
-					<span class="font-mono text-[10px] text-gray-400 dark:text-gray-600">-{gitStatus.behind}</span>
+					<span class="font-mono text-[10px] text-gray-400 dark:text-gray-600"
+						>-{gitStatus.behind}</span
+					>
 				{/if}
 				{#if totalChanges > 0}
-					<span class="ml-1 font-mono text-[10px] text-gray-400 dark:text-gray-600">{totalChanges} changed</span>
+					<span class="ml-1 font-mono text-[10px] text-gray-400 dark:text-gray-600"
+						>{totalChanges} changed</span
+					>
 				{/if}
 			</div>
 
@@ -308,7 +325,9 @@
 		</header>
 
 		{#if totalChanges > 0}
-			<div class="flex h-8 shrink-0 items-center gap-2 border-b border-gray-200 px-3 dark:border-white/6">
+			<div
+				class="flex h-8 shrink-0 items-center gap-2 border-b border-gray-200 px-3 dark:border-white/6"
+			>
 				<button
 					class="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/6 dark:hover:text-gray-300"
 					onclick={toggleAll}
@@ -317,7 +336,9 @@
 					<span>{anyExpanded ? 'Collapse All' : 'Expand All'}</span>
 				</button>
 				<span class="text-[11px] text-gray-500 dark:text-gray-400">Uncommitted</span>
-				<span class="ml-auto text-[11px] text-gray-400 dark:text-gray-600">{totalChanges} {totalChanges === 1 ? 'change' : 'changes'}</span>
+				<span class="ml-auto text-[11px] text-gray-400 dark:text-gray-600"
+					>{totalChanges} {totalChanges === 1 ? 'change' : 'changes'}</span
+				>
 			</div>
 		{/if}
 
@@ -325,9 +346,18 @@
 			{#if totalChanges === 0}
 				<div class="flex h-full items-center justify-center px-6">
 					<div class="flex -translate-y-8 flex-col items-center gap-2 text-center">
-						<Icon name="git-diff" size={30} strokeWidth={1.2} class="text-gray-300 dark:text-gray-700" />
-						<h2 class="text-sm font-medium text-gray-700 dark:text-gray-300">No file changes yet</h2>
-						<p class="text-xs text-gray-400 dark:text-gray-600">Changes in this project will appear here.</p>
+						<Icon
+							name="git-diff"
+							size={30}
+							strokeWidth={1.2}
+							class="text-gray-300 dark:text-gray-700"
+						/>
+						<h2 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+							No file changes yet
+						</h2>
+						<p class="text-xs text-gray-400 dark:text-gray-600">
+							Changes in this project will appear here.
+						</p>
 					</div>
 				</div>
 			{:else}
@@ -340,43 +370,72 @@
 								class="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-lg px-2 text-left transition-colors hover:bg-gray-100 dark:hover:bg-white/4"
 								onclick={() => toggleFile(file.key)}
 							>
-								<Icon name="chevron-right" size={12} class="shrink-0 text-gray-400 transition-transform dark:text-gray-600 {file.expanded ? 'rotate-90' : ''}" />
-								<span class="w-4 shrink-0 text-center font-mono text-[11px] font-bold {meta.className}" title={meta.label}>{meta.char}</span>
+								<Icon
+									name="chevron-right"
+									size={12}
+									class="shrink-0 text-gray-400 transition-transform dark:text-gray-600 {file.expanded
+										? 'rotate-90'
+										: ''}"
+								/>
+								<span
+									class="w-4 shrink-0 text-center font-mono text-[11px] font-bold {meta.className}"
+									title={meta.label}>{meta.char}</span
+								>
 								<Icon name="git-diff" size={13} class="shrink-0 text-gray-400 dark:text-gray-600" />
 								<div class="flex min-w-0 flex-1 items-baseline gap-2">
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<span
 										class="truncate text-xs font-medium text-gray-800 dark:text-gray-200 hover:underline"
-										onclick={(e) => { e.stopPropagation(); openFile(file.path); }}
-									>{parts.name}</span>
+										onclick={(e) => {
+											e.stopPropagation();
+											openFile(file.path);
+										}}>{parts.name}</span
+									>
 									{#if parts.dir}
-										<span class="hidden truncate text-[11px] text-gray-400 dark:text-gray-600 sm:inline">{parts.dir}</span>
+										<span
+											class="hidden truncate text-[11px] text-gray-400 dark:text-gray-600 sm:inline"
+											>{parts.dir}</span
+										>
 									{/if}
 								</div>
 								{#if file.additions > 0}
-									<span class="shrink-0 font-mono text-[11px] font-medium text-green-600 dark:text-green-400">+{file.additions}</span>
+									<span
+										class="shrink-0 font-mono text-[11px] font-medium text-green-600 dark:text-green-400"
+										>+{file.additions}</span
+									>
 								{/if}
 								{#if file.deletions > 0}
-									<span class="shrink-0 font-mono text-[11px] font-medium text-red-500 dark:text-red-400">-{file.deletions}</span>
+									<span
+										class="shrink-0 font-mono text-[11px] font-medium text-red-500 dark:text-red-400"
+										>-{file.deletions}</span
+									>
 								{/if}
 
-								<span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-rose-500 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-300">
+								<span
+									class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-rose-500 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-300"
+								>
 									{file.staged ? 'Staged' : 'Uncommitted'}
 								</span>
 							</button>
 
 							{#if file.expanded}
-								<div class="mb-1 overflow-x-auto border-y border-gray-100 bg-white font-mono text-[11px] leading-[18px] dark:border-white/4 dark:bg-black">
+								<div
+									class="mb-1 overflow-x-auto border-y border-gray-100 bg-white font-mono text-[11px] leading-[18px] dark:border-white/4 dark:bg-black"
+								>
 									<div class="diff-content">
 										{#if file.diffFiles.some((diffFile) => diffFile.hunks.length > 0)}
 											{#each file.diffFiles as diffFile}
 												{#if file.diffFiles.length > 1}
-													<div class="sticky top-0 z-10 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-500 dark:border-white/4 dark:bg-white/3 dark:text-gray-400">
+													<div
+														class="sticky top-0 z-10 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-500 dark:border-white/4 dark:bg-white/3 dark:text-gray-400"
+													>
 														{diffFile.path}
 													</div>
 												{/if}
 												{#each diffFile.hunks as hunk}
-													<div class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] border-b border-gray-100 bg-gray-50 text-gray-400 dark:border-white/4 dark:bg-white/3 dark:text-gray-600">
+													<div
+														class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] border-b border-gray-100 bg-gray-50 text-gray-400 dark:border-white/4 dark:bg-white/3 dark:text-gray-600"
+													>
 														<span></span>
 														<span></span>
 														<span></span>
@@ -386,10 +445,21 @@
 														<div class="w-full {blockClass(group.type)}">
 															{#each group.lines as line}
 																<div class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto]">
-																	<span class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600">{line.oldNumber ?? ''}</span>
-																	<span class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600">{line.newNumber ?? ''}</span>
-																	<span class="select-none px-1 text-center {prefixClass(line.type)}">{linePrefix(line.type)}</span>
-																	<code class="whitespace-pre px-2 {textClass(line.type)}">{line.content || ' '}</code>
+																	<span
+																		class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600"
+																		>{line.oldNumber ?? ''}</span
+																	>
+																	<span
+																		class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600"
+																		>{line.newNumber ?? ''}</span
+																	>
+																	<span
+																		class="select-none px-1 text-center {prefixClass(line.type)}"
+																		>{linePrefix(line.type)}</span
+																	>
+																	<code class="whitespace-pre px-2 {textClass(line.type)}"
+																		>{line.content || ' '}</code
+																	>
 																</div>
 															{/each}
 														</div>
@@ -397,7 +467,11 @@
 												{/each}
 											{/each}
 										{:else}
-											<div class="px-3 py-8 text-center text-[11px] text-gray-400 dark:text-gray-600">No textual diff available</div>
+											<div
+												class="px-3 py-8 text-center text-[11px] text-gray-400 dark:text-gray-600"
+											>
+												No textual diff available
+											</div>
 										{/if}
 									</div>
 								</div>
@@ -419,11 +493,12 @@
 	.diff-gutter-removed {
 		border-left: 3px solid transparent;
 		border-image: repeating-linear-gradient(
-			-45deg,
-			#ef4444 0,
-			#ef4444 1px,
-			transparent 1px,
-			transparent 3px
-		) 3;
+				-45deg,
+				#ef4444 0,
+				#ef4444 1px,
+				transparent 1px,
+				transparent 3px
+			)
+			3;
 	}
 </style>

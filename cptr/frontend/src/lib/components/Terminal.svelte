@@ -9,7 +9,7 @@
 	//   0x00 + raw input bytes (microtask-batched for throughput)
 	//   0x02 + uint16 cols + uint16 rows, big-endian (5 bytes total)
 	// Server → Client:  raw PTY output bytes (no prefix)
-	const MSG_INPUT  = 0;
+	const MSG_INPUT = 0;
 	const MSG_RESIZE = 2;
 
 	const textEncoder = new TextEncoder();
@@ -19,9 +19,9 @@
 	// and per-flush Uint8Array creation.  Microtask-flushed for batching.
 	const INPUT_BUF_CAP = 4096;
 	const inputBuf = new Uint8Array(INPUT_BUF_CAP);
-	let inputBufLen = 0;           // bytes written after the type prefix
+	let inputBufLen = 0; // bytes written after the type prefix
 	let inputFlushScheduled = false;
-	inputBuf[0] = MSG_INPUT;       // prefix is constant
+	inputBuf[0] = MSG_INPUT; // prefix is constant
 
 	function flushInput() {
 		inputFlushScheduled = false;
@@ -86,7 +86,7 @@
 		foreground: '#e0e0e0',
 		cursor: '#e0e0e0',
 		cursorAccent: '#000000',
-		selectionBackground: 'rgba(255, 255, 255, 0.2)',
+		selectionBackground: 'rgba(255, 255, 255, 0.2)'
 	};
 
 	const lightTheme = {
@@ -94,7 +94,7 @@
 		foreground: '#1a1a1a',
 		cursor: '#1a1a1a',
 		cursorAccent: '#ffffff',
-		selectionBackground: 'rgba(0, 0, 0, 0.15)',
+		selectionBackground: 'rgba(0, 0, 0, 0.15)'
 	};
 
 	// Send input to PTY via WebSocket (binary prefix protocol).
@@ -143,7 +143,7 @@
 			lineHeight: 1.3,
 			scrollback: 10000,
 			macOptionClickForceSelection: true,
-			theme: isDarkMode() ? darkTheme : lightTheme,
+			theme: isDarkMode() ? darkTheme : lightTheme
 		});
 
 		// Watch for theme changes
@@ -346,7 +346,9 @@
 		};
 
 		ws.onclose = (e) => {
-			console.log(`[terminal] WebSocket closed for ${sessionId}, code=${e.code}, reason=${e.reason}`);
+			console.log(
+				`[terminal] WebSocket closed for ${sessionId}, code=${e.code}, reason=${e.reason}`
+			);
 			if (destroyed) return;
 			reconnectTimer = setTimeout(() => {
 				if (!destroyed) connectWebSocket();
@@ -372,10 +374,7 @@
 	});
 </script>
 
-<div
-	bind:this={containerEl}
-	class="h-full w-full pt-1 pl-2 overflow-hidden"
-></div>
+<div bind:this={containerEl} class="h-full w-full pt-1 pl-2 overflow-hidden"></div>
 
 <style>
 	@reference "../../app.css";

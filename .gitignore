@@ -25,7 +25,4 @@ computr/frontend/.svelte-kit/
 .DS_Store
 Thumbs.db
 
-# uv
-uv.lock
-
 .cptr

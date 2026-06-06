@@ -17,16 +17,17 @@ def _uuid() -> str:
 
 class Chat(Base):
     """A chat conversation. Workspace association lives in the filesystem."""
+
     __tablename__ = "chat"
 
-    id                 = Column(Text, primary_key=True, default=_uuid)
-    user_id            = Column(Text, ForeignKey("users.id"), nullable=False)
-    title              = Column(Text, nullable=False)
-    summary            = Column(Text, nullable=True)
+    id = Column(Text, primary_key=True, default=_uuid)
+    user_id = Column(Text, ForeignKey("users.id"), nullable=False)
+    title = Column(Text, nullable=False)
+    summary = Column(Text, nullable=True)
     current_message_id = Column(Text, nullable=True)
-    meta               = Column(JSON, nullable=True)    # {model_id, connection_id, pinned, archived, ...}
-    created_at         = Column(BigInteger, nullable=False)
-    updated_at         = Column(BigInteger, nullable=False)
+    meta = Column(JSON, nullable=True)  # {model_id, connection_id, pinned, archived, ...}
+    created_at = Column(BigInteger, nullable=False)
+    updated_at = Column(BigInteger, nullable=False)
 
     # ── Class methods ────────────────────────────────────────
 
@@ -78,7 +79,9 @@ class Chat(Base):
     async def update_summary(chat_id: str, summary: str, updated_at: int = 0) -> bool:
         async with await get_db() as db:
             result = await db.execute(
-                update(Chat).where(Chat.id == chat_id).values(summary=summary, updated_at=updated_at)
+                update(Chat)
+                .where(Chat.id == chat_id)
+                .values(summary=summary, updated_at=updated_at)
             )
             await db.commit()
             return result.rowcount > 0
@@ -93,12 +96,14 @@ class Chat(Base):
             return result.rowcount > 0
 
     @staticmethod
-    async def update_current_message(chat_id: str, message_id: str | None, updated_at: int = 0) -> bool:
+    async def update_current_message(
+        chat_id: str, message_id: str | None, updated_at: int = 0
+    ) -> bool:
         async with await get_db() as db:
             result = await db.execute(
-                update(Chat).where(Chat.id == chat_id).values(
-                    current_message_id=message_id, updated_at=updated_at
-                )
+                update(Chat)
+                .where(Chat.id == chat_id)
+                .values(current_message_id=message_id, updated_at=updated_at)
             )
             await db.commit()
             return result.rowcount > 0
@@ -115,18 +120,19 @@ class Chat(Base):
 
 class ChatMessage(Base):
     """A single message in a chat conversation."""
+
     __tablename__ = "chat_message"
 
-    id         = Column(Text, primary_key=True, default=_uuid)
-    chat_id    = Column(Text, ForeignKey("chat.id", ondelete="CASCADE"), nullable=False, index=True)
-    parent_id  = Column(Text, nullable=True)
-    role       = Column(Text, nullable=False)        # "user" | "assistant"
-    content    = Column(Text, nullable=False)         # Flattened text content
-    model      = Column(Text, nullable=True)          # Model used (assistant only)
-    done       = Column(Boolean, default=True)        # false = streaming or pending approval
-    output     = Column(JSON, nullable=True)          # Responses API output items
-    usage      = Column(JSON, nullable=True)          # {input_tokens, output_tokens, ...}
-    meta       = Column(JSON, nullable=True)          # {files, followups, error, ...}
+    id = Column(Text, primary_key=True, default=_uuid)
+    chat_id = Column(Text, ForeignKey("chat.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(Text, nullable=True)
+    role = Column(Text, nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)  # Flattened text content
+    model = Column(Text, nullable=True)  # Model used (assistant only)
+    done = Column(Boolean, default=True)  # false = streaming or pending approval
+    output = Column(JSON, nullable=True)  # Responses API output items
+    usage = Column(JSON, nullable=True)  # {input_tokens, output_tokens, ...}
+    meta = Column(JSON, nullable=True)  # {files, followups, error, ...}
     created_at = Column(BigInteger, nullable=False)
 
     # ── Class methods ────────────────────────────────────────

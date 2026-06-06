@@ -29,7 +29,7 @@ def decrypt_key(stored: str, jwt_secret: str) -> str:
     """Decrypt an API key. Accepts 'encrypted:<token>' or plain text fallback."""
     if not stored.startswith("encrypted:"):
         return stored  # Not encrypted, return as-is
-    token = stored[len("encrypted:"):]
+    token = stored[len("encrypted:") :]
     f = Fernet(_derive_fernet_key(jwt_secret))
     try:
         return f.decrypt(token.encode()).decode()

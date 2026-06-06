@@ -18,6 +18,7 @@ def _uuid() -> str:
 
 class User(Base):
     """Profile only. No credentials, no login identity."""
+
     __tablename__ = "users"
 
     id = Column(Text, primary_key=True, default=_uuid)
@@ -45,7 +46,14 @@ class User(Base):
         """List all users joined with their auth username."""
         async with await get_db() as db:
             result = await db.execute(
-                select(User.id, User.display_name, User.profile_image_url, User.role, User.created_at, Auth.username)
+                select(
+                    User.id,
+                    User.display_name,
+                    User.profile_image_url,
+                    User.role,
+                    User.created_at,
+                    Auth.username,
+                )
                 .join(Auth, User.id == Auth.user_id)
                 .order_by(User.created_at)
             )
@@ -62,8 +70,13 @@ class User(Base):
             ]
 
     @staticmethod
-    async def create(username: str, password_hash: str, role: str = "user",
-                     display_name: str | None = None, created_at: int = 0) -> str:
+    async def create(
+        username: str,
+        password_hash: str,
+        role: str = "user",
+        display_name: str | None = None,
+        created_at: int = 0,
+    ) -> str:
         """Create a User + Auth row. Returns the new user_id."""
         async with await get_db() as db:
             user = User(created_at=created_at, display_name=display_name, role=role)
@@ -77,9 +90,7 @@ class User(Base):
     async def update_role(user_id: str, role: str) -> bool:
         """Update a user's role. Returns True if user existed."""
         async with await get_db() as db:
-            result = await db.execute(
-                update(User).where(User.id == user_id).values(role=role)
-            )
+            result = await db.execute(update(User).where(User.id == user_id).values(role=role))
             await db.commit()
             return result.rowcount > 0
 
@@ -115,6 +126,7 @@ class User(Base):
 
 class Auth(Base):
     """Login identity + credentials. 1:1 with User."""
+
     __tablename__ = "auths"
 
     user_id = Column(Text, ForeignKey("users.id"), primary_key=True)
@@ -147,9 +159,7 @@ class Auth(Base):
             auth = result.scalar_one_or_none()
             if not auth:
                 return False
-            await db.execute(
-                update(Auth).where(Auth.user_id == user_id).values(password=new_hash)
-            )
+            await db.execute(update(Auth).where(Auth.user_id == user_id).values(password=new_hash))
             await db.commit()
             return True
 
@@ -190,6 +200,7 @@ class Auth(Base):
 
 class UserStates(Base):
     """Workspace layout state. 1:1 with User."""
+
     __tablename__ = "user_states"
 
     user_id = Column(Text, ForeignKey("users.id"), primary_key=True)

@@ -12,7 +12,20 @@
 	import AuthScreen from '$lib/components/AuthScreen.svelte';
 	import ChangelogModal from '$lib/components/ChangelogModal.svelte';
 	import { Toaster } from 'svelte-sonner';
-	import { activeTab, currentWorkspace, stateLoaded, initState, gitReviewOpen, isGitRepo, splitActive, splitCurrentTab, closeGroup, appVersion, lastSeenVersion, showChangelog } from '$lib/stores';
+	import {
+		activeTab,
+		currentWorkspace,
+		stateLoaded,
+		initState,
+		gitReviewOpen,
+		isGitRepo,
+		splitActive,
+		splitCurrentTab,
+		closeGroup,
+		appVersion,
+		lastSeenVersion,
+		showChangelog
+	} from '$lib/stores';
 	import { matchKeybinding, executeAction } from '$lib/stores/keybindings';
 	import { systemEvents } from '$lib/stores/systemEvents.svelte';
 	import { socketStore } from '$lib/stores/socket.svelte';
@@ -40,13 +53,18 @@
 		// Periodic session health check (every 30 min).
 		// This triggers the backend's sliding session refresh and
 		// proactively catches expired sessions before a 401 mid-action.
-		const healthCheck = setInterval(() => {
-			if (authState === 'authenticated') {
-				getSession().then((auth) => {
-					if (!auth.authenticated) clearSession();
-				}).catch(() => {});
-			}
-		}, 30 * 60 * 1000);
+		const healthCheck = setInterval(
+			() => {
+				if (authState === 'authenticated') {
+					getSession()
+						.then((auth) => {
+							if (!auth.authenticated) clearSession();
+						})
+						.catch(() => {});
+				}
+			},
+			30 * 60 * 1000
+		);
 
 		// iOS/Android: visualViewport gives accurate height when keyboard is open.
 		// Debounce to avoid firing dozens of resizes during the keyboard animation
@@ -105,9 +123,11 @@
 
 			const auth = await getSession();
 
-			getConfig().then(cfg => {
-				appVersion.set(cfg.version);
-			}).catch(() => {});
+			getConfig()
+				.then((cfg) => {
+					appVersion.set(cfg.version);
+				})
+				.catch(() => {});
 
 			if (auth.authenticated) {
 				setSession({
@@ -115,7 +135,7 @@
 					username: auth.username!,
 					display_name: auth.display_name,
 					role: auth.role!,
-					profile_image_url: auth.profile_image_url,
+					profile_image_url: auth.profile_image_url
 				});
 				authState = 'authenticated';
 				initState();
@@ -142,7 +162,7 @@
 					username: auth.username!,
 					display_name: auth.display_name,
 					role: auth.role!,
-					profile_image_url: auth.profile_image_url,
+					profile_image_url: auth.profile_image_url
 				});
 				authState = 'authenticated';
 				initState();
@@ -158,8 +178,12 @@
 		if (!action) return;
 		e.preventDefault();
 		executeAction(action, {
-			toggleQuickOpen: () => { showQuickOpen = !showQuickOpen; },
-			toggleSettings: () => { showSettings = !showSettings; },
+			toggleQuickOpen: () => {
+				showQuickOpen = !showQuickOpen;
+			},
+			toggleSettings: () => {
+				showSettings = !showSettings;
+			}
 		});
 	}
 
@@ -189,7 +213,7 @@
 
 		async function check() {
 			try {
-				const status = await getGitStatus(wsPath) as { is_repo?: boolean };
+				const status = (await getGitStatus(wsPath)) as { is_repo?: boolean };
 				if (!cancelled) isGitRepo.set(Boolean(status?.is_repo));
 			} catch {
 				if (!cancelled) isGitRepo.set(false);
@@ -198,14 +222,20 @@
 
 		check();
 		const interval = setInterval(check, 5000);
-		return () => { cancelled = true; clearInterval(interval); };
+		return () => {
+			cancelled = true;
+			clearInterval(interval);
+		};
 	});
 </script>
 
 <svelte:head>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap"
+		rel="stylesheet"
+	/>
 	<title>{$currentWorkspace ? `${$currentWorkspace.name} / cptr` : 'cptr'}</title>
 	<meta name="description" content={$t('app.tagline')} />
 </svelte:head>
@@ -215,7 +245,9 @@
 {#if authState === 'checking'}
 	<!-- Loading spinner while checking auth -->
 	<div class="flex items-center justify-center h-dvh bg-white dark:bg-black">
-		<div class="w-5 h-5 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"></div>
+		<div
+			class="w-5 h-5 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"
+		></div>
 	</div>
 {:else if authState === 'needs_setup' || authState === 'needs_login'}
 	<!-- Auth screen -->
@@ -227,7 +259,10 @@
 		onauth={handleAuth}
 	/>
 {:else if $stateLoaded}
-	<div class="flex overflow-hidden font-sans antialiased text-gray-900 bg-white dark:text-gray-100 dark:bg-black" style="height: {viewportHeight};">
+	<div
+		class="flex overflow-hidden font-sans antialiased text-gray-900 bg-white dark:text-gray-100 dark:bg-black"
+		style="height: {viewportHeight};"
+	>
 		<Sidebar />
 
 		<div class="flex flex-col flex-1 min-w-0">
@@ -249,21 +284,24 @@
 	</div>
 
 	{#if showQuickOpen}
-		<QuickOpen onclose={() => showQuickOpen = false} />
+		<QuickOpen onclose={() => (showQuickOpen = false)} />
 	{/if}
 	{#if showSettings}
-		<SettingsModal onclose={() => showSettings = false} />
+		<SettingsModal onclose={() => (showSettings = false)} />
 	{/if}
 	<ChangelogModal />
 {:else}
 	<div class="flex items-center justify-center h-dvh bg-white dark:bg-black">
-		<div class="w-5 h-5 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"></div>
+		<div
+			class="w-5 h-5 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"
+		></div>
 	</div>
 {/if}
 
 <Toaster
 	position="bottom-center"
 	toastOptions={{
-		style: 'font-size: 12px; font-family: var(--font-sans); background: #111; color: #e0e0e0; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;'
+		style:
+			'font-size: 12px; font-family: var(--font-sans); background: #111; color: #e0e0e0; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;'
 	}}
 />

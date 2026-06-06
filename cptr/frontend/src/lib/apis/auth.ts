@@ -31,27 +31,33 @@ export const setup = (username: string, password: string, token: string) =>
 	fetchJSON('/api/auth/setup', jsonBody({ username, password, token }));
 
 export const signup = (username: string, password: string) =>
-	fetchJSON<{ ok?: boolean; pending?: boolean }>('/api/auth/signup', jsonBody({ username, password }));
+	fetchJSON<{ ok?: boolean; pending?: boolean }>(
+		'/api/auth/signup',
+		jsonBody({ username, password })
+	);
 
-export const logout = () =>
-	fetchHandler('/api/auth/logout', { method: 'POST' }).catch(() => {});
+export const logout = () => fetchHandler('/api/auth/logout', { method: 'POST' }).catch(() => {});
 
 export const updatePassword = (currentPassword: string, newPassword: string) =>
-	fetchJSON('/api/auth/password', jsonBody({
-		current_password: currentPassword,
-		new_password: newPassword,
-	}));
+	fetchJSON(
+		'/api/auth/password',
+		jsonBody({
+			current_password: currentPassword,
+			new_password: newPassword
+		})
+	);
 
 /** Upload avatar (resized client-side). Returns { ok, profile_image_url }. */
-export const uploadAvatar = async (blob: Blob): Promise<{ ok: boolean; profile_image_url: string }> => {
+export const uploadAvatar = async (
+	blob: Blob
+): Promise<{ ok: boolean; profile_image_url: string }> => {
 	const form = new FormData();
 	form.append('file', blob, 'avatar.png');
 	return fetchJSON('/api/auth/avatar', { method: 'PUT', body: form });
 };
 
 /** Delete avatar. */
-export const deleteAvatar = () =>
-	fetchJSON('/api/auth/avatar', { method: 'DELETE' });
+export const deleteAvatar = () => fetchJSON('/api/auth/avatar', { method: 'DELETE' });
 
 /** Update display name. */
 export const updateProfile = (display_name: string | null) =>

@@ -25,9 +25,7 @@ def _html_to_text(html: str) -> str:
     text = re.sub(r"<p[^>]*>", "\n\n", text, flags=re.IGNORECASE)
     text = re.sub(r"</p>", "", text, flags=re.IGNORECASE)
     text = re.sub(r"<li[^>]*>", "\n- ", text, flags=re.IGNORECASE)
-    text = re.sub(
-        r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"\2 (\1)", text, flags=re.IGNORECASE
-    )
+    text = re.sub(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"\2 (\1)", text, flags=re.IGNORECASE)
     text = re.sub(
         r"<pre[^>]*>(.*?)</pre>", r"\n```\n\1\n```\n", text, flags=re.DOTALL | re.IGNORECASE
     )

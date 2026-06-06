@@ -18,9 +18,26 @@
 	import SvgPreview from './preview/SvgPreview.svelte';
 	import OfficePreview from './preview/OfficePreview.svelte';
 	import { EditorState } from '@codemirror/state';
-	import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, highlightActiveLine, rectangularSelection } from '@codemirror/view';
+	import {
+		EditorView,
+		keymap,
+		lineNumbers,
+		highlightActiveLineGutter,
+		highlightSpecialChars,
+		drawSelection,
+		highlightActiveLine,
+		rectangularSelection
+	} from '@codemirror/view';
 	import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-	import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
+	import {
+		syntaxHighlighting,
+		defaultHighlightStyle,
+		indentOnInput,
+		bracketMatching,
+		foldGutter,
+		foldKeymap,
+		StreamLanguage
+	} from '@codemirror/language';
 	import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 	import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 	import { oneDark } from '@codemirror/theme-one-dark';
@@ -152,8 +169,10 @@
 	}
 
 	function diffBlockClass(type: DiffLine['type']): string {
-		if (type === 'added') return 'bg-green-100 border-l-[3px] border-l-green-500 dark:bg-green-500/15 dark:border-l-green-400';
-		if (type === 'removed') return 'bg-red-100 border-l-[3px] border-l-red-400 dark:bg-red-500/15 dark:border-l-red-400';
+		if (type === 'added')
+			return 'bg-green-100 border-l-[3px] border-l-green-500 dark:bg-green-500/15 dark:border-l-green-400';
+		if (type === 'removed')
+			return 'bg-red-100 border-l-[3px] border-l-red-400 dark:bg-red-500/15 dark:border-l-red-400';
 		return '';
 	}
 
@@ -177,35 +196,63 @@
 
 	// Editing state: true when the code editor should be active
 	let isEditing = $derived(
-		fileData && !fileData.binary && !isBinaryPreview && !isCsv && (
-			isMarkdown ? markdownMode === 'raw' :
-			(isHtml || isSvg) ? !previewMode :
-			isJson ? (jsonViewMode === 'source' || jsonParseError) :
-			true
-		)
+		fileData &&
+			!fileData.binary &&
+			!isBinaryPreview &&
+			!isCsv &&
+			(isMarkdown
+				? markdownMode === 'raw'
+				: isHtml || isSvg
+					? !previewMode
+					: isJson
+						? jsonViewMode === 'source' || jsonParseError
+						: true)
 	);
 
 	// ── Language support ─────────────────────────────────────────
 	function getLanguageExtension(lang: string | null) {
 		switch (lang) {
-			case 'javascript': return javascript();
-			case 'typescript': return javascript({ typescript: true });
-			case 'jsx': return javascript({ jsx: true });
-			case 'tsx': return javascript({ jsx: true, typescript: true });
-			case 'python': return python();
-			case 'json': return json();
-			case 'css': return css();
-			case 'html': return html();
-			case 'svelte': return html();
-			case 'markdown': return markdown();
-			case 'rust': return rust();
-			case 'c': case 'cpp': return cpp();
-			case 'java': case 'kotlin': return java();
-			case 'sql': return sql();
-			case 'xml': return xml();
-			case 'yaml': return yaml();
-			case 'bash': case 'shell': case 'sh': case 'zsh': return StreamLanguage.define(shell);
-			default: return [];
+			case 'javascript':
+				return javascript();
+			case 'typescript':
+				return javascript({ typescript: true });
+			case 'jsx':
+				return javascript({ jsx: true });
+			case 'tsx':
+				return javascript({ jsx: true, typescript: true });
+			case 'python':
+				return python();
+			case 'json':
+				return json();
+			case 'css':
+				return css();
+			case 'html':
+				return html();
+			case 'svelte':
+				return html();
+			case 'markdown':
+				return markdown();
+			case 'rust':
+				return rust();
+			case 'c':
+			case 'cpp':
+				return cpp();
+			case 'java':
+			case 'kotlin':
+				return java();
+			case 'sql':
+				return sql();
+			case 'xml':
+				return xml();
+			case 'yaml':
+				return yaml();
+			case 'bash':
+			case 'shell':
+			case 'sh':
+			case 'zsh':
+				return StreamLanguage.define(shell);
+			default:
+				return [];
 		}
 	}
 
@@ -234,7 +281,7 @@
 			size: 0,
 			binary: false,
 			content: '',
-			language: null,
+			language: null
 		};
 		requestAnimationFrame(() => initEditor('', null));
 	}
@@ -264,7 +311,14 @@
 				if (res.ok) {
 					fileData = await res.json();
 				} else {
-					fileData = { path, name: path.split('/').pop() ?? '', size: 0, binary: true, content: null, language: null };
+					fileData = {
+						path,
+						name: path.split('/').pop() ?? '',
+						size: 0,
+						binary: true,
+						content: null,
+						language: null
+					};
 				}
 			} else {
 				// Text files
@@ -307,7 +361,10 @@
 			try {
 				const ws = get(activeWorkspace);
 				if (ws) {
-					const status = await getGitStatus(ws.path) as { is_repo?: boolean; files?: { path: string }[] };
+					const status = (await getGitStatus(ws.path)) as {
+						is_repo?: boolean;
+						files?: { path: string }[];
+					};
 					if (status?.is_repo && status.files) {
 						const relPath = path.startsWith(ws.path)
 							? path.slice(ws.path.replace(/\/$/, '').length + 1)
@@ -342,7 +399,15 @@
 			diffMode = false;
 			diffFiles = [];
 			// Restore editor if it was a text file
-			if (fileData && !fileData.binary && !isBinaryPreview && !isCsv && !isMarkdown && !(isHtml || isSvg) && !(isJson && !jsonParseError)) {
+			if (
+				fileData &&
+				!fileData.binary &&
+				!isBinaryPreview &&
+				!isCsv &&
+				!isMarkdown &&
+				!(isHtml || isSvg) &&
+				!(isJson && !jsonParseError)
+			) {
 				requestAnimationFrame(() => initEditor(fileData!.content!, fileData!.language));
 			}
 			return;
@@ -359,7 +424,7 @@
 				? filePath.slice(ws.path.replace(/\/$/, '').length + 1)
 				: filePath;
 			const params = new URLSearchParams({ root: ws.path, file: relPath, staged: 'false' });
-			const d = await getGitDiff(params.toString()) as { files?: DiffFileEntry[] };
+			const d = (await getGitDiff(params.toString())) as { files?: DiffFileEntry[] };
 			diffFiles = d.files ?? [];
 		} catch {
 			diffFiles = [];
@@ -457,7 +522,13 @@
 				...historyKeymap,
 				...foldKeymap,
 				indentWithTab,
-				{ key: 'Mod-s', run: () => { saveFile(); return true; } },
+				{
+					key: 'Mod-s',
+					run: () => {
+						saveFile();
+						return true;
+					}
+				}
 			]),
 			syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
 			...(dark ? [oneDark] : []),
@@ -472,19 +543,19 @@
 				'&': {
 					height: '100%',
 					fontSize: '13px',
-					backgroundColor: dark ? '#000' : '#ffffff',
+					backgroundColor: dark ? '#000' : '#ffffff'
 				},
 				'.cm-scroller': { fontFamily: '"JetBrains Mono", "Fira Code", ui-monospace, monospace' },
 				'.cm-gutters': {
 					backgroundColor: dark ? '#000' : '#ffffff',
 					color: dark ? '#555' : '#999',
-					border: 'none',
+					border: 'none'
 				},
 				'.cm-activeLineGutter': { backgroundColor: dark ? '#1a1a1a' : '#f3f4f6' },
 				'.cm-activeLine': { backgroundColor: dark ? '#1a1a1a' : '#f9fafb' },
-				'&.cm-focused': { outline: 'none' },
+				'&.cm-focused': { outline: 'none' }
 			}),
-			getLanguageExtension(language),
+			getLanguageExtension(language)
 		];
 
 		const state = EditorState.create({ doc: content, extensions });
@@ -497,7 +568,10 @@
 				initEditor(doc, language);
 			}
 		});
-		themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
 	}
 
 	function destroyEditor() {
@@ -545,7 +619,9 @@
 				loadedPath = path;
 			}
 
-			setTimeout(() => { saved = false; }, 2000);
+			setTimeout(() => {
+				saved = false;
+			}, 2000);
 		} catch (e: any) {
 			error = e.message;
 		} finally {
@@ -581,66 +657,82 @@
 			<div class="toolbar-right">
 				{#if isMarkdown && !fileData.binary}
 					<button
-						class="toolbar-btn" class:active={markdownMode === 'preview'}
+						class="toolbar-btn"
+						class:active={markdownMode === 'preview'}
 						onclick={() => switchMarkdownMode('preview')}
-						use:tooltip={'Preview'}
-					><Icon name="eye" size={12} /></button>
+						use:tooltip={'Preview'}><Icon name="eye" size={12} /></button
+					>
 					<button
-						class="toolbar-btn" class:active={markdownMode === 'editor'}
+						class="toolbar-btn"
+						class:active={markdownMode === 'editor'}
 						onclick={() => switchMarkdownMode('editor')}
-						use:tooltip={'Editor'}
-					><Icon name="pencil" size={11} /></button>
+						use:tooltip={'Editor'}><Icon name="pencil" size={11} /></button
+					>
 					<button
-						class="toolbar-btn" class:active={markdownMode === 'raw'}
+						class="toolbar-btn"
+						class:active={markdownMode === 'raw'}
 						onclick={() => switchMarkdownMode('raw')}
-						use:tooltip={'Source'}
-					><Icon name="code" size={12} /></button>
+						use:tooltip={'Source'}><Icon name="code" size={12} /></button
+					>
 				{:else if (isHtml || isSvg) && !fileData.binary}
 					<button
-						class="toolbar-btn" class:active={previewMode}
-						onclick={() => { if (!previewMode) togglePreview(); }}
-						use:tooltip={'Preview'}
-					><Icon name="eye" size={12} /></button>
+						class="toolbar-btn"
+						class:active={previewMode}
+						onclick={() => {
+							if (!previewMode) togglePreview();
+						}}
+						use:tooltip={'Preview'}><Icon name="eye" size={12} /></button
+					>
 					<button
-						class="toolbar-btn" class:active={!previewMode}
-						onclick={() => { if (previewMode) togglePreview(); }}
-						use:tooltip={'Edit'}
-					><Icon name="pencil" size={11} /></button>
+						class="toolbar-btn"
+						class:active={!previewMode}
+						onclick={() => {
+							if (previewMode) togglePreview();
+						}}
+						use:tooltip={'Edit'}><Icon name="pencil" size={11} /></button
+					>
 				{/if}
 				{#if isJson && !fileData.binary && !jsonParseError}
 					<button
-						class="toolbar-btn" class:active={jsonViewMode === 'tree'}
-						onclick={() => { if (jsonViewMode !== 'tree') toggleJsonView(); }}
-						use:tooltip={'Tree view'}
-					><Icon name="list" size={12} /></button>
+						class="toolbar-btn"
+						class:active={jsonViewMode === 'tree'}
+						onclick={() => {
+							if (jsonViewMode !== 'tree') toggleJsonView();
+						}}
+						use:tooltip={'Tree view'}><Icon name="list" size={12} /></button
+					>
 					<button
-						class="toolbar-btn" class:active={jsonViewMode === 'source'}
-						onclick={() => { if (jsonViewMode !== 'source') toggleJsonView(); }}
-						use:tooltip={'Source'}
-					><Icon name="code" size={12} /></button>
+						class="toolbar-btn"
+						class:active={jsonViewMode === 'source'}
+						onclick={() => {
+							if (jsonViewMode !== 'source') toggleJsonView();
+						}}
+						use:tooltip={'Source'}><Icon name="code" size={12} /></button
+					>
 				{/if}
-			{#if isEditing || markdownMode === 'editor' || hasChanges || saving || saved}
-				<button
-					class="toolbar-btn {saved ? 'saved' : ''}"
-					onclick={saveFile}
-					disabled={saving}
-					use:tooltip={saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
-				><Icon name={saved ? 'check' : 'save'} size={11} /></button>
-			{/if}
-			{#if !isUntitled && hasGitChanges}
-				<button
-					class="toolbar-btn" class:active={diffMode}
-					onclick={toggleDiff}
-					use:tooltip={diffMode ? 'Hide diff' : 'Show diff'}
-				><Icon name="git-diff" size={12} /></button>
-			{/if}
-			{#if !isUntitled}
-				<button
-					class="toolbar-btn"
-					onclick={() => loadFile(filePath)}
-					use:tooltip={'Refresh'}
-				><Icon name="refresh" size={11} /></button>
-			{/if}
+				{#if isEditing || markdownMode === 'editor' || hasChanges || saving || saved}
+					<button
+						class="toolbar-btn {saved ? 'saved' : ''}"
+						onclick={saveFile}
+						disabled={saving}
+						use:tooltip={saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
+						><Icon name={saved ? 'check' : 'save'} size={11} /></button
+					>
+				{/if}
+				{#if !isUntitled && hasGitChanges}
+					<button
+						class="toolbar-btn"
+						class:active={diffMode}
+						onclick={toggleDiff}
+						use:tooltip={diffMode ? 'Hide diff' : 'Show diff'}
+						><Icon name="git-diff" size={12} /></button
+					>
+				{/if}
+				{#if !isUntitled}
+					<button class="toolbar-btn" onclick={() => loadFile(filePath)} use:tooltip={'Refresh'}
+						><Icon name="refresh" size={11} /></button
+					>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -651,45 +743,36 @@
 		{:else if error}
 			<div class="state error">{error}</div>
 
-		<!-- ── Binary previews ─────────────────────────────── -->
+			<!-- ── Binary previews ─────────────────────────────── -->
 		{:else if isImage && binaryUrl}
 			<ImagePreview src={binaryUrl} alt={fileData?.name ?? ''} />
-
 		{:else if isPdf && binaryUrl}
 			<PDFViewer src={binaryUrl} />
-
 		{:else if isVideo && binaryUrl}
 			<div class="media-container">
 				<!-- svelte-ignore a11y_media_has_caption -->
 				<video controls preload="metadata" src={binaryUrl}></video>
 			</div>
-
 		{:else if isAudio && binaryUrl}
 			<div class="media-container">
 				<audio controls preload="metadata" src={binaryUrl}></audio>
 			</div>
-
 		{:else if isSqlite && binaryUrl}
 			<SqliteView src={binaryUrl} />
-
 		{:else if isOffice && binaryUrl}
 			<OfficePreview src={binaryUrl} fileName={fileData?.name ?? ''} />
 
-		<!-- ── Rich text previews ──────────────────────────── -->
+			<!-- ── Rich text previews ──────────────────────────── -->
 		{:else if isSvg && fileData?.content && previewMode}
 			<SvgPreview content={fileData.content} />
-
 		{:else if isHtml && fileData?.content && previewMode}
-			<HtmlPreview content={fileData.content} filePath={filePath} />
-
+			<HtmlPreview content={fileData.content} {filePath} />
 		{:else if isJson && jsonData !== null && jsonViewMode === 'tree'}
 			<div class="tree-container">
 				<JsonTreeView data={jsonData} />
 			</div>
-
 		{:else if isCsv && fileData?.content}
 			<CsvTable content={fileData.content} separator={isTsv ? '\t' : ','} />
-
 		{:else if isMarkdown && fileData?.content !== null && fileData?.content !== undefined}
 			{#if markdownMode === 'preview'}
 				<div class="markdown-preview">
@@ -703,20 +786,22 @@
 					content={fileData.content}
 					filePath={fileData.path}
 					workspacePath={wsPath}
-					onchange={() => { hasChanges = true; saved = false; markTabUnsaved(tabId, true); }}
+					onchange={() => {
+						hasChanges = true;
+						saved = false;
+						markTabUnsaved(tabId, true);
+					}}
 					onsave={saveFile}
 				/>
 			{:else if markdownMode === 'raw'}
 				<div bind:this={editorEl} class="editor-el"></div>
 			{/if}
-
 		{:else if fileData?.binary}
 			<!-- Unknown binary, fallback -->
 			<div class="state">
 				<p class="state-title">Binary file</p>
 				<p class="state-sub">{fileData.name} ({formatSize(fileData.size)})</p>
 			</div>
-
 		{:else if diffMode}
 			<!-- Diff view -->
 			{#if diffLoading}
@@ -730,7 +815,9 @@
 				<div class="diff-scroll">
 					{#each diffFiles as df}
 						{#each df.hunks as hunk}
-							<div class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] border-b border-gray-100 bg-gray-50 text-gray-400 dark:border-white/4 dark:bg-white/3 dark:text-gray-600 font-mono text-[11px]">
+							<div
+								class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] border-b border-gray-100 bg-gray-50 text-gray-400 dark:border-white/4 dark:bg-white/3 dark:text-gray-600 font-mono text-[11px]"
+							>
 								<span></span>
 								<span></span>
 								<span></span>
@@ -739,11 +826,23 @@
 							{#each diffGroupLines(diffNumberedLines(hunk)) as group}
 								<div class="w-full {diffBlockClass(group.type)}">
 									{#each group.lines as line}
-										<div class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] font-mono text-[11px] leading-[18px]">
-											<span class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600">{line.oldNumber ?? ''}</span>
-											<span class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600">{line.newNumber ?? ''}</span>
-											<span class="select-none px-1 text-center {diffPrefixClass(line.type)}">{diffPrefix(line.type)}</span>
-											<code class="whitespace-pre px-2 {diffTextClass(line.type)}">{line.content || ' '}</code>
+										<div
+											class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] font-mono text-[11px] leading-[18px]"
+										>
+											<span
+												class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600"
+												>{line.oldNumber ?? ''}</span
+											>
+											<span
+												class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600"
+												>{line.newNumber ?? ''}</span
+											>
+											<span class="select-none px-1 text-center {diffPrefixClass(line.type)}"
+												>{diffPrefix(line.type)}</span
+											>
+											<code class="whitespace-pre px-2 {diffTextClass(line.type)}"
+												>{line.content || ' '}</code
+											>
 										</div>
 									{/each}
 								</div>
@@ -753,7 +852,7 @@
 				</div>
 			{/if}
 
-		<!-- ┌ Code editor (default) ───────────────────── -->
+			<!-- ┌ Code editor (default) ───────────────────── -->
 		{:else}
 			<div bind:this={editorEl} class="editor-el"></div>
 		{/if}
@@ -761,8 +860,11 @@
 		{#if showSaveDialog}
 			<SaveDialog
 				defaultName={fileData?.name || 'Untitled'}
-				initialDir={(() => { const ws = get(activeWorkspace); return ws?.path; })()}
-				onclose={() => showSaveDialog = false}
+				initialDir={(() => {
+					const ws = get(activeWorkspace);
+					return ws?.path;
+				})()}
+				onclose={() => (showSaveDialog = false)}
 				onsave={handleSaveDialogSave}
 			/>
 		{/if}
@@ -949,7 +1051,9 @@
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	/* ── Diff view ────────────────────────────────────────── */
@@ -957,7 +1061,7 @@
 	.diff-scroll {
 		height: 100%;
 		overflow: auto;
-		font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+		font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 		font-size: 12px;
 		line-height: 18px;
 	}
@@ -995,8 +1099,12 @@
 		color: #86efac;
 	}
 
-	.diff-added .diff-prefix { color: #16a34a; }
-	:global(.dark) .diff-added .diff-prefix { color: #4ade80; }
+	.diff-added .diff-prefix {
+		color: #16a34a;
+	}
+	:global(.dark) .diff-added .diff-prefix {
+		color: #4ade80;
+	}
 
 	.diff-removed {
 		background: #fee2e2;
@@ -1008,8 +1116,12 @@
 		color: #fca5a5;
 	}
 
-	.diff-removed .diff-prefix { color: #ef4444; }
-	:global(.dark) .diff-removed .diff-prefix { color: #f87171; }
+	.diff-removed .diff-prefix {
+		color: #ef4444;
+	}
+	:global(.dark) .diff-removed .diff-prefix {
+		color: #f87171;
+	}
 
 	.diff-ctx {
 		color: var(--color-gray-600);

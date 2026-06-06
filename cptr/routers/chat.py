@@ -56,6 +56,7 @@ def _get_user(request: Request) -> str:
 
 # ── List chats for a workspace ──────────────────────────────
 
+
 @router.get("")
 async def list_chats(
     request: Request,
@@ -98,33 +99,38 @@ async def list_chats(
     for entry in chat_entries:
         chat = chat_map.get(entry["id"])
         if chat and chat.user_id == user_id:
-            result.append({
-                "id": chat.id,
-                "title": chat.title,
-                "summary": chat.summary,
-                "folder": entry["folder"],
-                "meta": chat.meta,
-                "current_message_id": chat.current_message_id,
-                "created_at": chat.created_at,
-                "updated_at": chat.updated_at,
-            })
+            result.append(
+                {
+                    "id": chat.id,
+                    "title": chat.title,
+                    "summary": chat.summary,
+                    "folder": entry["folder"],
+                    "meta": chat.meta,
+                    "current_message_id": chat.current_message_id,
+                    "created_at": chat.created_at,
+                    "updated_at": chat.updated_at,
+                }
+            )
 
     # Sort by requested field
     sort_field = sort_by if sort_by in ("title", "updated_at") else "updated_at"
     reverse = sort_dir != "asc"
-    result.sort(key=lambda c: (c[sort_field] or ""), reverse=reverse)
+    result.sort(key=lambda c: c[sort_field] or "", reverse=reverse)
     total = len(result)
     page = result[offset : offset + limit]
     return {"chats": page, "total": total, "has_more": offset + limit < total}
 
+
 # ── Models aggregation ──────────────────────────────────────
 # NOTE: Must be declared before /{chat_id} to avoid 'models' being treated as a chat_id.
+
 
 async def _get_connections() -> list[dict]:
     return await Config.get("chat.connections") or []
 
 
 # ── Model cache (app.state) ─────────────────────────────────
+
 
 async def _get_connection_models(conn: dict, app_state) -> list[str]:
     """Get models for a connection: from stored data, cache, or auto-discover."""
@@ -167,14 +173,16 @@ async def get_models(request: Request):
 
         prefix = (conn.get("prefix_id") or "").strip()
 
-        for model_id in (model_ids or []):
+        for model_id in model_ids or []:
             prefixed_id = f"{prefix}/{model_id}" if prefix else model_id
-            models.append({
-                "id": prefixed_id,
-                "name": model_id,
-                "provider": conn.get("provider", ""),
-                "connection_id": conn["id"],
-            })
+            models.append(
+                {
+                    "id": prefixed_id,
+                    "name": model_id,
+                    "provider": conn.get("provider", ""),
+                    "connection_id": conn["id"],
+                }
+            )
 
     default_model = await Config.get("chat.default_model")
     return {"models": models, "default": default_model}
@@ -193,10 +201,13 @@ async def _fetch_provider_models(conn: dict) -> list[str]:
         if provider == "anthropic":
             url = (base_url or "https://api.anthropic.com/v1") + "/models"
             async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get(url, headers={
-                    "x-api-key": api_key or "",
-                    "anthropic-version": "2023-06-01",
-                })
+                r = await client.get(
+                    url,
+                    headers={
+                        "x-api-key": api_key or "",
+                        "anthropic-version": "2023-06-01",
+                    },
+                )
                 if r.status_code == 200:
                     data = r.json()
                     return [m["id"] for m in data.get("data", [])]
@@ -204,9 +215,12 @@ async def _fetch_provider_models(conn: dict) -> list[str]:
         elif provider == "openai":
             url = (base_url or "https://api.openai.com/v1") + "/models"
             async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get(url, headers={
-                    "Authorization": f"Bearer {api_key or ''}",
-                })
+                r = await client.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {api_key or ''}",
+                    },
+                )
                 if r.status_code == 200:
                     data = r.json()
                     return [m["id"] for m in data.get("data", [])]
@@ -218,6 +232,7 @@ async def _fetch_provider_models(conn: dict) -> list[str]:
 
 
 # ── Get a chat with all messages ────────────────────────────
+
 
 @router.get("/{chat_id}")
 async def get_chat(chat_id: str, request: Request):
@@ -238,15 +253,14 @@ async def get_chat(chat_id: str, request: Request):
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
         },
-        "messages": [
-            _message_dict(m) for m in messages
-        ],
+        "messages": [_message_dict(m) for m in messages],
     }
 
 
 def _message_dict(m) -> dict:
     """Serialize a ChatMessage, overlaying live state if task is running."""
     from cptr.utils.chat_task import get_live_state
+
     d = {
         "id": m.id,
         "parent_id": m.parent_id,
@@ -269,6 +283,7 @@ def _message_dict(m) -> dict:
 
 # ── Delete a chat ───────────────────────────────────────────
 
+
 @router.delete("/{chat_id}")
 async def delete_chat(chat_id: str, request: Request):
     """Delete a chat and all its messages."""
@@ -288,6 +303,7 @@ async def delete_chat(chat_id: str, request: Request):
 
 
 # ── Send a message ──────────────────────────────────────────
+
 
 class SendMessageRequest(BaseModel):
     content: str = ""
@@ -348,6 +364,7 @@ async def send_message(body: SendMessageRequest, request: Request):
         # process queue now to close the race window.
         if not await _chat_has_active_generation(chat.id):
             from cptr.utils.chat_task import _process_queue
+
             workspace = (chat.meta or {}).get("workspace", body.workspace)
             await _process_queue(chat.id, user_id, workspace)
         return {"chat_id": chat.id, "message_id": user_msg.id, "queued": True}
@@ -390,6 +407,7 @@ async def send_message(body: SendMessageRequest, request: Request):
 
     # Start background task (export_chat_to_file runs after task completes)
     from cptr.utils.chat_task import start_task
+
     start_task(
         message_id=assistant_msg.id,
         chat_id=chat.id,
@@ -405,15 +423,14 @@ async def send_message(body: SendMessageRequest, request: Request):
 
 # ── Approve / reject a pending tool call ────────────────────
 
+
 class ApproveRequest(BaseModel):
     call_id: str
     approved: bool = True
 
 
 @router.post("/{chat_id}/messages/{message_id}/approve")
-async def approve_tool(
-    chat_id: str, message_id: str, body: ApproveRequest, request: Request
-):
+async def approve_tool(chat_id: str, message_id: str, body: ApproveRequest, request: Request):
     """Execute or reject a pending tool call, then continue."""
     user_id = _get_user(request)
     chat = await Chat.get_by_id(chat_id)
@@ -447,11 +464,13 @@ async def approve_tool(
             call["name"], call.get("arguments", {}), chat.meta.get("workspace", "")
         )
         call["status"] = "completed"
-        output.append({
-            "type": "function_call_output",
-            "call_id": body.call_id,
-            "output": result,
-        })
+        output.append(
+            {
+                "type": "function_call_output",
+                "call_id": body.call_id,
+                "output": result,
+            }
+        )
         await ChatMessage.update(message_id, output=output, done=False)
 
         # Resolve connection and continue
@@ -460,6 +479,7 @@ async def approve_tool(
         workspace = chat.meta.get("workspace", "") if chat.meta else ""
 
         from cptr.utils.chat_task import start_task
+
         start_task(
             message_id=message_id,
             chat_id=chat_id,
@@ -473,6 +493,7 @@ async def approve_tool(
         await ChatMessage.update(message_id, output=output, done=True)
         # Process queued messages since this chat is now idle
         from cptr.utils.chat_task import _process_queue
+
         workspace = chat.meta.get("workspace", "") if chat.meta else ""
         await _process_queue(chat_id, user_id, workspace)
 
@@ -481,10 +502,9 @@ async def approve_tool(
 
 # ── Cancel a running task ───────────────────────────────────
 
+
 @router.post("/{chat_id}/messages/{message_id}/cancel")
-async def cancel_task_endpoint(
-    chat_id: str, message_id: str, request: Request
-):
+async def cancel_task_endpoint(chat_id: str, message_id: str, request: Request):
     """Cancel running task, preserve partial output."""
     user_id = _get_user(request)
     chat = await Chat.get_by_id(chat_id)
@@ -492,6 +512,7 @@ async def cancel_task_endpoint(
         raise HTTPException(404, "chat not found")
 
     from cptr.utils.chat_task import cancel_task
+
     found = await cancel_task(message_id)
 
     if not found:
@@ -507,6 +528,7 @@ async def cancel_task_endpoint(
 
     # Process queued messages since this chat may now be idle
     from cptr.utils.chat_task import _process_queue
+
     workspace = chat.meta.get("workspace", "") if chat.meta else ""
     await _process_queue(chat_id, user_id, workspace)
 
@@ -515,14 +537,13 @@ async def cancel_task_endpoint(
 
 # ── Update current branch pointer ──────────────────────────
 
+
 class UpdateCurrentRequest(BaseModel):
     message_id: str
 
 
 @router.post("/{chat_id}/current")
-async def update_current(
-    chat_id: str, body: UpdateCurrentRequest, request: Request
-):
+async def update_current(chat_id: str, body: UpdateCurrentRequest, request: Request):
     """Set current_message_id (the active branch leaf)."""
     user_id = _get_user(request)
     chat = await Chat.get_by_id(chat_id)
@@ -533,6 +554,7 @@ async def update_current(
 
 
 # ── Update message content / output ────────────────────────
+
 
 class UpdateMessageRequest(BaseModel):
     content: Optional[str] = None
@@ -561,6 +583,7 @@ async def update_message(
 
 # ── Create message directly (no task) ──────────────────────
 
+
 class CreateMessageRequest(BaseModel):
     parent_id: Optional[str] = None
     role: str
@@ -569,9 +592,7 @@ class CreateMessageRequest(BaseModel):
 
 
 @router.post("/{chat_id}/messages")
-async def create_message_endpoint(
-    chat_id: str, body: CreateMessageRequest, request: Request
-):
+async def create_message_endpoint(chat_id: str, body: CreateMessageRequest, request: Request):
     """Create a message without starting a task (for Save As Copy)."""
     user_id = _get_user(request)
     chat = await Chat.get_by_id(chat_id)
@@ -590,6 +611,7 @@ async def create_message_endpoint(
     await Chat.update_current_message(chat_id, msg.id, now_ms())
     return {"ok": True, "message_id": msg.id}
 
+
 async def _chat_has_active_generation(chat_id: str) -> bool:
     """Check if any assistant message in this chat has done=False."""
     messages = await ChatMessage.get_all_by_chat(chat_id)
@@ -598,10 +620,9 @@ async def _chat_has_active_generation(chat_id: str) -> bool:
 
 # ── Queue management ───────────────────────────────────────
 
+
 @router.post("/{chat_id}/queue/{message_id}/send")
-async def queue_send_now(
-    chat_id: str, message_id: str, request: Request
-):
+async def queue_send_now(chat_id: str, message_id: str, request: Request):
     """Cancel current generation, dequeue this message, send it immediately."""
     user_id = _get_user(request)
     chat = await Chat.get_by_id(chat_id)
@@ -619,6 +640,7 @@ async def queue_send_now(
     for m in all_msgs:
         if m.role == "assistant" and not m.done:
             from cptr.utils.chat_task import cancel_task
+
             await cancel_task(m.id)
             await ChatMessage.update(m.id, done=True)
 
@@ -649,13 +671,18 @@ async def queue_send_now(
     workspace = (chat.meta or {}).get("workspace", "")
 
     assistant_msg = await ChatMessage.create(
-        chat_id=chat_id, role="assistant", content="",
-        parent_id=message_id, model=model_id,
-        done=False, created_at=now_ms(),
+        chat_id=chat_id,
+        role="assistant",
+        content="",
+        parent_id=message_id,
+        model=model_id,
+        done=False,
+        created_at=now_ms(),
     )
     await Chat.update_current_message(chat_id, assistant_msg.id, now_ms())
 
     from cptr.utils.chat_task import start_task
+
     start_task(
         message_id=assistant_msg.id,
         chat_id=chat_id,
@@ -668,9 +695,7 @@ async def queue_send_now(
 
 
 @router.delete("/{chat_id}/queue/{message_id}")
-async def queue_delete(
-    chat_id: str, message_id: str, request: Request
-):
+async def queue_delete(chat_id: str, message_id: str, request: Request):
     """Remove a queued message."""
     user_id = _get_user(request)
     chat = await Chat.get_by_id(chat_id)

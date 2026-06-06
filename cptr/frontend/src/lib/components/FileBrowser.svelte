@@ -8,7 +8,14 @@
 	import { activeWorkspace, setFileBrowserCwd, openFileTab, openPreviewTab } from '$lib/stores';
 	import { systemEvents } from '$lib/stores/systemEvents.svelte';
 	import { tooltip } from '$lib/tooltip';
-	import { listDir, downloadArchive, deleteFiles, moveFile, uploadFiles as apiUpload, createEntry } from '$lib/apis/files';
+	import {
+		listDir,
+		downloadArchive,
+		deleteFiles,
+		moveFile,
+		uploadFiles as apiUpload,
+		createEntry
+	} from '$lib/apis/files';
 	import { fileIconName } from '$lib/utils/fileIcon';
 	import Icon from './Icon.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
@@ -38,7 +45,9 @@
 	let newName = $state('');
 	let dropzoneActive = $state(false);
 	let addMenuOpen = $state(false);
-	let showHidden = $state(typeof localStorage !== 'undefined' && localStorage.getItem('fileBrowser:showHidden') === 'true');
+	let showHidden = $state(
+		typeof localStorage !== 'undefined' && localStorage.getItem('fileBrowser:showHidden') === 'true'
+	);
 	let sortMenuOpen = $state(false);
 	let sortBtnEl: HTMLButtonElement | undefined = $state();
 	let addBtnEl: HTMLButtonElement | undefined = $state();
@@ -57,7 +66,9 @@
 	let dragOverBreadcrumb = $state<string | null>(null);
 
 	// Context menu
-	let contextMenu = $state<{ x: number; y: number; entry: TreeEntry; anchor?: HTMLElement } | null>(null);
+	let contextMenu = $state<{ x: number; y: number; entry: TreeEntry; anchor?: HTMLElement } | null>(
+		null
+	);
 	let renamingEntry = $state<string | null>(null);
 	let renameValue = $state('');
 
@@ -66,8 +77,10 @@
 
 	// Ports from this workspace's terminals
 	let workspacePorts = $derived(
-		systemEvents.ports.filter((p) =>
-			p.session_id && $activeWorkspace?.groups.some((g) => g.tabs.some((t) => t.sessionId === p.session_id))
+		systemEvents.ports.filter(
+			(p) =>
+				p.session_id &&
+				$activeWorkspace?.groups.some((g) => g.tabs.some((t) => t.sessionId === p.session_id))
 		)
 	);
 
@@ -306,9 +319,7 @@
 		const query = searchQuery.toLowerCase();
 
 		function walk(parentPath: string, items: FileEntry[], depth: number) {
-			let filtered = query
-				? items.filter((e) => e.name.toLowerCase().includes(query))
-				: items;
+			let filtered = query ? items.filter((e) => e.name.toLowerCase().includes(query)) : items;
 			for (const entry of sortItems(filtered)) {
 				const fullPath = parentPath.endsWith('/')
 					? parentPath + entry.name
@@ -370,7 +381,9 @@
 		if (selectedPaths.size === 0) return;
 		if (!confirm($t('files.deleteItemConfirm', { count: selectedPaths.size }))) return;
 		for (const path of selectedPaths) {
-			try { await deleteFiles([path]); } catch {}
+			try {
+				await deleteFiles([path]);
+			} catch {}
 		}
 		clearSelection();
 		fetchDirectory(cwd);
@@ -475,7 +488,9 @@
 			const form = new FormData();
 			form.append('file', file);
 			form.append('directory', directory);
-			try { await apiUpload(directory, form); } catch {}
+			try {
+				await apiUpload(directory, form);
+			} catch {}
 		}
 		fetchDirectory(cwd);
 	}
@@ -588,8 +603,6 @@
 	}
 </script>
 
-
-
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="flex flex-col h-full overflow-hidden relative"
@@ -598,7 +611,9 @@
 	ondrop={onDropzoneDrop}
 >
 	<!-- Header: breadcrumb + actions -->
-	<div class="flex items-center gap-2 h-9 px-3 border-b border-gray-200 dark:border-white/6 shrink-0">
+	<div
+		class="flex items-center gap-2 h-9 px-3 border-b border-gray-200 dark:border-white/6 shrink-0"
+	>
 		<div class="flex items-center gap-1 text-xs min-w-0 flex-1">
 			{#each breadcrumbs() as seg, i}
 				{#if i > 0}<span class="text-gray-300 dark:text-gray-600">/</span>{/if}
@@ -606,21 +621,25 @@
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<span
 						class="font-medium truncate transition-colors duration-75
-							{dragOverBreadcrumb === seg.path ? 'text-gray-900 dark:text-white bg-gray-200 dark:bg-white/10 rounded px-1 -mx-1' : 'text-gray-900 dark:text-white'}"
+							{dragOverBreadcrumb === seg.path
+							? 'text-gray-900 dark:text-white bg-gray-200 dark:bg-white/10 rounded px-1 -mx-1'
+							: 'text-gray-900 dark:text-white'}"
 						ondragover={(e) => onBreadcrumbDragOver(e, seg.path)}
 						ondragleave={onBreadcrumbDragLeave}
-						ondrop={(e) => onBreadcrumbDrop(e, seg.path)}
-					>{seg.name}</span>
+						ondrop={(e) => onBreadcrumbDrop(e, seg.path)}>{seg.name}</span
+					>
 				{:else}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<button
 						class="shrink-0 transition-colors duration-75
-							{dragOverBreadcrumb === seg.path ? 'text-gray-900 dark:text-white bg-gray-200 dark:bg-white/10 rounded px-1 -mx-1' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}"
+							{dragOverBreadcrumb === seg.path
+							? 'text-gray-900 dark:text-white bg-gray-200 dark:bg-white/10 rounded px-1 -mx-1'
+							: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}"
 						onclick={() => navigateTo(seg.path)}
 						ondragover={(e) => onBreadcrumbDragOver(e, seg.path)}
 						ondragleave={onBreadcrumbDragLeave}
-						ondrop={(e) => onBreadcrumbDrop(e, seg.path)}
-					>{seg.name}</button>
+						ondrop={(e) => onBreadcrumbDrop(e, seg.path)}>{seg.name}</button
+					>
 				{/if}
 			{/each}
 		</div>
@@ -638,7 +657,9 @@
 		<button
 			bind:this={sortBtnEl}
 			class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
-			onclick={() => { sortMenuOpen = !sortMenuOpen; }}
+			onclick={() => {
+				sortMenuOpen = !sortMenuOpen;
+			}}
 			use:tooltip={$t('files.sort')}
 		>
 			<Icon name="sort" size={11} />
@@ -648,7 +669,9 @@
 		<button
 			bind:this={addBtnEl}
 			class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
-			onclick={() => { toggleAddMenu(); }}
+			onclick={() => {
+				toggleAddMenu();
+			}}
 			use:tooltip={$t('files.actions')}
 		>
 			<Icon name="three-dots" size={11} />
@@ -657,20 +680,24 @@
 
 	<!-- Ports -->
 	{#if workspacePorts.length > 0}
-		<div class="flex items-center gap-1.5 h-7 px-3 border-b border-gray-200 dark:border-white/6 shrink-0">
+		<div
+			class="flex items-center gap-1.5 h-7 px-3 border-b border-gray-200 dark:border-white/6 shrink-0"
+		>
 			<span class="text-[10px] text-gray-400 shrink-0">{$t('files.ports')}</span>
 			{#each workspacePorts as p (p.port)}
 				<button
 					class="px-1.5 py-0.5 rounded text-[11px] font-mono font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
 					onclick={() => openPreviewTab(p.port)}
-					use:tooltip={$t('files.clickToPreview', { process: p.process })}
-				>:{p.port}</button>
+					use:tooltip={$t('files.clickToPreview', { process: p.process })}>:{p.port}</button
+				>
 			{/each}
 		</div>
 	{/if}
 
 	<!-- Search -->
-	<div class="flex items-center gap-1.5 h-8 px-3 border-b border-gray-200 dark:border-white/6 shrink-0">
+	<div
+		class="flex items-center gap-1.5 h-8 px-3 border-b border-gray-200 dark:border-white/6 shrink-0"
+	>
 		<Icon name="search" size={13} class="text-gray-400 shrink-0" />
 		<input
 			type="text"
@@ -679,7 +706,7 @@
 			bind:value={searchQuery}
 		/>
 		{#if searchQuery}
-			<button class="text-gray-400 flex items-center" onclick={() => searchQuery = ''}>
+			<button class="text-gray-400 flex items-center" onclick={() => (searchQuery = '')}>
 				<Icon name="xmark" size={11} />
 			</button>
 		{/if}
@@ -692,19 +719,34 @@
 		<!-- New item input -->
 		{#if showNewInput}
 			<div class="flex items-center gap-2 h-7 px-2">
-				<Icon name={showNewInput === 'folder' ? 'folder' : 'empty-page'} size={14} class="text-gray-400 shrink-0" />
+				<Icon
+					name={showNewInput === 'folder' ? 'folder' : 'empty-page'}
+					size={14}
+					class="text-gray-400 shrink-0"
+				/>
 				<input
 					type="text"
 					class="flex-1 border-none outline-none bg-transparent text-xs text-gray-900 dark:text-white"
-					placeholder={showNewInput === 'folder' ? $t('files.folderNamePlaceholder') : $t('files.fileNamePlaceholder')}
+					placeholder={showNewInput === 'folder'
+						? $t('files.folderNamePlaceholder')
+						: $t('files.fileNamePlaceholder')}
 					bind:value={newName}
-					onkeydown={(e) => { if (e.key === 'Enter') confirmNew(); if (e.key === 'Escape') cancelNew(); }}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') confirmNew();
+						if (e.key === 'Escape') cancelNew();
+					}}
 					autofocus
 				/>
-				<button class="flex items-center justify-center w-5 h-5 rounded text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors duration-75" onclick={confirmNew}>
+				<button
+					class="flex items-center justify-center w-5 h-5 rounded text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors duration-75"
+					onclick={confirmNew}
+				>
 					<Icon name="check" size={12} />
 				</button>
-				<button class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75" onclick={cancelNew}>
+				<button
+					class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
+					onclick={cancelNew}
+				>
 					<Icon name="xmark" size={12} />
 				</button>
 			</div>
@@ -712,15 +754,17 @@
 
 		{#if loading}
 			<div class="flex items-center justify-center py-12">
-				<div class="w-4 h-4 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"></div>
+				<div
+					class="w-4 h-4 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"
+				></div>
 			</div>
 		{:else if error}
 			<div class="flex flex-col items-center justify-center py-12 gap-2">
 				<p class="text-xs text-red-400">{error}</p>
 				<button
 					class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/6 transition-colors duration-100"
-					onclick={() => fetchDirectory(cwd)}
-				>{$t('files.retry')}</button>
+					onclick={() => fetchDirectory(cwd)}>{$t('files.retry')}</button
+				>
 			</div>
 		{:else if visibleEntries.length === 0 && !showNewInput}
 			<div class="flex items-center justify-center py-12">
@@ -732,13 +776,23 @@
 			{#each visibleEntries as entry, i (entry.path)}
 				{#if renamingEntry === entry.path}
 					<!-- Inline rename -->
-					<div class="flex items-center gap-2 h-7" style="padding-left: {8 + entry.depth * 16}px; padding-right: 8px;">
-						<Icon name={fileIconName(entry.name, entry.type)} size={14} class="text-gray-400 shrink-0" />
+					<div
+						class="flex items-center gap-2 h-7"
+						style="padding-left: {8 + entry.depth * 16}px; padding-right: 8px;"
+					>
+						<Icon
+							name={fileIconName(entry.name, entry.type)}
+							size={14}
+							class="text-gray-400 shrink-0"
+						/>
 						<input
 							type="text"
 							class="flex-1 border-none outline-none bg-transparent text-xs text-gray-900 dark:text-white"
 							bind:value={renameValue}
-							onkeydown={(e) => { if (e.key === 'Enter') confirmRename(entry.path); if (e.key === 'Escape') renamingEntry = null; }}
+							onkeydown={(e) => {
+								if (e.key === 'Enter') confirmRename(entry.path);
+								if (e.key === 'Escape') renamingEntry = null;
+							}}
 							onblur={() => confirmRename(entry.path)}
 							autofocus
 						/>
@@ -748,7 +802,11 @@
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<button
 						class="group flex items-center gap-1 w-full h-7 rounded-lg text-left transition-colors duration-75
-							{isSelected ? 'bg-blue-50 dark:bg-blue-500/10' : dragOverDir === entry.path ? 'bg-blue-100 dark:bg-blue-500/20' : 'hover:bg-gray-100 dark:hover:bg-white/4'}"
+							{isSelected
+							? 'bg-blue-50 dark:bg-blue-500/10'
+							: dragOverDir === entry.path
+								? 'bg-blue-100 dark:bg-blue-500/20'
+								: 'hover:bg-gray-100 dark:hover:bg-white/4'}"
 						style="padding-left: {8 + entry.depth * 16}px; padding-right: 8px;"
 						onclick={(e) => handleClick(e, entry, i)}
 						oncontextmenu={(e) => onContextMenu(e, entry)}
@@ -760,13 +818,22 @@
 						ondragend={onDragEnd}
 					>
 						{#if entry.type === 'directory'}
-							<span class="flex items-center justify-center w-4 shrink-0 text-gray-400 dark:text-gray-600">
-								<Icon name={expandedDirs.has(entry.path) ? 'chevron-down' : 'chevron-right'} size={10} />
+							<span
+								class="flex items-center justify-center w-4 shrink-0 text-gray-400 dark:text-gray-600"
+							>
+								<Icon
+									name={expandedDirs.has(entry.path) ? 'chevron-down' : 'chevron-right'}
+									size={10}
+								/>
 							</span>
 						{:else}
 							<span class="w-4 shrink-0"></span>
 						{/if}
-						<span class="flex items-center justify-center w-4 shrink-0 {entry.type === 'directory' ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}">
+						<span
+							class="flex items-center justify-center w-4 shrink-0 {entry.type === 'directory'
+								? 'text-gray-500 dark:text-gray-400'
+								: 'text-gray-400 dark:text-gray-500'}"
+						>
 							<Icon name={fileIconName(entry.name, entry.type)} size={14} strokeWidth={1.4} />
 						</span>
 						{#if entry.type === 'directory'}
@@ -775,14 +842,26 @@
 								class="flex-1 text-xs text-gray-800 dark:text-gray-200 truncate hover:underline cursor-pointer"
 								role="button"
 								tabindex="-1"
-								onclick={(e) => { e.stopPropagation(); setFileBrowserCwd(entry.path); }}
-								onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setFileBrowserCwd(entry.path); } }}
-							>{entry.name}</span>
+								onclick={(e) => {
+									e.stopPropagation();
+									setFileBrowserCwd(entry.path);
+								}}
+								onkeydown={(e) => {
+									if (e.key === 'Enter') {
+										e.stopPropagation();
+										setFileBrowserCwd(entry.path);
+									}
+								}}>{entry.name}</span
+							>
 						{:else}
-							<span class="flex-1 text-xs text-gray-800 dark:text-gray-200 truncate">{entry.name}</span>
+							<span class="flex-1 text-xs text-gray-800 dark:text-gray-200 truncate"
+								>{entry.name}</span
+							>
 						{/if}
 						{#if entry.type !== 'directory' && entry.size !== null}
-							<span class="text-[11px] font-mono text-gray-400 dark:text-gray-600 shrink-0">{formatSize(entry.size)}</span>
+							<span class="text-[11px] font-mono text-gray-400 dark:text-gray-600 shrink-0"
+								>{formatSize(entry.size)}</span
+							>
 						{/if}
 						<!-- Three-dot menu per entry -->
 						<span
@@ -790,7 +869,9 @@
 							role="button"
 							tabindex="-1"
 							onclick={(e) => openEntryMenu(e, entry)}
-							onkeydown={(e) => { if (e.key === 'Enter') openEntryMenu(e, entry); }}
+							onkeydown={(e) => {
+								if (e.key === 'Enter') openEntryMenu(e, entry);
+							}}
 							aria-label={$t('files.moreActions')}
 						>
 							<Icon name="three-dots" size={12} />
@@ -803,34 +884,40 @@
 
 	<!-- Upload dropzone overlay -->
 	{#if dropzoneActive}
-		<div class="absolute inset-0 bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-500 rounded-lg flex items-center justify-center z-10 pointer-events-none">
+		<div
+			class="absolute inset-0 bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-500 rounded-lg flex items-center justify-center z-10 pointer-events-none"
+		>
 			<p class="text-xs font-medium text-blue-500 dark:text-blue-400">{$t('files.dropToUpload')}</p>
 		</div>
 	{/if}
 
 	<!-- Multi-select action bar -->
 	{#if selectedPaths.size > 0}
-		<div class="flex items-center justify-between h-8 px-2 border-t border-gray-200 dark:border-white/6 shrink-0 bg-blue-50 dark:bg-blue-500/5">
-			<span class="text-[11px] font-medium text-blue-600 dark:text-blue-400">{$t('files.selected', { count: selectedPaths.size })}</span>
+		<div
+			class="flex items-center justify-between h-8 px-2 border-t border-gray-200 dark:border-white/6 shrink-0 bg-blue-50 dark:bg-blue-500/5"
+		>
+			<span class="text-[11px] font-medium text-blue-600 dark:text-blue-400"
+				>{$t('files.selected', { count: selectedPaths.size })}</span
+			>
 			<div class="flex items-center gap-1">
 				<button
 					class="text-[11px] px-2 py-0.5 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-75"
-					onclick={selectAll}
-				>{$t('files.all')}</button>
+					onclick={selectAll}>{$t('files.all')}</button
+				>
 				<button
 					class="text-[11px] px-2 py-0.5 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-75"
 					onclick={archiveSelected}
-					use:tooltip={$t('files.downloadAsZip')}
-				><Icon name="download" size={12} /></button>
+					use:tooltip={$t('files.downloadAsZip')}><Icon name="download" size={12} /></button
+				>
 				<button
 					class="text-[11px] px-2 py-0.5 rounded text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors duration-75"
 					onclick={deleteSelected}
-					use:tooltip={$t('files.deleteSelected')}
-				><Icon name="trash" size={12} /></button>
+					use:tooltip={$t('files.deleteSelected')}><Icon name="trash" size={12} /></button
+				>
 				<button
 					class="text-[11px] px-2 py-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
-					onclick={clearSelection}
-				><Icon name="xmark" size={11} /></button>
+					onclick={clearSelection}><Icon name="xmark" size={11} /></button
+				>
 			</div>
 		</div>
 	{/if}
@@ -840,11 +927,27 @@
 	<DropdownMenu
 		anchor={sortBtnEl}
 		items={[
-			{ label: $t('files.name'), icon: sortBy === 'name' ? (sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined, active: sortBy === 'name', onclick: () => toggleSort('name') },
-			{ label: $t('files.size'), icon: sortBy === 'size' ? (sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined, active: sortBy === 'size', onclick: () => toggleSort('size') },
-			{ label: $t('files.date'), icon: sortBy === 'modified' ? (sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined, active: sortBy === 'modified', onclick: () => toggleSort('modified') },
+			{
+				label: $t('files.name'),
+				icon: sortBy === 'name' ? (sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined,
+				active: sortBy === 'name',
+				onclick: () => toggleSort('name')
+			},
+			{
+				label: $t('files.size'),
+				icon: sortBy === 'size' ? (sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined,
+				active: sortBy === 'size',
+				onclick: () => toggleSort('size')
+			},
+			{
+				label: $t('files.date'),
+				icon:
+					sortBy === 'modified' ? (sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined,
+				active: sortBy === 'modified',
+				onclick: () => toggleSort('modified')
+			}
 		]}
-		onclose={() => sortMenuOpen = false}
+		onclose={() => (sortMenuOpen = false)}
 	/>
 {/if}
 
@@ -857,9 +960,13 @@
 			{ label: '', divider: true, onclick: () => {} },
 			{ label: $t('files.uploadFile'), icon: 'upload', onclick: () => handleUploadFromMenu() },
 			{ label: '', divider: true, onclick: () => {} },
-			{ label: showHidden ? $t('files.hideHidden') : $t('files.showHidden'), icon: 'eye', onclick: () => toggleHidden() },
+			{
+				label: showHidden ? $t('files.hideHidden') : $t('files.showHidden'),
+				icon: 'eye',
+				onclick: () => toggleHidden()
+			}
 		]}
-		onclose={() => addMenuOpen = false}
+		onclose={() => (addMenuOpen = false)}
 	/>
 {/if}
 
@@ -869,9 +976,15 @@
 		items={[
 			{ label: $t('files.rename'), icon: 'pencil', onclick: () => startRename(contextMenu!.entry) },
 			...(contextMenu.entry.type !== 'directory'
-				? [{ label: $t('files.download'), icon: 'download', onclick: () => downloadEntry(contextMenu!.entry) }]
+				? [
+						{
+							label: $t('files.download'),
+							icon: 'download',
+							onclick: () => downloadEntry(contextMenu!.entry)
+						}
+					]
 				: []),
-			{ label: $t('files.delete'), icon: 'xmark', onclick: () => deleteEntry(contextMenu!.entry) },
+			{ label: $t('files.delete'), icon: 'xmark', onclick: () => deleteEntry(contextMenu!.entry) }
 		]}
 		onclose={closeMenu}
 	/>

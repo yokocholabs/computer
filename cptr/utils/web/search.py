@@ -22,6 +22,7 @@ async def _get_key(env_var: str, config_key: str) -> str:
         return val
     try:
         from cptr.models import Config
+
         return (await Config.get(config_key)) or ""
     except Exception:
         return ""
@@ -31,6 +32,7 @@ async def _get_config(key: str) -> str:
     """Read a single config value from DB."""
     try:
         from cptr.models import Config
+
         return (await Config.get(key)) or ""
     except Exception:
         return ""

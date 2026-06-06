@@ -28,7 +28,7 @@ export const getWorkspaceState = (path: string) =>
 export const saveWorkspaceState = (path: string, data: Record<string, unknown>) =>
 	fetchHandler(`/api/state/workspace?path=${encodeURIComponent(path)}`, {
 		...jsonBody(data),
-		method: 'PUT',
+		method: 'PUT'
 	});
 
 export const deleteWorkspace = (path: string) =>

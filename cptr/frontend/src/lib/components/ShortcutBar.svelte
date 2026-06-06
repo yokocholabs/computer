@@ -67,7 +67,7 @@
 		{ label: '~', value: '~' },
 		{ label: '/', value: '/' },
 		{ label: '-', value: '-' },
-		{ label: '_', value: '_' },
+		{ label: '_', value: '_' }
 	];
 </script>
 
@@ -79,16 +79,36 @@
 					class="key"
 					class:active={ctrlHeld}
 					onmousedown={(e) => e.preventDefault()}
-					ontouchstart={(e) => { e.preventDefault(); touchHandled = true; toggleCtrl(); }}
-					onclick={() => { if (touchHandled) { touchHandled = false; return; } toggleCtrl(); }}
-				>{key.label}</button>
+					ontouchstart={(e) => {
+						e.preventDefault();
+						touchHandled = true;
+						toggleCtrl();
+					}}
+					onclick={() => {
+						if (touchHandled) {
+							touchHandled = false;
+							return;
+						}
+						toggleCtrl();
+					}}>{key.label}</button
+				>
 			{:else}
 				<button
 					class="key"
 					onmousedown={(e) => e.preventDefault()}
-					ontouchstart={(e) => { e.preventDefault(); touchHandled = true; sendKey(key.value); }}
-					onclick={() => { if (touchHandled) { touchHandled = false; return; } sendKey(key.value); }}
-				>{key.label}</button>
+					ontouchstart={(e) => {
+						e.preventDefault();
+						touchHandled = true;
+						sendKey(key.value);
+					}}
+					onclick={() => {
+						if (touchHandled) {
+							touchHandled = false;
+							return;
+						}
+						sendKey(key.value);
+					}}>{key.label}</button
+				>
 			{/if}
 		{/each}
 	</div>

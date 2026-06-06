@@ -30,7 +30,7 @@ export const supportedLocales = [
 	{ code: 'ja', label: '日本語' },
 	{ code: 'ko', label: '한국어' },
 	{ code: 'zh-CN', label: '简体中文' },
-	{ code: 'zh-TW', label: '繁體中文' },
+	{ code: 'zh-TW', label: '繁體中文' }
 ] as const;
 
 const resources: Record<string, { translation: Record<string, string> }> = {
@@ -43,20 +43,20 @@ const resources: Record<string, { translation: Record<string, string> }> = {
 	'pt-BR': { translation: ptBR },
 	ru: { translation: ru },
 	'zh-CN': { translation: zhCN },
-	'zh-TW': { translation: zhTW },
+	'zh-TW': { translation: zhTW }
 };
 
 i18next.use(LanguageDetector).init({
 	resources,
 	fallbackLng: 'en',
 	interpolation: {
-		escapeValue: false, // Svelte handles escaping
+		escapeValue: false // Svelte handles escaping
 	},
 	detection: {
 		order: ['localStorage', 'navigator'],
 		caches: ['localStorage'],
-		lookupLocalStorage: 'cptr_locale',
-	},
+		lookupLocalStorage: 'cptr_locale'
+	}
 });
 
 // ── Svelte store wrapper ────────────────────────────────────────

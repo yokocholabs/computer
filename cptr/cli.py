@@ -16,7 +16,8 @@ def cli():
 def run(host: str, port: int, reload: bool, headless: bool):
     """Start the cptr server."""
     import os, secrets
-    display_host = 'localhost' if host == '0.0.0.0' else host
+
+    display_host = "localhost" if host == "0.0.0.0" else host
 
     token = secrets.token_hex(32)
     os.environ["CPTR_STARTUP_TOKEN"] = token
@@ -25,6 +26,7 @@ def run(host: str, port: int, reload: bool, headless: bool):
     print(f"\n  ➜  {url}\n")
     if not headless:
         import threading, webbrowser
+
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run(
         "cptr.app:application",

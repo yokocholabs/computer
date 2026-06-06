@@ -16,7 +16,7 @@
 					startOnLoad: false,
 					theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
 					securityLevel: 'strict',
-					fontFamily: 'inherit',
+					fontFamily: 'inherit'
 				});
 
 				const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;

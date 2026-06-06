@@ -21,7 +21,7 @@ import {
 	splitActive,
 	splitCurrentTab,
 	closeGroup,
-	sidebarOpen,
+	sidebarOpen
 } from '$lib/stores';
 import { openChatTab } from '$lib/stores';
 
@@ -37,7 +37,7 @@ export const ACTION_IDS = [
 	'quickOpen',
 	'openSettings',
 	'toggleSplit',
-	'toggleSidebar',
+	'toggleSidebar'
 ] as const;
 
 export type ActionId = (typeof ACTION_IDS)[number];
@@ -54,7 +54,7 @@ export const ACTION_LABELS: Record<ActionId, string> = {
 	quickOpen: 'Quick Open',
 	openSettings: 'Open Settings',
 	toggleSplit: 'Toggle Split',
-	toggleSidebar: 'Toggle Sidebar',
+	toggleSidebar: 'Toggle Sidebar'
 };
 
 // ── Default bindings (browser-safe) ─────────────────────────────
@@ -69,7 +69,7 @@ export const DEFAULT_KEYBINDINGS: Record<ActionId, string> = {
 	quickOpen: 'Cmd+K',
 	openSettings: 'Cmd+.',
 	toggleSplit: 'Cmd+\\',
-	toggleSidebar: 'Cmd+Shift+S',
+	toggleSidebar: 'Cmd+Shift+S'
 };
 
 // ── Store ───────────────────────────────────────────────────────
@@ -152,11 +152,16 @@ export function formatChord(chord: string): string {
 	const formatted = parts.map((part) => {
 		if (IS_MAC) {
 			switch (part) {
-				case 'Cmd': return '⌘';
-				case 'Ctrl': return '⌃';
-				case 'Alt': return '⌥';
-				case 'Shift': return '⇧';
-				default: return part;
+				case 'Cmd':
+					return '⌘';
+				case 'Ctrl':
+					return '⌃';
+				case 'Alt':
+					return '⌥';
+				case 'Shift':
+					return '⇧';
+				default:
+					return part;
 			}
 		}
 		return part;
@@ -175,11 +180,16 @@ export function chordToDisplayParts(chord: string): string[] {
 	return parts.map((part) => {
 		if (IS_MAC) {
 			switch (part) {
-				case 'Cmd': return '⌘';
-				case 'Ctrl': return '⌃';
-				case 'Alt': return '⌥';
-				case 'Shift': return '⇧';
-				default: return part;
+				case 'Cmd':
+					return '⌘';
+				case 'Ctrl':
+					return '⌃';
+				case 'Alt':
+					return '⌥';
+				case 'Shift':
+					return '⇧';
+				default:
+					return part;
 			}
 		}
 		return part;

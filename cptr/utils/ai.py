@@ -44,6 +44,7 @@ _STREAM_RETRY_ERRORS = (
 
 class ChatCompletionForm(BaseModel):
     """Mirrors OpenAI Responses API request shape."""
+
     model: str
     messages: List[Dict]
     instructions: str = ""
@@ -114,7 +115,13 @@ async def chat_completion(
                 headers={"Authorization": f"Bearer {api_key}"},
             )
         if resp.status_code >= 400:
-            logger.debug("[chat_completion] %s %s → %s: %s", provider, model, resp.status_code, resp.text[:500])
+            logger.debug(
+                "[chat_completion] %s %s → %s: %s",
+                provider,
+                model,
+                resp.status_code,
+                resp.text[:500],
+            )
         resp.raise_for_status()
         data = resp.json()
 
@@ -130,6 +137,7 @@ async def chat_completion(
         return ""
     return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
+
 # ── Anthropic ────────────────────────────────────────────────
 
 
@@ -143,26 +151,32 @@ def _to_anthropic_messages(messages: list[dict]) -> list[dict]:
         content = m.get("content", "")
         if role == "tool":
             # tool result → Anthropic tool_result block
-            result.append({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": m.get("tool_call_id", ""),
-                    "content": content,
-                }],
-            })
+            result.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": m.get("tool_call_id", ""),
+                            "content": content,
+                        }
+                    ],
+                }
+            )
         elif role == "assistant" and m.get("tool_calls"):
             # assistant with tool calls → Anthropic tool_use blocks
             blocks: list[dict] = []
             if content:
                 blocks.append({"type": "text", "text": content})
             for tc in m["tool_calls"]:
-                blocks.append({
-                    "type": "tool_use",
-                    "id": tc.get("id", ""),
-                    "name": tc["function"]["name"],
-                    "input": json.loads(tc["function"].get("arguments", "{}")),
-                })
+                blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": tc.get("id", ""),
+                        "name": tc["function"]["name"],
+                        "input": json.loads(tc["function"].get("arguments", "{}")),
+                    }
+                )
             result.append({"role": "assistant", "content": blocks})
         else:
             result.append({"role": role, "content": content})
@@ -302,7 +316,11 @@ async def stream_openai_completions(
     for attempt in range(_STREAM_RETRY_ATTEMPTS):
         try:
             async with httpx.AsyncClient(timeout=_STREAM_TIMEOUT) as client:
-                logger.info("[stream] openai completions POST %s/chat/completions model=%s", url, form_data.model)
+                logger.info(
+                    "[stream] openai completions POST %s/chat/completions model=%s",
+                    url,
+                    form_data.model,
+                )
                 async with client.stream(
                     "POST", f"{url}/chat/completions", json=body, headers=headers
                 ) as resp:
@@ -328,9 +346,7 @@ async def stream_openai_completions(
                                     "name": tc["function"]["name"],
                                     "arguments_json": "",
                                 }
-                            tool_calls[idx]["arguments_json"] += tc["function"].get(
-                                "arguments", ""
-                            )
+                            tool_calls[idx]["arguments_json"] += tc["function"].get("arguments", "")
 
                         if choices and choices[0].get("finish_reason") == "tool_calls":
                             for tc in tool_calls.values():
@@ -372,20 +388,24 @@ def _to_responses_input(messages: list[dict], instructions: str) -> list[dict]:
         if role == "system":
             continue
         if role == "tool":
-            items.append({
-                "type": "function_call_output",
-                "call_id": m.get("tool_call_id", ""),
-                "output": m.get("content", ""),
-            })
+            items.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": m.get("tool_call_id", ""),
+                    "output": m.get("content", ""),
+                }
+            )
         elif role == "assistant" and m.get("tool_calls"):
             for tc in m["tool_calls"]:
-                items.append({
-                    "type": "function_call",
-                    "id": tc.get("id", ""),
-                    "call_id": tc.get("id", ""),
-                    "name": tc["function"]["name"],
-                    "arguments": tc["function"].get("arguments", "{}"),
-                })
+                items.append(
+                    {
+                        "type": "function_call",
+                        "id": tc.get("id", ""),
+                        "call_id": tc.get("id", ""),
+                        "name": tc["function"]["name"],
+                        "arguments": tc["function"].get("arguments", "{}"),
+                    }
+                )
         else:
             items.append({"role": role, "content": m.get("content", "")})
     return items
@@ -419,7 +439,9 @@ async def stream_openai_responses(
     for attempt in range(_STREAM_RETRY_ATTEMPTS):
         try:
             async with httpx.AsyncClient(timeout=_STREAM_TIMEOUT) as client:
-                logger.info("[stream] openai responses POST %s/responses model=%s", url, form_data.model)
+                logger.info(
+                    "[stream] openai responses POST %s/responses model=%s", url, form_data.model
+                )
                 async with client.stream(
                     "POST", f"{url}/responses", json=body, headers=headers
                 ) as resp:

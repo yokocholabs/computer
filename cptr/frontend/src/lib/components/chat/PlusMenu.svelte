@@ -20,7 +20,7 @@
 	const modes: { value: ToolApprovalMode; label: string; desc: string }[] = [
 		{ value: 'ask', label: 'Ask for approval', desc: 'Confirm each tool call before it runs' },
 		{ value: 'auto', label: 'Auto-approve', desc: 'Approve safe actions, ask for risky ones' },
-		{ value: 'full', label: 'Full access', desc: 'All tool calls run without confirmation' },
+		{ value: 'full', label: 'Full access', desc: 'All tool calls run without confirmation' }
 	];
 
 	const currentModeLabel = $derived(
@@ -94,7 +94,16 @@
 	aria-expanded={open}
 	aria-haspopup="menu"
 >
-	<svg class="size-3.5 transition-transform duration-150" class:rotate-45={open} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+	<svg
+		class="size-3.5 transition-transform duration-150"
+		class:rotate-45={open}
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
 		<line x1="12" y1="5" x2="12" y2="19" />
 		<line x1="5" y1="12" x2="19" y2="12" />
 	</svg>
@@ -108,7 +117,9 @@
 	<div
 		bind:this={menuEl}
 		class="fixed z-[101] w-56 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-150 dark:border-white/6 shadow-xl p-0.5 overflow-hidden"
-		style="left: {pos.x}px; bottom: {pos.bottom}px; opacity: {ready ? 1 : 0}; pointer-events: {ready ? 'auto' : 'none'};"
+		style="left: {pos.x}px; bottom: {pos.bottom}px; opacity: {ready ? 1 : 0}; pointer-events: {ready
+			? 'auto'
+			: 'none'};"
 		onclick={(e) => e.stopPropagation()}
 	>
 		{#if tab === ''}
@@ -118,8 +129,18 @@
 					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
 					onclick={triggerUpload}
 				>
-					<svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+					<svg
+						class="size-3.5 shrink-0"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path
+							d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+						/>
 					</svg>
 					<span class="flex-1 text-left truncate">Attach files</span>
 				</button>
@@ -128,11 +149,13 @@
 
 				<button
 					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
-					onclick={() => tab = 'tools'}
+					onclick={() => (tab = 'tools')}
 				>
 					<Icon name="shield" size={14} />
 					<span class="flex-1 text-left truncate">Tool permissions</span>
-					<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-16">{currentModeLabel}</span>
+					<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-16"
+						>{currentModeLabel}</span
+					>
 					<Icon name="chevron-right" size={12} class="shrink-0 text-gray-400 dark:text-gray-500" />
 				</button>
 			</div>
@@ -141,7 +164,7 @@
 			<div class="plus-menu-slide-in-right">
 				<button
 					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
-					onclick={() => tab = ''}
+					onclick={() => (tab = '')}
 				>
 					<Icon name="chevron-left" size={12} />
 					<span class="flex-1 text-left font-medium">Tool permissions</span>
@@ -153,14 +176,22 @@
 					<button
 						class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs transition-colors duration-75
 							{$toolApprovalMode === mode.value
-								? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5'
-								: 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
+							? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5'
+							: 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
 						onclick={() => selectMode(mode.value)}
 						use:tooltip={{ content: mode.desc, placement: 'right' }}
 					>
 						<span class="flex-1 text-left truncate">{mode.label}</span>
 						{#if $toolApprovalMode === mode.value}
-							<svg class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+							<svg
+								class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
 								<polyline points="20 6 9 17 4 12" />
 							</svg>
 						{/if}

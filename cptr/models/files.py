@@ -17,6 +17,7 @@ def _uuid() -> str:
 
 class File(Base):
     """One row per uploaded blob. Storage key == id (UUID)."""
+
     __tablename__ = "files"
 
     id = Column(Text, primary_key=True, default=_uuid)
@@ -24,7 +25,7 @@ class File(Base):
     filename = Column(Text, nullable=False)
     path = Column(Text, nullable=False, default="")
     hash = Column(Text, nullable=False, default="")
-    meta = Column(JSON, nullable=False, default=dict)    # content_type, size, etc.
+    meta = Column(JSON, nullable=False, default=dict)  # content_type, size, etc.
     data = Column(JSON, nullable=False, default=dict)
     created_at = Column(BigInteger, nullable=False)
     updated_at = Column(BigInteger, nullable=True)
@@ -32,8 +33,7 @@ class File(Base):
     # ── Class methods ────────────────────────────────────────
 
     @staticmethod
-    async def create(*, user_id: str | None, filename: str, meta: dict,
-                     created_at: int) -> File:
+    async def create(*, user_id: str | None, filename: str, meta: dict, created_at: int) -> File:
         """Insert a new file record and return it."""
         async with await get_db() as db:
             f = File(

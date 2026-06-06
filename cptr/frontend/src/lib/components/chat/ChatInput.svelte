@@ -43,7 +43,7 @@
 		oncancel,
 		onqueuesendnow,
 		onqueueedit,
-		onqueuedelete,
+		onqueuedelete
 	}: Props = $props();
 
 	let editorEl: HTMLDivElement | undefined = $state();
@@ -71,17 +71,23 @@
 			return results.slice(0, 10).map((r: any) => ({
 				id: r.type === 'directory' && !r.path.endsWith('/') ? r.path + '/' : r.path,
 				label: r.name,
-				type: r.type === 'directory' ? 'directory' : 'file',
+				type: r.type === 'directory' ? 'directory' : 'file'
 			}));
 		} catch {
 			return [];
 		}
 	}
 
-	function mountPopup(items: FileMentionAttrs[], selectedIdx: number, onselect: (i: number) => void) {
+	function mountPopup(
+		items: FileMentionAttrs[],
+		selectedIdx: number,
+		onselect: (i: number) => void
+	) {
 		// Destroy previous instance
 		if (popupComponent) {
-			try { unmount(popupComponent); } catch {}
+			try {
+				unmount(popupComponent);
+			} catch {}
 			popupComponent = null;
 		}
 		if (!popupEl) {
@@ -90,7 +96,7 @@
 		}
 		popupComponent = mount(FileSuggestionPopup, {
 			target: popupEl,
-			props: { items, selectedIndex: selectedIdx, onselect },
+			props: { items, selectedIndex: selectedIdx, onselect }
 		});
 	}
 
@@ -151,7 +157,8 @@
 					return true;
 				}
 				if (event.key === 'ArrowUp') {
-					selectedIndex = (selectedIndex - 1 + currentItems.length) % Math.max(currentItems.length, 1);
+					selectedIndex =
+						(selectedIndex - 1 + currentItems.length) % Math.max(currentItems.length, 1);
 					remount();
 					return true;
 				}
@@ -168,7 +175,7 @@
 			},
 			onExit() {
 				destroyPopup();
-			},
+			}
 		};
 	}
 
@@ -186,7 +193,9 @@
 		stopRepositionLoop();
 		activeClientRectFn = null;
 		if (popupComponent) {
-			try { unmount(popupComponent); } catch {}
+			try {
+				unmount(popupComponent);
+			} catch {}
 			popupComponent = null;
 		}
 		if (popupEl) {
@@ -201,7 +210,7 @@
 
 		const fileMention = createFileMention({
 			items: fetchSuggestions,
-			render: createSuggestionRenderer,
+			render: createSuggestionRenderer
 		});
 
 		editor = new Editor({
@@ -209,12 +218,12 @@
 			extensions: [
 				StarterKit.configure({
 					codeBlock: false,
-					heading: { levels: [1, 2, 3] },
+					heading: { levels: [1, 2, 3] }
 				}),
 				Markdown,
 				Placeholder.configure({ placeholder }),
 				CodeBlockLowlight.configure({ lowlight }),
-				fileMention,
+				fileMention
 			],
 			content: inputText || '',
 			contentType: inputText ? 'markdown' : undefined,
@@ -222,7 +231,7 @@
 			editorProps: {
 				attributes: {
 					class: 'chat-prosemirror',
-					spellcheck: 'true',
+					spellcheck: 'true'
 				},
 				handleKeyDown: (view, event) => {
 					if (event.key === 'Enter' && !event.shiftKey) {
@@ -246,11 +255,11 @@
 						}
 					}
 					return false;
-				},
+				}
 			},
 			onUpdate: ({ editor: e }) => {
 				inputText = (e as any).getMarkdown() || '';
-			},
+			}
 		});
 	});
 
@@ -309,8 +318,9 @@
 		</div>
 	{/if}
 
-	<div class="rounded-3xl shadow-lg border border-gray-100/40 dark:border-white/4 focus-within:border-gray-200/50 focus-within:dark:border-white/8 transition px-1 bg-white dark:bg-gray-500/5">
-
+	<div
+		class="rounded-3xl shadow-lg border border-gray-100/40 dark:border-white/4 focus-within:border-gray-200/50 focus-within:dark:border-white/8 transition px-1 bg-white dark:bg-gray-500/5"
+	>
 		<!-- Editor area -->
 		<div class="px-2.5">
 			<div
@@ -328,11 +338,19 @@
 			onmousedown={(e) => e.stopPropagation()}
 		>
 			<div class="ml-0.5 self-end flex items-center">
-				<PlusMenu onfiles={(files) => { /* TODO: handle file uploads */ }} />
+				<PlusMenu
+					onfiles={(files) => {
+						/* TODO: handle file uploads */
+					}}
+				/>
 			</div>
 			<div class="self-end mr-1 flex items-center gap-2">
 				<ModelSelector bind:selectedModel />
-				<DictateButton ontext={(text) => { inputText += text; }} />
+				<DictateButton
+					ontext={(text) => {
+						inputText += text;
+					}}
+				/>
 				<SendButton {canSend} {streaming} {onsend} {oncancel} />
 			</div>
 		</div>
@@ -398,9 +416,15 @@
 	}
 
 	/* Headings */
-	.chat-editor-mount :global(.chat-prosemirror h1) { @apply text-base font-semibold my-1; }
-	.chat-editor-mount :global(.chat-prosemirror h2) { @apply text-sm font-semibold my-1; }
-	.chat-editor-mount :global(.chat-prosemirror h3) { @apply text-[13px] font-semibold my-1; }
+	.chat-editor-mount :global(.chat-prosemirror h1) {
+		@apply text-base font-semibold my-1;
+	}
+	.chat-editor-mount :global(.chat-prosemirror h2) {
+		@apply text-sm font-semibold my-1;
+	}
+	.chat-editor-mount :global(.chat-prosemirror h3) {
+		@apply text-[13px] font-semibold my-1;
+	}
 
 	/* HR */
 	.chat-editor-mount :global(.chat-prosemirror hr) {
@@ -408,11 +432,26 @@
 	}
 
 	/* Syntax highlighting */
-	.chat-editor-mount :global(.hljs-keyword) { color: #c678dd; }
-	.chat-editor-mount :global(.hljs-string) { color: #98c379; }
-	.chat-editor-mount :global(.hljs-number) { color: #d19a66; }
-	.chat-editor-mount :global(.hljs-comment) { color: #5c6370; font-style: italic; }
-	.chat-editor-mount :global(.hljs-function) { color: #61afef; }
-	.chat-editor-mount :global(.hljs-title) { color: #61afef; }
-	.chat-editor-mount :global(.hljs-built_in) { color: #e5c07b; }
+	.chat-editor-mount :global(.hljs-keyword) {
+		color: #c678dd;
+	}
+	.chat-editor-mount :global(.hljs-string) {
+		color: #98c379;
+	}
+	.chat-editor-mount :global(.hljs-number) {
+		color: #d19a66;
+	}
+	.chat-editor-mount :global(.hljs-comment) {
+		color: #5c6370;
+		font-style: italic;
+	}
+	.chat-editor-mount :global(.hljs-function) {
+		color: #61afef;
+	}
+	.chat-editor-mount :global(.hljs-title) {
+		color: #61afef;
+	}
+	.chat-editor-mount :global(.hljs-built_in) {
+		color: #e5c07b;
+	}
 </style>

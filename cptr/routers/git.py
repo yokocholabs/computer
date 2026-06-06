@@ -63,7 +63,9 @@ async def git_status(root: str):
 
 
 @router.get("/diff")
-async def git_diff(root: str, file: Optional[str] = None, staged: bool = False, untracked: bool = False):
+async def git_diff(
+    root: str, file: Optional[str] = None, staged: bool = False, untracked: bool = False
+):
     """Get diff for working tree or staged changes."""
     await _require_repo(root)
     try:

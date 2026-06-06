@@ -19,7 +19,7 @@ export const writeFile = (path: string, content: string) =>
 	fetchJSON('/api/workspace/files/write', jsonBody({ path, content }));
 
 export const deleteFiles = (paths: string[]) =>
-	Promise.all(paths.map(path => fetchJSON('/api/workspace/files/delete', jsonBody({ path }))));
+	Promise.all(paths.map((path) => fetchJSON('/api/workspace/files/delete', jsonBody({ path }))));
 
 export const moveFile = (src: string, dest: string) =>
 	fetchJSON('/api/workspace/files/move', jsonBody({ source: src, destination: dest }));
@@ -34,4 +34,6 @@ export const downloadArchive = (paths: string[]) =>
 	fetchHandler('/api/workspace/files/archive', { method: 'POST', ...jsonBody({ paths }) });
 
 export const searchFiles = (query: string, path: string) =>
-	fetchJSON(`/api/workspace/files/search?query=${encodeURIComponent(query)}&path=${encodeURIComponent(path)}`);
+	fetchJSON(
+		`/api/workspace/files/search?query=${encodeURIComponent(query)}&path=${encodeURIComponent(path)}`
+	);

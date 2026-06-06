@@ -14,8 +14,8 @@ from pathlib import Path
 import bcrypt
 
 from cptr.env import DATA_DIR, CONFIG_FILE
-SESSION_MAX_AGE = 30 * 24 * 3600  # 30 days (seconds, for JWT exp)
 
+SESSION_MAX_AGE = 30 * 24 * 3600  # 30 days (seconds, for JWT exp)
 
 
 def now_ms() -> int:
@@ -24,9 +24,9 @@ def now_ms() -> int:
 
 
 class AuthMode(str, Enum):
-    PASSWORD = "password"               # Default: single user with password
-    PAM = "pam"                         # Linux system users
-    TRUSTED_HEADER = "trusted_header"   # Reverse proxy / platform gateway
+    PASSWORD = "password"  # Default: single user with password
+    PAM = "pam"  # Linux system users
+    TRUSTED_HEADER = "trusted_header"  # Reverse proxy / platform gateway
 
 
 @dataclass
@@ -50,12 +50,14 @@ def load_config() -> dict:
         try:
             # Python 3.11+
             import tomllib
+
             with open(CONFIG_FILE, "rb") as f:
                 _config_cache = tomllib.load(f)
         except ImportError:
             try:
                 # Python 3.9-3.10 backport
                 import tomli
+
                 with open(CONFIG_FILE, "rb") as f:
                     _config_cache = tomli.load(f)
             except ImportError:
@@ -95,6 +97,7 @@ def _parse_simple_toml(text: str) -> dict:
             elif value.startswith("[") and value.endswith("]"):
                 # Simple list: ["a", "b"]
                 import json
+
                 try:
                     value = json.loads(value)
                 except Exception:
@@ -114,12 +117,12 @@ def save_config(config: dict):
                 if isinstance(v, str):
                     lines.append(f'{k} = "{v}"')
                 elif isinstance(v, bool):
-                    lines.append(f'{k} = {"true" if v else "false"}')
+                    lines.append(f"{k} = {'true' if v else 'false'}")
                 elif isinstance(v, list):
                     items = ", ".join(f'"{i}"' if isinstance(i, str) else str(i) for i in v)
-                    lines.append(f'{k} = [{items}]')
+                    lines.append(f"{k} = [{items}]")
                 else:
-                    lines.append(f'{k} = {v}')
+                    lines.append(f"{k} = {v}")
             lines.append("")
     CONFIG_FILE.write_text("\n".join(lines))
     _config_cache = config
@@ -131,6 +134,7 @@ def invalidate_config_cache():
 
 
 # ── Password ─────────────────────────────────────────────────
+
 
 def hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(12)).decode()
@@ -148,6 +152,7 @@ async def has_any_user() -> bool:
     from cptr.utils.db import get_db
     from cptr.models import Auth
     from sqlalchemy import select
+
     async with await get_db() as db:
         result = await db.execute(select(Auth).limit(1))
         return result.scalar_one_or_none() is not None
@@ -155,10 +160,12 @@ async def has_any_user() -> bool:
 
 # ── PAM ──────────────────────────────────────────────────────
 
+
 def pam_authenticate(username: str, password: str) -> bool:
     """Authenticate against Linux PAM. Returns True if valid."""
     try:
         import pam
+
         p = pam.pam()
         return p.authenticate(username, password, service="login")
     except ImportError:
@@ -171,16 +178,15 @@ def get_user_uid_gid(username: str) -> tuple[int, int] | None:
     """Get UID and GID for a Linux user. Returns (uid, gid) or None."""
     try:
         import pwd
+
         pw = pwd.getpwnam(username)
         return (pw.pw_uid, pw.pw_gid)
     except (KeyError, ImportError):
         return None
 
 
-
-
-
 # ── Users ────────────────────────────────────────────────────
+
 
 async def get_or_create_user(username: str) -> str:
     """Get or create a user + auth row, return user.id.
@@ -189,6 +195,7 @@ async def get_or_create_user(username: str) -> str:
     from cptr.utils.db import get_db
     from cptr.models import User, Auth
     from sqlalchemy import select, update
+
     async with await get_db() as db:
         result = await db.execute(select(Auth).where(Auth.username == username))
         auth = result.scalar_one_or_none()
@@ -231,6 +238,7 @@ def create_token(user_id: str, username: str, role: str = "user") -> str:
     - jti: unique token identifier
     """
     import uuid
+
     return jwt.encode(
         {
             "sub": user_id,
@@ -275,6 +283,7 @@ def record_attempt(ip: str):
 
 
 # ── Access Check ─────────────────────────────────────────────
+
 
 def get_auth_mode() -> AuthMode:
     """Returns the current auth mode. Default is PASSWORD."""

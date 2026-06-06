@@ -75,7 +75,10 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<Modal {onclose} class="w-full max-w-[520px] mx-4 max-md:mx-0 max-md:rounded-none max-h-[400px] max-md:max-h-dvh flex flex-col mb-[6vh] max-md:mb-0">
+<Modal
+	{onclose}
+	class="w-full max-w-[520px] mx-4 max-md:mx-0 max-md:rounded-none max-h-[400px] max-md:max-h-dvh flex flex-col mb-[6vh] max-md:mb-0"
+>
 	<div class="flex items-center px-4 py-2.5 gap-2.5 border-b border-gray-200 dark:border-white/6">
 		<Icon name="search" size={14} class="text-gray-400 shrink-0" />
 		<input
@@ -85,7 +88,10 @@
 			placeholder={$t('quickOpen.searchFiles')}
 			bind:value={query}
 		/>
-		<span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/6 text-gray-400 shrink-0">ESC</span>
+		<span
+			class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/6 text-gray-400 shrink-0"
+			>ESC</span
+		>
 	</div>
 
 	{#if results.length > 0}
@@ -94,14 +100,20 @@
 				<button
 					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-left transition-colors duration-75
 						{i === selectedIndex
-							? 'bg-gray-200/50 text-gray-900 dark:bg-white/6 dark:text-white'
-							: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/4'}"
+						? 'bg-gray-200/50 text-gray-900 dark:bg-white/6 dark:text-white'
+						: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/4'}"
 					onclick={() => selectResult(r)}
-					onmouseenter={() => selectedIndex = i}
+					onmouseenter={() => (selectedIndex = i)}
 				>
-					<Icon name={r.type === 'directory' ? 'folder' : 'empty-page'} size={14} class="shrink-0 text-gray-400" />
+					<Icon
+						name={r.type === 'directory' ? 'folder' : 'empty-page'}
+						size={14}
+						class="shrink-0 text-gray-400"
+					/>
 					<span class="text-xs font-medium shrink-0">{r.name}</span>
-					<span class="text-[11px] text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">{relativePath(r.path)}</span>
+					<span class="text-[11px] text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap"
+						>{relativePath(r.path)}</span
+					>
 				</button>
 			{/each}
 		</div>
@@ -109,4 +121,3 @@
 		<div class="p-6 text-center text-xs text-gray-400">{$t('quickOpen.noFiles')}</div>
 	{/if}
 </Modal>
-

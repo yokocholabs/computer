@@ -9,7 +9,10 @@
 		systemEvents.newPorts.filter((p) => {
 			if (!p.session_id) return false; // unknown origin, don't show
 			// Check if this session belongs to the active workspace
-			return $activeWorkspace?.groups.some((g) => g.tabs.some((t) => t.sessionId === p.session_id)) ?? false;
+			return (
+				$activeWorkspace?.groups.some((g) => g.tabs.some((t) => t.sessionId === p.session_id)) ??
+				false
+			);
 		})
 	);
 
@@ -19,10 +22,13 @@
 	$effect(() => {
 		for (const port of relevantPorts) {
 			if (!dismissTimers.has(port.port)) {
-				dismissTimers.set(port.port, setTimeout(() => {
-					systemEvents.dismissPort(port.port);
-					dismissTimers.delete(port.port);
-				}, 10000));
+				dismissTimers.set(
+					port.port,
+					setTimeout(() => {
+						systemEvents.dismissPort(port.port);
+						dismissTimers.delete(port.port);
+					}, 10000)
+				);
 			}
 		}
 	});
@@ -44,7 +50,9 @@
 	// Find terminal tab label for a session_id
 	function terminalLabel(sessionId: string | null): string | null {
 		if (!sessionId || !$activeWorkspace) return null;
-		const tab = $activeWorkspace.groups.flatMap((g) => g.tabs).find((t) => t.sessionId === sessionId);
+		const tab = $activeWorkspace.groups
+			.flatMap((g) => g.tabs)
+			.find((t) => t.sessionId === sessionId);
 		return tab?.label ?? null;
 	}
 </script>
@@ -56,15 +64,19 @@
 				class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-neutral-900 border border-gray-200 dark:border-white/10 shadow-lg pointer-events-auto animate-in"
 			>
 				<span class="text-xs text-gray-400 shrink-0">🌐</span>
-				<span class="text-xs font-medium font-mono text-gray-700 dark:text-gray-200">:{port.port}</span>
+				<span class="text-xs font-medium font-mono text-gray-700 dark:text-gray-200"
+					>:{port.port}</span
+				>
 				<span class="text-[11px] text-gray-400">({port.process})</span>
 				{#if terminalLabel(port.session_id)}
-					<span class="text-[10px] text-gray-400 italic">{$t('port.via', { name: terminalLabel(port.session_id) })}</span>
+					<span class="text-[10px] text-gray-400 italic"
+						>{$t('port.via', { name: terminalLabel(port.session_id) })}</span
+					>
 				{/if}
 				<button
 					class="ml-1 px-2 py-0.5 rounded text-[11px] font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors duration-100 shrink-0"
-					onclick={() => preview(port)}
-				>{$t('port.preview')}</button>
+					onclick={() => preview(port)}>{$t('port.preview')}</button
+				>
 				<button
 					class="flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
 					onclick={() => dismiss(port)}

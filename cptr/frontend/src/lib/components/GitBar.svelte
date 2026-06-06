@@ -1,6 +1,20 @@
 <script lang="ts">
 	import { activeWorkspace, openFileTab } from '$lib/stores';
-	import { getGitStatus, getGitLog, getGitDiff, getGitShow, getGitBranches, stageFiles, unstageFiles, discardChanges, gitCommit, gitPull, gitPush, checkoutBranch, createGitBranch } from '$lib/apis/git';
+	import {
+		getGitStatus,
+		getGitLog,
+		getGitDiff,
+		getGitShow,
+		getGitBranches,
+		stageFiles,
+		unstageFiles,
+		discardChanges,
+		gitCommit,
+		gitPull,
+		gitPush,
+		checkoutBranch,
+		createGitBranch
+	} from '$lib/apis/git';
 	import Icon from './Icon.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import { tooltip } from '$lib/tooltip';
@@ -40,8 +54,8 @@
 	let containerEl = $state<HTMLElement | null>(null);
 
 	const workspacePath = $derived($activeWorkspace?.path ?? '');
-	const stagedFiles = $derived((gitStatus?.files ?? []).filter(f => f.staged));
-	const unstagedFiles = $derived((gitStatus?.files ?? []).filter(f => !f.staged));
+	const stagedFiles = $derived((gitStatus?.files ?? []).filter((f) => f.staged));
+	const unstagedFiles = $derived((gitStatus?.files ?? []).filter((f) => !f.staged));
 	const totalChanges = $derived((gitStatus?.files ?? []).length);
 	const allStaged = $derived(totalChanges > 0 && unstagedFiles.length === 0);
 	const someStaged = $derived(stagedFiles.length > 0 && unstagedFiles.length > 0);
@@ -59,7 +73,7 @@
 	// Clear stale selection when file is no longer in the changed list
 	$effect(() => {
 		if (view === 'changes' && selectedFile) {
-			const stillExists = (gitStatus?.files ?? []).some(f => f.path === selectedFile);
+			const stillExists = (gitStatus?.files ?? []).some((f) => f.path === selectedFile);
 			if (!stillExists) {
 				selectedFile = null;
 				fileDiff = [];
@@ -70,7 +84,13 @@
 
 	// Auto-select first file
 	$effect(() => {
-		if (expanded && view === 'changes' && totalChanges > 0 && !selectedFile && window.innerWidth >= 768) {
+		if (
+			expanded &&
+			view === 'changes' &&
+			totalChanges > 0 &&
+			!selectedFile &&
+			window.innerWidth >= 768
+		) {
 			const f = [...stagedFiles, ...unstagedFiles][0];
 			if (f) selectFile(f.path, f.staged, f.status === 'untracked');
 		}
@@ -80,7 +100,9 @@
 		if (!workspacePath) return;
 		try {
 			gitStatus = await getGitStatus(workspacePath);
-		} catch { /* silent */ }
+		} catch {
+			/* silent */
+		}
 	}
 
 	async function selectFile(path: string, staged: boolean, untracked: boolean = false) {
@@ -88,11 +110,17 @@
 		selectedCommit = null;
 		showDiff = true;
 		try {
-			const params = new URLSearchParams({ root: workspacePath, file: path, staged: String(staged) });
+			const params = new URLSearchParams({
+				root: workspacePath,
+				file: path,
+				staged: String(staged)
+			});
 			if (untracked) params.set('untracked', 'true');
 			const d = await getGitDiff(params.toString());
 			fileDiff = d.files ?? [];
-		} catch { fileDiff = []; }
+		} catch {
+			fileDiff = [];
+		}
 	}
 
 	async function selectCommit(c: Commit) {
@@ -102,21 +130,29 @@
 		try {
 			const d = await getGitShow(workspacePath, c.hash);
 			fileDiff = d.diff?.files ?? [];
-		} catch { fileDiff = []; }
+		} catch {
+			fileDiff = [];
+		}
 	}
 
-	function backToList() { showDiff = false; }
+	function backToList() {
+		showDiff = false;
+	}
 
 	async function loadHistory() {
 		try {
 			commits = await getGitLog(workspacePath, 50);
-		} catch { commits = []; }
+		} catch {
+			commits = [];
+		}
 	}
 
 	async function loadBranches() {
 		try {
 			branchData = await getGitBranches(workspacePath);
-		} catch { branchData = null; }
+		} catch {
+			branchData = null;
+		}
 	}
 
 	function switchView(v: 'changes' | 'history') {
@@ -140,9 +176,15 @@
 
 	async function toggleAll() {
 		if (allStaged) {
-			await unstageFiles(workspacePath, stagedFiles.map(f => f.path));
+			await unstageFiles(
+				workspacePath,
+				stagedFiles.map((f) => f.path)
+			);
 		} else {
-			await stageFiles(workspacePath, unstagedFiles.map(f => f.path));
+			await stageFiles(
+				workspacePath,
+				unstagedFiles.map((f) => f.path)
+			);
 		}
 		await refresh();
 	}
@@ -154,7 +196,11 @@
 			? `${commitSummary.trim()}\n\n${commitDescription.trim()}`
 			: commitSummary.trim();
 		await gitCommit(workspacePath, msg);
-		commitSummary = ''; commitDescription = ''; flash($t('git.committed')); selectedFile = null; fileDiff = [];
+		commitSummary = '';
+		commitDescription = '';
+		flash($t('git.committed'));
+		selectedFile = null;
+		fileDiff = [];
 		loading = false;
 		await refresh();
 	}
@@ -163,14 +209,16 @@
 		loading = true;
 		const d = await gitPull(workspacePath);
 		flash(d.ok ? $t('git.pulled') : d.message);
-		loading = false; await refresh();
+		loading = false;
+		await refresh();
 	}
 
 	async function doPush() {
 		loading = true;
 		const d = await gitPush(workspacePath);
 		flash(d.ok ? $t('git.pushed') : d.message);
-		loading = false; await refresh();
+		loading = false;
+		await refresh();
 	}
 
 	async function switchBranch(branch: string) {
@@ -192,7 +240,12 @@
 		await refresh();
 	}
 
-	function flash(m: string) { actionMsg = m; setTimeout(() => { actionMsg = ''; }, 3000); }
+	function flash(m: string) {
+		actionMsg = m;
+		setTimeout(() => {
+			actionMsg = '';
+		}, 3000);
+	}
 
 	// Context menu
 	let contextMenu = $state<{ file: GitFile; anchor: HTMLElement } | null>(null);
@@ -208,7 +261,10 @@
 
 	async function discardFile(path: string) {
 		await discardChanges(workspacePath, [path]);
-		if (selectedFile === path) { selectedFile = null; fileDiff = []; }
+		if (selectedFile === path) {
+			selectedFile = null;
+			fileDiff = [];
+		}
 		flash($t('git.discarded'));
 		await refresh();
 	}
@@ -232,26 +288,45 @@
 
 	function relTime(d: string) {
 		const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
-		if (s < 60) return 'now'; if (s < 3600) return `${Math.floor(s/60)}m`;
-		if (s < 86400) return `${Math.floor(s/3600)}h`; return `${Math.floor(s/86400)}d`;
+		if (s < 60) return 'now';
+		if (s < 3600) return `${Math.floor(s / 60)}m`;
+		if (s < 86400) return `${Math.floor(s / 3600)}h`;
+		return `${Math.floor(s / 86400)}d`;
 	}
 
 	function statusChar(s: string): { char: string; color: string } {
 		switch (s) {
-			case 'added': return { char: 'A', color: 'text-green-500' };
-			case 'untracked': return { char: 'U', color: 'text-green-500' };
-			case 'modified': return { char: 'M', color: 'text-amber-500' };
-			case 'deleted': return { char: 'D', color: 'text-red-400' };
-			case 'renamed': return { char: 'R', color: 'text-blue-400' };
-			case 'conflict': return { char: '!', color: 'text-orange-500' };
-			default: return { char: '?', color: 'text-gray-400' };
+			case 'added':
+				return { char: 'A', color: 'text-green-500' };
+			case 'untracked':
+				return { char: 'U', color: 'text-green-500' };
+			case 'modified':
+				return { char: 'M', color: 'text-amber-500' };
+			case 'deleted':
+				return { char: 'D', color: 'text-red-400' };
+			case 'renamed':
+				return { char: 'R', color: 'text-blue-400' };
+			case 'conflict':
+				return { char: '!', color: 'text-orange-500' };
+			default:
+				return { char: '?', color: 'text-gray-400' };
 		}
 	}
 
 	const syncAction = $derived.by(() => {
 		if (!gitStatus) return { label: $t('git.fetch'), icon: 'refresh', action: doPull };
-		if (gitStatus.behind > 0) return { label: $t('git.pullCount', { count: gitStatus.behind }), icon: 'download', action: doPull };
-		if (gitStatus.ahead > 0) return { label: $t('git.pushCount', { count: gitStatus.ahead }), icon: 'upload', action: doPush };
+		if (gitStatus.behind > 0)
+			return {
+				label: $t('git.pullCount', { count: gitStatus.behind }),
+				icon: 'download',
+				action: doPull
+			};
+		if (gitStatus.ahead > 0)
+			return {
+				label: $t('git.pushCount', { count: gitStatus.ahead }),
+				icon: 'upload',
+				action: doPush
+			};
 		return { label: $t('git.fetch'), icon: 'refresh', action: doPull };
 	});
 
@@ -261,8 +336,14 @@
 		const startY = e.clientY;
 		const startH = panelHeight;
 		const maxH = getMaxHeight();
-		function onMove(ev: PointerEvent) { panelHeight = Math.max(140, Math.min(maxH, startH - (ev.clientY - startY))); }
-		function onUp() { resizing = false; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); }
+		function onMove(ev: PointerEvent) {
+			panelHeight = Math.max(140, Math.min(maxH, startH - (ev.clientY - startY)));
+		}
+		function onUp() {
+			resizing = false;
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+		}
 		window.addEventListener('pointermove', onMove);
 		window.addEventListener('pointerup', onUp);
 	}
@@ -310,51 +391,77 @@
 </script>
 
 {#if gitStatus?.is_repo}
-	<div class="shrink-0 border-t border-gray-200 dark:border-white/6 relative" bind:this={containerEl}>
+	<div
+		class="shrink-0 border-t border-gray-200 dark:border-white/6 relative"
+		bind:this={containerEl}
+	>
 		<!-- Resize handle (top edge, styled like sidebar) -->
 		{#if expanded}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="git-resize-handle"
-				class:active={resizing}
-				onpointerdown={onResizeStart}
-			></div>
+			<div class="git-resize-handle" class:active={resizing} onpointerdown={onResizeStart}></div>
 		{/if}
 
 		<!-- Collapsed bar (entire bar is clickable to expand) -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="flex items-center h-7 px-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75"
-			onclick={() => { expanded = !expanded; if (expanded && view === 'history') loadHistory(); }}
+			onclick={() => {
+				expanded = !expanded;
+				if (expanded && view === 'history') loadHistory();
+			}}
 		>
 			<!-- Branch button (opens branch picker, stops expand) -->
 			<button
 				class="flex items-center gap-1.5 h-6 px-1.5 -ml-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
-				onclick={(e) => { e.stopPropagation(); showBranches = !showBranches; if (showBranches) loadBranches(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					showBranches = !showBranches;
+					if (showBranches) loadBranches();
+				}}
 			>
 				<Icon name="git-branch" size={12} class="text-gray-400 dark:text-gray-600 shrink-0" />
-				<span class="text-[11px] text-gray-600 dark:text-gray-400 font-mono">{gitStatus.branch}</span>
+				<span class="text-[11px] text-gray-600 dark:text-gray-400 font-mono"
+					>{gitStatus.branch}</span
+				>
 				<Icon name="chevron-down" size={9} class="text-gray-400 dark:text-gray-600" />
 			</button>
 
-			{#if gitStatus.ahead > 0}<span class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-1.5">↑{gitStatus.ahead}</span>{/if}
-			{#if gitStatus.behind > 0}<span class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-1">↓{gitStatus.behind}</span>{/if}
-			{#if totalChanges > 0}<span class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-1.5">{$t('git.changedCount', { count: totalChanges })}</span>{/if}
-			{#if actionMsg}<span class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-auto">{actionMsg}</span>{/if}
+			{#if gitStatus.ahead > 0}<span
+					class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-1.5"
+					>↑{gitStatus.ahead}</span
+				>{/if}
+			{#if gitStatus.behind > 0}<span
+					class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-1"
+					>↓{gitStatus.behind}</span
+				>{/if}
+			{#if totalChanges > 0}<span
+					class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-1.5"
+					>{$t('git.changedCount', { count: totalChanges })}</span
+				>{/if}
+			{#if actionMsg}<span class="text-[10px] font-mono text-gray-400 dark:text-gray-600 ml-auto"
+					>{actionMsg}</span
+				>{/if}
 
 			<div class="flex-1"></div>
 
 			<!-- Sync button (stops expand) -->
 			<button
 				class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
-				onclick={(e) => { e.stopPropagation(); syncAction.action(); }} disabled={loading}
+				onclick={(e) => {
+					e.stopPropagation();
+					syncAction.action();
+				}}
+				disabled={loading}
 			>
 				<Icon name={syncAction.icon} size={12} />
 				<span>{syncAction.label}</span>
 			</button>
 
 			<!-- Chevron indicator -->
-			<span class="text-gray-300 dark:text-gray-700 shrink-0 transition-transform duration-100 ml-0.5" style="transform: rotate({expanded ? '180deg' : '0deg'})">
+			<span
+				class="text-gray-300 dark:text-gray-700 shrink-0 transition-transform duration-100 ml-0.5"
+				style="transform: rotate({expanded ? '180deg' : '0deg'})"
+			>
 				<Icon name="chevron-up" size={10} />
 			</span>
 		</div>
@@ -362,27 +469,40 @@
 		<!-- Branch picker dropdown -->
 		{#if showBranches}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="fixed inset-0 z-40" onclick={() => showBranches = false}></div>
-			<div class="absolute bottom-full left-2 mb-1 w-56 max-h-64 overflow-y-auto rounded-xl border border-gray-150 dark:border-white/6 bg-white dark:bg-[#1a1a1a] shadow-xl z-50 p-0.5">
+			<div class="fixed inset-0 z-40" onclick={() => (showBranches = false)}></div>
+			<div
+				class="absolute bottom-full left-2 mb-1 w-56 max-h-64 overflow-y-auto rounded-xl border border-gray-150 dark:border-white/6 bg-white dark:bg-[#1a1a1a] shadow-xl z-50 p-0.5"
+			>
 				<!-- New branch -->
 				{#if creatingBranch}
-					<div class="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100 dark:border-white/4">
+					<div
+						class="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100 dark:border-white/4"
+					>
 						<input
 							type="text"
 							class="flex-1 h-6 px-1.5 rounded border border-gray-200 dark:border-white/10 bg-transparent text-xs text-gray-900 dark:text-white placeholder:text-gray-400 outline-none"
 							placeholder={$t('git.branchName')}
 							bind:value={newBranchName}
-							onkeydown={(e) => { if (e.key === 'Enter') createBranch(); if (e.key === 'Escape') { creatingBranch = false; newBranchName = ''; } }}
+							onkeydown={(e) => {
+								if (e.key === 'Enter') createBranch();
+								if (e.key === 'Escape') {
+									creatingBranch = false;
+									newBranchName = '';
+								}
+							}}
 							autofocus
 						/>
-						<button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" onclick={createBranch}>
+						<button
+							class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+							onclick={createBranch}
+						>
 							<Icon name="check" size={12} />
 						</button>
 					</div>
 				{:else}
 					<button
 						class="flex items-center gap-1.5 w-full h-7 px-2.5 text-[11px] text-gray-500 hover:bg-gray-50 dark:hover:bg-white/4 transition-colors border-b border-gray-100 dark:border-white/4"
-						onclick={() => creatingBranch = true}
+						onclick={() => (creatingBranch = true)}
 					>
 						<Icon name="plus" size={11} />
 						<span>{$t('git.newBranch')}</span>
@@ -390,7 +510,7 @@
 				{/if}
 
 				{#if branchData}
-					{#each (branchData.all ?? []) as b}
+					{#each branchData.all ?? [] as b}
 						<button
 							class="flex items-center gap-1.5 w-full h-7 px-2.5 text-left transition-colors duration-75
 								{b.is_current ? 'bg-gray-50 dark:bg-white/4' : 'hover:bg-gray-50 dark:hover:bg-white/3'}"
@@ -402,7 +522,9 @@
 					{/each}
 				{:else}
 					<div class="flex items-center justify-center h-10">
-						<div class="w-3.5 h-3.5 border border-gray-300 dark:border-gray-600 border-t-gray-600 dark:border-t-gray-300 rounded-full animate-spin"></div>
+						<div
+							class="w-3.5 h-3.5 border border-gray-300 dark:border-gray-600 border-t-gray-600 dark:border-t-gray-300 rounded-full animate-spin"
+						></div>
 					</div>
 				{/if}
 			</div>
@@ -411,7 +533,9 @@
 		{#if expanded}
 			<div class="border-t border-gray-100 dark:border-white/4">
 				<!-- Header tabs -->
-				<div class="flex items-center gap-0.5 h-8 px-2 border-b border-gray-100 dark:border-white/4">
+				<div
+					class="flex items-center gap-0.5 h-8 px-2 border-b border-gray-100 dark:border-white/4"
+				>
 					<!-- Mobile back button when viewing diff -->
 					{#if showDiff}
 						<button
@@ -425,14 +549,21 @@
 					<!-- Tabs (always visible) -->
 					<button
 						class="px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors duration-75
-							{view === 'changes' ? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
+							{view === 'changes'
+							? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white'
+							: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
 						onclick={() => switchView('changes')}
-					>Changes{#if totalChanges > 0}<span class="ml-1 text-gray-400 dark:text-gray-500">{totalChanges}</span>{/if}</button>
+						>Changes{#if totalChanges > 0}<span class="ml-1 text-gray-400 dark:text-gray-500"
+								>{totalChanges}</span
+							>{/if}</button
+					>
 					<button
 						class="px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors duration-75
-							{view === 'history' ? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
-						onclick={() => switchView('history')}
-					>{$t('git.history')}</button>
+							{view === 'history'
+							? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white'
+							: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
+						onclick={() => switchView('history')}>{$t('git.history')}</button
+					>
 
 					<div class="flex-1"></div>
 
@@ -448,11 +579,11 @@
 
 				<!-- Content -->
 				<div class="flex min-h-36" style="height: {panelHeight}px;">
-
 					<!-- Left pane: file list or commit list -->
-					<div class="w-full md:w-60 lg:w-72 shrink-0 md:border-r md:border-gray-100 md:dark:border-white/4 flex flex-col overflow-hidden
-						{showDiff ? 'hidden md:flex' : 'flex'}">
-
+					<div
+						class="w-full md:w-60 lg:w-72 shrink-0 md:border-r md:border-gray-100 md:dark:border-white/4 flex flex-col overflow-hidden
+						{showDiff ? 'hidden md:flex' : 'flex'}"
+					>
 						{#if view === 'changes'}
 							<!-- Global checkbox -->
 							{#if totalChanges > 0}
@@ -460,42 +591,72 @@
 									class="flex items-center gap-1.5 h-7 px-2.5 border-b border-gray-100 dark:border-white/4 hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75 shrink-0"
 									onclick={toggleAll}
 								>
-									<span class="flex items-center justify-center w-3 h-3 rounded border shrink-0
-										{allStaged ? 'border-gray-300 dark:border-gray-600 bg-gray-800 dark:bg-white' : someStaged ? 'border-gray-300 dark:border-gray-600 bg-gray-400 dark:bg-gray-500' : 'border-gray-300 dark:border-gray-600'}">
+									<span
+										class="flex items-center justify-center w-3 h-3 rounded border shrink-0
+										{allStaged
+											? 'border-gray-300 dark:border-gray-600 bg-gray-800 dark:bg-white'
+											: someStaged
+												? 'border-gray-300 dark:border-gray-600 bg-gray-400 dark:bg-gray-500'
+												: 'border-gray-300 dark:border-gray-600'}"
+									>
 										{#if allStaged || someStaged}
-											<Icon name={allStaged ? 'check' : 'minus'} size={7} class="text-white dark:text-black" />
+											<Icon
+												name={allStaged ? 'check' : 'minus'}
+												size={7}
+												class="text-white dark:text-black"
+											/>
 										{/if}
 									</span>
-									<span class="text-[11px] text-gray-600 dark:text-gray-400">{$t('git.changedFile', { count: totalChanges })}</span>
+									<span class="text-[11px] text-gray-600 dark:text-gray-400"
+										>{$t('git.changedFile', { count: totalChanges })}</span
+									>
 								</button>
 							{/if}
 
 							<!-- File list -->
 							<div class="flex-1 overflow-y-auto">
-								{#each (gitStatus?.files ?? []) as file (file.path)}
+								{#each gitStatus?.files ?? [] as file (file.path)}
 									{@const fp = fPath(file.path)}
 									{@const sc = statusChar(file.status)}
 									<button
 										class="group flex items-center gap-1.5 w-full h-7 px-2.5 text-left transition-colors duration-75
-											{selectedFile === file.path ? 'bg-gray-100 dark:bg-white/8' : 'hover:bg-gray-50 dark:hover:bg-white/3'}"
+											{selectedFile === file.path
+											? 'bg-gray-100 dark:bg-white/8'
+											: 'hover:bg-gray-50 dark:hover:bg-white/3'}"
 										onclick={() => selectFile(file.path, file.staged, file.status === 'untracked')}
 									>
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
 										<span
 											class="flex items-center justify-center w-3 h-3 rounded border shrink-0 cursor-pointer
-												{file.staged ? 'border-gray-300 dark:border-gray-600 bg-gray-800 dark:bg-white' : 'border-gray-300 dark:border-gray-600 hover:border-gray-500 dark:hover:border-gray-400'}"
-											onclick={(e) => { e.stopPropagation(); toggleStage(e, file); }}
+												{file.staged
+												? 'border-gray-300 dark:border-gray-600 bg-gray-800 dark:bg-white'
+												: 'border-gray-300 dark:border-gray-600 hover:border-gray-500 dark:hover:border-gray-400'}"
+											onclick={(e) => {
+												e.stopPropagation();
+												toggleStage(e, file);
+											}}
 										>
 											{#if file.staged}
 												<Icon name="check" size={7} class="text-white dark:text-black" />
 											{/if}
 										</span>
 										{#if fp.dir}
-											<span class="text-[10px] text-gray-400 dark:text-gray-600 truncate shrink min-w-0">{fp.dir}</span>
+											<span
+												class="text-[10px] text-gray-400 dark:text-gray-600 truncate shrink min-w-0"
+												>{fp.dir}</span
+											>
 										{/if}
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<span class="text-[11px] text-gray-800 dark:text-gray-200 truncate shrink-0 hover:underline cursor-pointer" onclick={(e) => { e.stopPropagation(); openFileTab(workspacePath.replace(/\/$/, '') + '/' + file.path); }}>{fp.name}</span>
-										<span class="ml-auto text-[10px] font-mono font-bold shrink-0 {sc.color}">{sc.char}</span>
+										<span
+											class="text-[11px] text-gray-800 dark:text-gray-200 truncate shrink-0 hover:underline cursor-pointer"
+											onclick={(e) => {
+												e.stopPropagation();
+												openFileTab(workspacePath.replace(/\/$/, '') + '/' + file.path);
+											}}>{fp.name}</span
+										>
+										<span class="ml-auto text-[10px] font-mono font-bold shrink-0 {sc.color}"
+											>{sc.char}</span
+										>
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
 										<span
 											class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
@@ -508,18 +669,21 @@
 										</span>
 									</button>
 								{/each}
-
 							</div>
 
 							<!-- Commit area: combined input group -->
 							<div class="border-t border-gray-100 dark:border-white/4 p-2 shrink-0">
-								<div class="rounded-lg border border-gray-200 dark:border-white/8 overflow-hidden focus-within:border-gray-300 dark:focus-within:border-white/15 transition-colors">
+								<div
+									class="rounded-lg border border-gray-200 dark:border-white/8 overflow-hidden focus-within:border-gray-300 dark:focus-within:border-white/15 transition-colors"
+								>
 									<input
 										type="text"
 										class="w-full h-7 px-2 bg-transparent text-[11px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none"
 										placeholder={$t('git.summaryRequired')}
 										bind:value={commitSummary}
-										onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) doCommit(); }}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' && !e.shiftKey) doCommit();
+										}}
 									/>
 									<textarea
 										class="w-full px-2 py-1.5 bg-transparent text-[11px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none resize-none border-t border-gray-100 dark:border-white/4"
@@ -531,44 +695,60 @@
 								<button
 									class="w-full h-7 mt-1.5 rounded-lg text-[11px] font-medium transition-colors duration-75
 										{stagedFiles.length && commitSummary.trim()
-											? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200'
-											: 'bg-gray-100 dark:bg-white/6 text-gray-400 dark:text-gray-600 cursor-default'}"
+										? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200'
+										: 'bg-gray-100 dark:bg-white/6 text-gray-400 dark:text-gray-600 cursor-default'}"
 									disabled={!commitSummary.trim() || !stagedFiles.length || loading}
 									onclick={doCommit}
 								>
 									{#if stagedFiles.length}
-										{$t('git.commitFilesToBranch', { count: stagedFiles.length, branch: gitStatus.branch })}
+										{$t('git.commitFilesToBranch', {
+											count: stagedFiles.length,
+											branch: gitStatus.branch
+										})}
 									{:else}
 										{$t('git.commitToBranch', { branch: gitStatus.branch })}
 									{/if}
 								</button>
 							</div>
-
 						{:else}
 							<!-- History: commit list -->
 							<div class="flex-1 overflow-y-auto">
 								{#each commits as c}
 									<button
 										class="flex flex-col w-full px-2.5 py-1.5 text-left border-b border-gray-50 dark:border-white/3 transition-colors duration-75
-											{selectedCommit?.hash === c.hash ? 'bg-gray-100 dark:bg-white/8' : 'hover:bg-gray-50 dark:hover:bg-white/3'}"
+											{selectedCommit?.hash === c.hash
+											? 'bg-gray-100 dark:bg-white/8'
+											: 'hover:bg-gray-50 dark:hover:bg-white/3'}"
 										onclick={() => selectCommit(c)}
 									>
-										<span class="text-xs text-gray-800 dark:text-gray-200 truncate w-full">{c.message}</span>
-										<span class="text-[10px] text-gray-400 dark:text-gray-600 font-mono">{c.short_hash} · {c.author} · {relTime(c.date)}</span>
+										<span class="text-xs text-gray-800 dark:text-gray-200 truncate w-full"
+											>{c.message}</span
+										>
+										<span class="text-[10px] text-gray-400 dark:text-gray-600 font-mono"
+											>{c.short_hash} · {c.author} · {relTime(c.date)}</span
+										>
 									</button>
 								{/each}
 								{#if !commits.length}
-									<div class="flex items-center justify-center h-full text-[11px] text-gray-400 dark:text-gray-600">{$t('git.noCommits')}</div>
+									<div
+										class="flex items-center justify-center h-full text-[11px] text-gray-400 dark:text-gray-600"
+									>
+										{$t('git.noCommits')}
+									</div>
 								{/if}
 							</div>
 						{/if}
 					</div>
 
 					<!-- Right pane: diff viewer -->
-					<div class="flex-1 overflow-hidden font-mono text-[11px] leading-[18px]
-						{showDiff ? 'flex flex-col' : 'hidden md:flex md:flex-col'}">
+					<div
+						class="flex-1 overflow-hidden font-mono text-[11px] leading-[18px]
+						{showDiff ? 'flex flex-col' : 'hidden md:flex md:flex-col'}"
+					>
 						{#if fileDiff.length}
-							<div class="hidden md:flex items-center h-6 px-2 border-b border-gray-100 dark:border-white/4 shrink-0">
+							<div
+								class="hidden md:flex items-center h-6 px-2 border-b border-gray-100 dark:border-white/4 shrink-0"
+							>
 								<span class="text-[10px] text-gray-400 dark:text-gray-600 font-mono truncate">
 									{#if selectedCommit}
 										{selectedCommit.short_hash} · {selectedCommit.message}
@@ -579,39 +759,64 @@
 							</div>
 							<div class="flex-1 overflow-auto">
 								<div class="diff-content">
-								{#each fileDiff as df}
-									{#if fileDiff.length > 1}
-										<div class="px-2 py-1 text-[10px] text-gray-500 dark:text-gray-400 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-white/4 sticky top-0 z-10 font-medium">{df.path}</div>
-									{/if}
-									{#each df.hunks as hunk}
-										<div class="px-2 py-0.5 text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-white/3 border-b border-gray-100 dark:border-white/4 w-full">{hunk.header}</div>
-										{#each groupLines(hunk.lines) as group}
-											<div class="w-full {blockClass(group.type)}">
-												{#each group.lines as line}
-													<div class="px-2 whitespace-pre-wrap break-all"><span class="{
-														line.type === 'added' ? 'text-green-600 dark:text-green-400' :
-														line.type === 'removed' ? 'text-red-500 dark:text-red-400' :
-														'text-gray-400 dark:text-gray-600'
-													}">{line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}</span><span class="{
-														line.type === 'added' ? 'text-green-900 dark:text-green-300' :
-														line.type === 'removed' ? 'text-red-900 dark:text-red-300' :
-														'text-gray-600 dark:text-gray-400'
-													}">{line.content}</span></div>
-												{/each}
+									{#each fileDiff as df}
+										{#if fileDiff.length > 1}
+											<div
+												class="px-2 py-1 text-[10px] text-gray-500 dark:text-gray-400 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-white/4 sticky top-0 z-10 font-medium"
+											>
+												{df.path}
 											</div>
+										{/if}
+										{#each df.hunks as hunk}
+											<div
+												class="px-2 py-0.5 text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-white/3 border-b border-gray-100 dark:border-white/4 w-full"
+											>
+												{hunk.header}
+											</div>
+											{#each groupLines(hunk.lines) as group}
+												<div class="w-full {blockClass(group.type)}">
+													{#each group.lines as line}
+														<div class="px-2 whitespace-pre-wrap break-all">
+															<span
+																class={line.type === 'added'
+																	? 'text-green-600 dark:text-green-400'
+																	: line.type === 'removed'
+																		? 'text-red-500 dark:text-red-400'
+																		: 'text-gray-400 dark:text-gray-600'}
+																>{line.type === 'added'
+																	? '+'
+																	: line.type === 'removed'
+																		? '-'
+																		: ' '}</span
+															><span
+																class={line.type === 'added'
+																	? 'text-green-900 dark:text-green-300'
+																	: line.type === 'removed'
+																		? 'text-red-900 dark:text-red-300'
+																		: 'text-gray-600 dark:text-gray-400'}>{line.content}</span
+															>
+														</div>
+													{/each}
+												</div>
+											{/each}
 										{/each}
 									{/each}
-								{/each}
 								</div>
 							</div>
 						{:else}
 							<div class="flex items-center justify-center h-full">
 								{#if view === 'history' && !selectedCommit}
-									<span class="text-[11px] text-gray-400 dark:text-gray-600">{$t('git.selectCommit')}</span>
+									<span class="text-[11px] text-gray-400 dark:text-gray-600"
+										>{$t('git.selectCommit')}</span
+									>
 								{:else if totalChanges}
-									<span class="text-[11px] text-gray-400 dark:text-gray-600">{$t('git.selectFile')}</span>
+									<span class="text-[11px] text-gray-400 dark:text-gray-600"
+										>{$t('git.selectFile')}</span
+									>
 								{:else}
-									<span class="text-[11px] text-gray-400 dark:text-gray-600">{$t('git.noLocalChanges')}</span>
+									<span class="text-[11px] text-gray-400 dark:text-gray-600"
+										>{$t('git.noLocalChanges')}</span
+									>
 								{/if}
 							</div>
 						{/if}
@@ -626,9 +831,21 @@
 	<DropdownMenu
 		anchor={contextMenu.anchor}
 		items={[
-			{ label: $t('git.discard'), icon: 'xmark', onclick: () => discardFile(contextMenu!.file.path) },
-			{ label: $t('git.copyFilePath'), icon: 'copy', onclick: () => copyFilePath(contextMenu!.file.path) },
-			{ label: $t('git.copyRelativePath'), icon: 'copy', onclick: () => copyRelativePath(contextMenu!.file.path) },
+			{
+				label: $t('git.discard'),
+				icon: 'xmark',
+				onclick: () => discardFile(contextMenu!.file.path)
+			},
+			{
+				label: $t('git.copyFilePath'),
+				icon: 'copy',
+				onclick: () => copyFilePath(contextMenu!.file.path)
+			},
+			{
+				label: $t('git.copyRelativePath'),
+				icon: 'copy',
+				onclick: () => copyRelativePath(contextMenu!.file.path)
+			}
 		]}
 		onclose={closeContextMenu}
 	/>
@@ -643,12 +860,13 @@
 	.diff-gutter-removed {
 		border-left: 3px solid transparent;
 		border-image: repeating-linear-gradient(
-			-45deg,
-			#ef4444 0,
-			#ef4444 1px,
-			transparent 1px,
-			transparent 3px
-		) 3;
+				-45deg,
+				#ef4444 0,
+				#ef4444 1px,
+				transparent 1px,
+				transparent 3px
+			)
+			3;
 	}
 
 	.git-resize-handle {

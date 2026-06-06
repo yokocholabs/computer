@@ -1,7 +1,22 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { currentWorkspace, activeTab, workspaceList, addWorkspace, loadWorkspace, gitReviewOpen, setActiveGroup, setSplitRatio, moveTabToGroup, openInSplit, openTabInSplit, setSplitDirection, appVersion, showChangelog } from '$lib/stores';
+	import {
+		currentWorkspace,
+		activeTab,
+		workspaceList,
+		addWorkspace,
+		loadWorkspace,
+		gitReviewOpen,
+		setActiveGroup,
+		setSplitRatio,
+		moveTabToGroup,
+		openInSplit,
+		openTabInSplit,
+		setSplitDirection,
+		appVersion,
+		showChangelog
+	} from '$lib/stores';
 	import { splitActive } from '$lib/stores';
 	import type { Tab, EditorGroup, WorkspaceState } from '$lib/stores';
 	import { t } from '$lib/i18n';
@@ -67,7 +82,9 @@
 	$effect(() => {
 		if (!$currentWorkspace) {
 			getWelcome()
-				.then((data) => { welcomeData = data; })
+				.then((data) => {
+					welcomeData = data;
+				})
 				.catch(() => {});
 		}
 	});
@@ -93,13 +110,15 @@
 									...g,
 									tabs: g.tabs.map((t) =>
 										t.id === tab.id ? { ...t, sessionId: data.session_id } : t
-									),
-								})),
+									)
+								}))
 							};
 						});
 					})
 					.catch((e) => console.error('Failed to init terminal:', e))
-					.finally(() => { initingTerminal = false; });
+					.finally(() => {
+						initingTerminal = false;
+					});
 				return; // Only init one at a time
 			}
 		}
@@ -152,7 +171,9 @@
 
 	$effect(() => {
 		if (typeof window === 'undefined') return;
-		function onResize() { isWideScreen = window.innerWidth >= 1024; }
+		function onResize() {
+			isWideScreen = window.innerWidth >= 1024;
+		}
 		window.addEventListener('resize', onResize);
 		return () => window.removeEventListener('resize', onResize);
 	});
@@ -257,7 +278,9 @@
 					{/if}
 				</div>
 				{#if welcomeData?.hostname}
-					<p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5 font-mono">{welcomeData.hostname}</p>
+					<p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5 font-mono">
+						{welcomeData.hostname}
+					</p>
 				{/if}
 			</div>
 
@@ -273,7 +296,7 @@
 				<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('home.start')}</h2>
 				<button
 					class="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-100"
-					onclick={() => showPicker = true}
+					onclick={() => (showPicker = true)}
 				>
 					<Icon name="folder" size={15} strokeWidth={1.3} />
 					{$t('home.openFolder')}
@@ -290,8 +313,13 @@
 								class="flex items-center gap-3 py-1.5 group text-left transition-colors duration-100"
 								onclick={() => quickOpen(item.path)}
 							>
-								<span class="text-[13px] text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">{item.name}</span>
-								<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono">{shortenPath(item.path)}</span>
+								<span
+									class="text-[13px] text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white"
+									>{item.name}</span
+								>
+								<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
+									>{shortenPath(item.path)}</span
+								>
 							</button>
 						{/each}
 					</div>
@@ -310,7 +338,9 @@
 							>
 								<Icon name="folder" size={14} strokeWidth={1.3} />
 								<span>{item.name}</span>
-								<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono">{shortenPath(item.path)}</span>
+								<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
+									>{shortenPath(item.path)}</span
+								>
 							</button>
 						{/each}
 					</div>
@@ -320,7 +350,7 @@
 	</div>
 
 	{#if showPicker}
-		<DirectoryPicker onclose={() => showPicker = false} />
+		<DirectoryPicker onclose={() => (showPicker = false)} />
 	{/if}
 {:else}
 	<!-- Editor groups layout -->
@@ -369,42 +399,36 @@
 
 				<!-- Tab content -->
 				<div class="pane-content">
-				{#if $gitReviewOpen && i === 0}
+					{#if $gitReviewOpen && i === 0}
 						<GitView />
 					{:else}
 						<!-- Persist all tab instances so state survives tab switches (like VS Code) -->
-						{#each group.tabs.filter(t => t.type === 'file' && t.filePath) as tab (tab.id)}
-							<div
-								class="persisted-tab"
-								class:persisted-tab-hidden={tab.id !== group.activeTabId}
-							>
+						{#each group.tabs.filter((t) => t.type === 'file' && t.filePath) as tab (tab.id)}
+							<div class="persisted-tab" class:persisted-tab-hidden={tab.id !== group.activeTabId}>
 								<FileEditor filePath={tab.filePath} tabId={tab.id} />
 							</div>
 						{/each}
 
-						{#each group.tabs.filter(t => t.type === 'chat') as tab (tab.id)}
-							<div
-								class="persisted-tab"
-								class:persisted-tab-hidden={tab.id !== group.activeTabId}
-							>
-								<ChatPanel workspace={$currentWorkspace.path} chatId={tab.path?.startsWith('new-') || tab.path?.startsWith('pending-') ? undefined : tab.path} tabId={tab.id} />
+						{#each group.tabs.filter((t) => t.type === 'chat') as tab (tab.id)}
+							<div class="persisted-tab" class:persisted-tab-hidden={tab.id !== group.activeTabId}>
+								<ChatPanel
+									workspace={$currentWorkspace.path}
+									chatId={tab.path?.startsWith('new-') || tab.path?.startsWith('pending-')
+										? undefined
+										: tab.path}
+									tabId={tab.id}
+								/>
 							</div>
 						{/each}
 
-						{#each group.tabs.filter(t => t.type === 'terminal' && t.sessionId) as tab (tab.id)}
-							<div
-								class="persisted-tab"
-								class:persisted-tab-hidden={tab.id !== group.activeTabId}
-							>
+						{#each group.tabs.filter((t) => t.type === 'terminal' && t.sessionId) as tab (tab.id)}
+							<div class="persisted-tab" class:persisted-tab-hidden={tab.id !== group.activeTabId}>
 								<Terminal sessionId={tab.sessionId} />
 							</div>
 						{/each}
 
-						{#each group.tabs.filter(t => t.type === 'preview' && t.port) as tab (tab.id)}
-							<div
-								class="persisted-tab"
-								class:persisted-tab-hidden={tab.id !== group.activeTabId}
-							>
+						{#each group.tabs.filter((t) => t.type === 'preview' && t.port) as tab (tab.id)}
+							<div class="persisted-tab" class:persisted-tab-hidden={tab.id !== group.activeTabId}>
 								<PortPreview port={tab.port} />
 							</div>
 						{/each}
@@ -414,7 +438,9 @@
 							<FileBrowser />
 						{:else if groupTab.type === 'terminal' && !groupTab.sessionId}
 							<div class="flex items-center justify-center h-full">
-								<div class="w-5 h-5 border-2 border-gray-800 border-t-gray-400 rounded-full animate-spin"></div>
+								<div
+									class="w-5 h-5 border-2 border-gray-800 border-t-gray-400 rounded-full animate-spin"
+								></div>
 							</div>
 						{/if}
 					{/if}

@@ -34,7 +34,9 @@ async def create_session(req: CreateSessionRequest):
     """Create a new terminal session."""
     logger.info(f"Creating terminal session: cwd={req.cwd}, rows={req.rows}, cols={req.cols}")
     session = manager.create(rows=req.rows, cols=req.cols, cwd=req.cwd)
-    logger.info(f"Created session {session.session_id} at {session.cwd}, fd={session._fd}, alive={session.is_alive()}")
+    logger.info(
+        f"Created session {session.session_id} at {session.cwd}, fd={session._fd}, alive={session.is_alive()}"
+    )
     return SessionInfo(session_id=session.session_id, cwd=session.cwd)
 
 
@@ -81,7 +83,9 @@ async def terminal_ws(websocket: WebSocket, session_id: str):
         return
 
     await websocket.accept()
-    logger.info(f"WebSocket connected for session {session_id}, fd={session._fd}, alive={session.is_alive()}")
+    logger.info(
+        f"WebSocket connected for session {session_id}, fd={session._fd}, alive={session.is_alive()}"
+    )
 
     # Replay scrollback buffer so reconnecting clients see history
     scrollback = session.get_scrollback()
@@ -175,6 +179,7 @@ async def terminal_ws(websocket: WebSocket, session_id: str):
                     else:
                         # Legacy JSON fallback
                         import json as _json
+
                         resize_data = _json.loads(payload)
                         cols = resize_data.get("cols", 80)
                         rows = resize_data.get("rows", 24)
@@ -192,4 +197,3 @@ async def terminal_ws(websocket: WebSocket, session_id: str):
             await read_task
         except asyncio.CancelledError:
             pass
-

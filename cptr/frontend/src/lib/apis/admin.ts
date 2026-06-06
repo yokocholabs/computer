@@ -26,25 +26,25 @@ export const deleteUser = (userId: string) =>
 export const updateRole = (userId: string, role: string) =>
 	fetchJSON(`/api/admin/users/${userId}/role`, {
 		...jsonBody({ role }),
-		method: 'PUT',
+		method: 'PUT'
 	});
 
 export const updateUserProfile = (userId: string, display_name: string | null) =>
 	fetchJSON(`/api/admin/users/${userId}/profile`, {
 		...jsonBody({ display_name }),
-		method: 'PUT',
+		method: 'PUT'
 	});
 
 export const resetPassword = (userId: string, password: string) =>
 	fetchJSON(`/api/admin/users/${userId}/password`, {
 		...jsonBody({ password }),
-		method: 'PUT',
+		method: 'PUT'
 	});
 
 export const updateUsername = (userId: string, username: string) =>
 	fetchJSON(`/api/admin/users/${userId}/username`, {
 		...jsonBody({ username }),
-		method: 'PUT',
+		method: 'PUT'
 	});
 
 export const getAdminConfig = async (): Promise<Record<string, unknown>> => {
@@ -55,9 +55,8 @@ export const getAdminConfig = async (): Promise<Record<string, unknown>> => {
 export const updateConfig = (config: Record<string, unknown>) =>
 	fetchJSON('/api/admin/config', {
 		method: 'PUT',
-		...jsonBody({ config }),
+		...jsonBody({ config })
 	});
-
 
 // ── Connections ─────────────────────────────────────────────
 
@@ -89,14 +88,19 @@ export const createConnection = (conn: {
 	models?: string[];
 }) => fetchJSON('/api/admin/connections', jsonBody(conn));
 
-export const updateConnection = (id: string, updates: Partial<Omit<Connection, 'id' | 'data'>> & { models?: string[] }) =>
+export const updateConnection = (
+	id: string,
+	updates: Partial<Omit<Connection, 'id' | 'data'>> & { models?: string[] }
+) =>
 	fetchJSON(`/api/admin/connections/${id}`, {
 		...jsonBody(updates),
-		method: 'PUT',
+		method: 'PUT'
 	});
 
 export const deleteConnection = (id: string) =>
 	fetchJSON(`/api/admin/connections/${id}`, { method: 'DELETE' });
 
 export const verifyConnection = (id: string) =>
-	fetchJSON<{ ok: boolean; message: string }>(`/api/admin/connections/${id}/verify`, { method: 'POST' });
+	fetchJSON<{ ok: boolean; message: string }>(`/api/admin/connections/${id}/verify`, {
+		method: 'POST'
+	});

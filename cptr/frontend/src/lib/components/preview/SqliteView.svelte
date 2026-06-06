@@ -61,7 +61,7 @@
 		// Get total row count
 		try {
 			const countResult = db.exec(`SELECT COUNT(*) FROM "${name}"`);
-			totalRows = countResult[0]?.values[0]?.[0] as number ?? 0;
+			totalRows = (countResult[0]?.values[0]?.[0] as number) ?? 0;
 		} catch {
 			totalRows = 0;
 		}
@@ -133,7 +133,9 @@
 		return '';
 	}
 
-	onMount(() => { loadDb(); });
+	onMount(() => {
+		loadDb();
+	});
 
 	onDestroy(() => {
 		if (db) {
@@ -154,15 +156,19 @@
 			<div class="tabs">
 				{#each tables as table}
 					<button
-						class="tab" class:active={activeTable === table && !queryMode}
-						onclick={() => selectTable(table)}
-					>{table}</button>
+						class="tab"
+						class:active={activeTable === table && !queryMode}
+						onclick={() => selectTable(table)}>{table}</button
+					>
 				{/each}
 			</div>
 			<button
-				class="tab query-tab" class:active={queryMode}
-				onclick={() => { queryMode = true; }}
-			>SQL</button>
+				class="tab query-tab"
+				class:active={queryMode}
+				onclick={() => {
+					queryMode = true;
+				}}>SQL</button
+			>
 		</div>
 
 		<!-- Query input -->
@@ -173,7 +179,9 @@
 					bind:value={customQuery}
 					placeholder="SELECT * FROM ..."
 					rows="2"
-					onkeydown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runQuery(); }}
+					onkeydown={(e) => {
+						if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runQuery();
+					}}
 				></textarea>
 				<button class="run-btn" onclick={runQuery}>Run ⌘↵</button>
 			</div>
@@ -214,7 +222,9 @@
 				<span class="page-info">
 					{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalRows)} of {totalRows}
 				</span>
-				<button class="page-btn" onclick={nextPage} disabled={(page + 1) * PAGE_SIZE >= totalRows}>Next →</button>
+				<button class="page-btn" onclick={nextPage} disabled={(page + 1) * PAGE_SIZE >= totalRows}
+					>Next →</button
+				>
 			</div>
 		{/if}
 	{/if}
@@ -252,7 +262,9 @@
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	/* ── Tab bar ──────────────────────────────────── */

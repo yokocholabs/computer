@@ -56,7 +56,7 @@ function connect(watchPath: string) {
 					port: msg.port,
 					pid: msg.pid,
 					process: msg.process,
-					session_id: msg.session_id ?? null,
+					session_id: msg.session_id ?? null
 				};
 				// Add to active ports
 				_ports = [..._ports.filter((p) => p.port !== info.port), info];
@@ -106,9 +106,7 @@ function watchPath(path: string) {
 }
 
 function isRelevantFsChange(targetPath: string): boolean {
-	return _fsChangedPaths.some(
-		(p) => p === targetPath || p.startsWith(targetPath + '/')
-	);
+	return _fsChangedPaths.some((p) => p === targetPath || p.startsWith(targetPath + '/'));
 }
 
 function dismissPort(port: number) {
@@ -122,12 +120,20 @@ export const systemEvents = {
 	watchPath,
 
 	// FS
-	get fsTick() { return _fsTick; },
-	get fsChangedPaths() { return _fsChangedPaths; },
+	get fsTick() {
+		return _fsTick;
+	},
+	get fsChangedPaths() {
+		return _fsChangedPaths;
+	},
 	isRelevantFsChange,
 
 	// Ports
-	get ports() { return _ports; },
-	get newPorts() { return _newPorts; },
-	dismissPort,
+	get ports() {
+		return _ports;
+	},
+	get newPorts() {
+		return _newPorts;
+	},
+	dismissPort
 };

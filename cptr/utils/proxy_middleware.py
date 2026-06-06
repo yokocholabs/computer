@@ -109,7 +109,9 @@ class ProxyFallbackMiddleware:
 
         return None
 
-    async def _proxy_http(self, scope: Scope, receive: Receive, send: Send, port: int, path: str) -> None:
+    async def _proxy_http(
+        self, scope: Scope, receive: Receive, send: Send, port: int, path: str
+    ) -> None:
         """Proxy an HTTP request through the shared proxy function."""
         from cptr.routers.proxy import proxy_http_request, cache_path
 
@@ -120,7 +122,9 @@ class ProxyFallbackMiddleware:
         response = await proxy_http_request(port, path.lstrip("/"), request)
         await response(scope, receive, send)
 
-    async def _proxy_websocket(self, scope: Scope, receive: Receive, send: Send, port: int, path: str) -> None:
+    async def _proxy_websocket(
+        self, scope: Scope, receive: Receive, send: Send, port: int, path: str
+    ) -> None:
         """Proxy a WebSocket connection to the dev server.
 
         This handles the case where Vite HMR or similar tools try to
@@ -142,6 +146,7 @@ class ProxyFallbackMiddleware:
             ws_url = f"ws://{host}:{port}{path}{qs}"
             try:
                 import websockets
+
                 upstream_ws = await asyncio.wait_for(
                     websockets.connect(ws_url, additional_headers={"host": f"127.0.0.1:{port}"}),
                     timeout=5.0,
@@ -179,7 +184,10 @@ class ProxyFallbackMiddleware:
 
         try:
             done, pending = await asyncio.wait(
-                [asyncio.create_task(client_to_upstream()), asyncio.create_task(upstream_to_client())],
+                [
+                    asyncio.create_task(client_to_upstream()),
+                    asyncio.create_task(upstream_to_client()),
+                ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
             for t in pending:

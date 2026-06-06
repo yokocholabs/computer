@@ -42,7 +42,20 @@
 		if (!dateStr) return '';
 		const parts = dateStr.split('-');
 		if (parts.length !== 3) return dateStr;
-		const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+		const months = [
+			'Jan',
+			'Feb',
+			'Mar',
+			'Apr',
+			'May',
+			'Jun',
+			'Jul',
+			'Aug',
+			'Sep',
+			'Oct',
+			'Nov',
+			'Dec'
+		];
 		const year = parts[0];
 		const monthIdx = parseInt(parts[1], 10) - 1;
 		const day = parseInt(parts[2], 10);
@@ -57,7 +70,9 @@
 				<h2 class="text-sm font-medium text-gray-900 dark:text-white">What's New</h2>
 				{#if selectedData}
 					{@const [ver, data] = selectedData}
-					<p class="mt-0.5 text-[11px] text-gray-400 dark:text-gray-600">v{ver} · {formatDate(data.date)}</p>
+					<p class="mt-0.5 text-[11px] text-gray-400 dark:text-gray-600">
+						v{ver} · {formatDate(data.date)}
+					</p>
 				{/if}
 			</div>
 
@@ -76,11 +91,13 @@
 					<button
 						class="h-7 shrink-0 rounded-lg px-2 text-[11px] transition-colors duration-75
 							{(selectedVersion ?? versions[0][0]) === ver
-								? 'bg-gray-100 text-gray-900 dark:bg-white/6 dark:text-white'
-								: 'text-gray-400 hover:text-gray-700 dark:text-gray-600 dark:hover:text-gray-300'}"
+							? 'bg-gray-100 text-gray-900 dark:bg-white/6 dark:text-white'
+							: 'text-gray-400 hover:text-gray-700 dark:text-gray-600 dark:hover:text-gray-300'}"
 						onclick={() => (selectedVersion = ver)}
 					>
-						v{ver}{#if i === 0}<span class="ml-1 font-sans text-[9px] text-gray-300 dark:text-gray-700">latest</span>{/if}
+						v{ver}{#if i === 0}<span
+								class="ml-1 font-sans text-[9px] text-gray-300 dark:text-gray-700">latest</span
+							>{/if}
 					</button>
 				{/each}
 			</div>
@@ -93,19 +110,31 @@
 					{#each Object.entries(data).filter(([key]) => key !== 'date') as [section, items]}
 						{#if Array.isArray(items) && items.length > 0}
 							<section>
-								<h3 class="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-600">{section}</h3>
+								<h3
+									class="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-600"
+								>
+									{section}
+								</h3>
 								<ul class="space-y-2.5">
 									{#each items as entry}
 										<li class="flex gap-2.5 text-xs leading-relaxed">
-											<span class="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-gray-300 dark:bg-gray-700"></span>
+											<span
+												class="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-gray-300 dark:bg-gray-700"
+											></span>
 											<div class="min-w-0">
 												{#if entry.title}
-													<span class="font-medium text-gray-900 dark:text-white">{entry.title}</span>
+													<span class="font-medium text-gray-900 dark:text-white"
+														>{entry.title}</span
+													>
 													{#if entry.content}
-														<span class="ml-1 text-gray-500 dark:text-gray-400">{entry.content}</span>
+														<span class="ml-1 text-gray-500 dark:text-gray-400"
+															>{entry.content}</span
+														>
 													{/if}
 												{:else}
-													<span class="text-gray-600 dark:text-gray-400">{entry.content || entry.raw}</span>
+													<span class="text-gray-600 dark:text-gray-400"
+														>{entry.content || entry.raw}</span
+													>
 												{/if}
 											</div>
 										</li>
@@ -127,7 +156,9 @@
 				</div>
 			{:else}
 				<div class="flex flex-col items-center justify-center py-16 gap-3">
-					<div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400"></div>
+					<div
+						class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400"
+					></div>
 					<span class="text-[11px] text-gray-400 dark:text-gray-600">Loading release notes...</span>
 				</div>
 			{/if}

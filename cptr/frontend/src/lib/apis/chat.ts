@@ -51,8 +51,7 @@ export const getChats = (
 		`/api/chats?workspace=${encodeURIComponent(workspace)}&limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_dir=${sortDir}`
 	);
 
-export const getChat = (chatId: string) =>
-	fetchJSON<ChatDetail>(`/api/chats/${chatId}`);
+export const getChat = (chatId: string) => fetchJSON<ChatDetail>(`/api/chats/${chatId}`);
 
 export const deleteChat = (chatId: string) =>
 	fetchJSON<{ ok: boolean }>(`/api/chats/${chatId}`, { method: 'DELETE' });
@@ -98,10 +97,7 @@ export const cancelTask = (chatId: string, messageId: string) =>
 	fetchJSON(`/api/chats/${chatId}/messages/${messageId}/cancel`, { method: 'POST' });
 
 export const updateCurrentMessage = (chatId: string, messageId: string) =>
-	fetchJSON<{ ok: boolean }>(
-		`/api/chats/${chatId}/current`,
-		jsonBody({ message_id: messageId })
-	);
+	fetchJSON<{ ok: boolean }>(`/api/chats/${chatId}/current`, jsonBody({ message_id: messageId }));
 
 export const updateMessage = (
 	chatId: string,
@@ -135,7 +131,4 @@ export const queueSendNow = (chatId: string, messageId: string) =>
 	);
 
 export const queueDelete = (chatId: string, messageId: string) =>
-	fetchJSON<{ ok: boolean }>(
-		`/api/chats/${chatId}/queue/${messageId}`,
-		{ method: 'DELETE' }
-	);
+	fetchJSON<{ ok: boolean }>(`/api/chats/${chatId}/queue/${messageId}`, { method: 'DELETE' });

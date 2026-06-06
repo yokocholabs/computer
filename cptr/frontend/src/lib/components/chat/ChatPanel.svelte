@@ -1,6 +1,26 @@
 <script lang="ts">
-	import { getChat, getChats, deleteChat as apiDeleteChat, sendMessage as apiSendMessage, approveToolCall, cancelTask, updateCurrentMessage, updateMessage, createMessage, queueSendNow as apiQueueSendNow, queueDelete as apiQueueDelete, type ChatMessageRow, type ChatInfo } from '$lib/apis/chat';
-	import { chatModels, defaultModel, streamingChatTabs, registerStreamingChat, unregisterStreamingChat } from '$lib/stores/chat';
+	import {
+		getChat,
+		getChats,
+		deleteChat as apiDeleteChat,
+		sendMessage as apiSendMessage,
+		approveToolCall,
+		cancelTask,
+		updateCurrentMessage,
+		updateMessage,
+		createMessage,
+		queueSendNow as apiQueueSendNow,
+		queueDelete as apiQueueDelete,
+		type ChatMessageRow,
+		type ChatInfo
+	} from '$lib/apis/chat';
+	import {
+		chatModels,
+		defaultModel,
+		streamingChatTabs,
+		registerStreamingChat,
+		unregisterStreamingChat
+	} from '$lib/stores/chat';
 	import { socketStore } from '$lib/stores/socket.svelte';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { get } from 'svelte/store';
@@ -77,16 +97,19 @@
 		if (!allMessages.length) return [];
 
 		// Exclude queued messages from the display path — they only appear in the queue UI
-		const displayMessages = allMessages.filter((m) => !(m.meta?.queued));
+		const displayMessages = allMessages.filter((m) => !m.meta?.queued);
 		if (!displayMessages.length) return [];
 
 		const msgMap = new Map(displayMessages.map((m) => [m.id, m]));
 		const childrenMap = buildChildrenMap(displayMessages);
 
 		// Determine effective currentId: fall back to last message if unset
-		const effectiveId = currentMessageId && msgMap.has(currentMessageId)
-			? currentMessageId
-			: allMessages.length > 0 ? allMessages[allMessages.length - 1].id : null;
+		const effectiveId =
+			currentMessageId && msgMap.has(currentMessageId)
+				? currentMessageId
+				: allMessages.length > 0
+					? allMessages[allMessages.length - 1].id
+					: null;
 
 		if (!effectiveId) return [];
 
@@ -109,7 +132,7 @@
 			path.push({
 				msg: next,
 				siblingIds: siblings.map((s) => s.id),
-				siblingIndex: siblings.findIndex((s) => s.id === next.id),
+				siblingIndex: siblings.findIndex((s) => s.id === next.id)
 			});
 			parentId = next.id;
 		}
@@ -312,7 +335,11 @@
 		if (data.done) {
 			// Clear streaming indicator for this tab
 			if (tabId) {
-				streamingChatTabs.update((s) => { const n = new Set(s); n.delete(tabId); return n; });
+				streamingChatTabs.update((s) => {
+					const n = new Set(s);
+					n.delete(tabId);
+					return n;
+				});
 			}
 			// Skip reload for cancelled messages — optimistic state is already correct
 			// and reloading causes a visual flash + scroll jump
@@ -346,7 +373,10 @@
 
 		const tryBind = () => {
 			const socket = socketStore.getSocket();
-			if (!socket) { setTimeout(tryBind, 100); return; }
+			if (!socket) {
+				setTimeout(tryBind, 100);
+				return;
+			}
 			socket.on('events:chat', handleSocketEvent);
 			socket.on('connect', handleReconnect);
 		};
@@ -377,7 +407,8 @@
 		const tid = tabId;
 		streamingChatTabs.update((s) => {
 			const next = new Set(s);
-			if (streaming) next.add(tid); else next.delete(tid);
+			if (streaming) next.add(tid);
+			else next.delete(tid);
 			return next;
 		});
 	});
@@ -459,37 +490,51 @@
 				// Cancel active generation, then fall through to normal send
 				const active = allMessages.find((m) => m.role === 'assistant' && !m.done);
 				if (active) {
-					try { await cancelTask(chatId, active.id); } catch {}
+					try {
+						await cancelTask(chatId, active.id);
+					} catch {}
 					await loadChat(chatId);
 				}
 			} else {
-			try {
-				const mode = get(toolApprovalMode);
-			const result = await apiSendMessage(text, selectedModel, workspace, chatId, parentId, { tool_approval_mode: mode }, undefined, files);
-				if (result.queued) {
-					// Add directly to allMessages so it appears in queue UI instantly
-					allMessages = [...allMessages, {
-						id: result.message_id,
-						parent_id: parentId,
-						role: 'user' as const,
-						content: text,
-						model: null,
-						done: true,
-						output: null,
-						usage: null,
-						meta: { queued: true },
-						created_at: Date.now(),
-					}];
-				} else {
-					await loadChat(result.chat_id);
+				try {
+					const mode = get(toolApprovalMode);
+					const result = await apiSendMessage(
+						text,
+						selectedModel,
+						workspace,
+						chatId,
+						parentId,
+						{ tool_approval_mode: mode },
+						undefined,
+						files
+					);
+					if (result.queued) {
+						// Add directly to allMessages so it appears in queue UI instantly
+						allMessages = [
+							...allMessages,
+							{
+								id: result.message_id,
+								parent_id: parentId,
+								role: 'user' as const,
+								content: text,
+								model: null,
+								done: true,
+								output: null,
+								usage: null,
+								meta: { queued: true },
+								created_at: Date.now()
+							}
+						];
+					} else {
+						await loadChat(result.chat_id);
+					}
+				} catch (e) {
+					console.error('[chat] send (queue) error', e);
+				} finally {
+					sending = false;
+					chatInputEl?.focus();
 				}
-			} catch (e) {
-				console.error('[chat] send (queue) error', e);
-			} finally {
-				sending = false;
-				chatInputEl?.focus();
-			}
-			return;
+				return;
 			} // end queue behavior
 		} // end streaming check
 
@@ -505,7 +550,7 @@
 			output: null,
 			usage: null,
 			meta: null,
-			created_at: Date.now() / 1000,
+			created_at: Date.now() / 1000
 		};
 		allMessages = [...allMessages, optimisticMsg];
 		currentMessageId = tempId;
@@ -517,7 +562,16 @@
 
 		try {
 			const mode = get(toolApprovalMode);
-			const result = await apiSendMessage(text, selectedModel, workspace, chatId ?? undefined, parentId, { tool_approval_mode: mode }, undefined, files);
+			const result = await apiSendMessage(
+				text,
+				selectedModel,
+				workspace,
+				chatId ?? undefined,
+				parentId,
+				{ tool_approval_mode: mode },
+				undefined,
+				files
+			);
 			await loadChat(result.chat_id);
 			if (isNew && tabId) {
 				updateTab(tabId, result.chat_id, text.slice(0, 40) || 'Chat');
@@ -604,8 +658,8 @@
 					id: `flush-${Date.now()}`,
 					status: 'completed',
 					role: 'assistant',
-					content: [{ type: 'output_text', text: pendingText }],
-				},
+					content: [{ type: 'output_text', text: pendingText }]
+				}
 			];
 		}
 
@@ -626,7 +680,8 @@
 		const msg = allMessages.find((m) => m.id === messageId);
 		if (msg?.output) {
 			const call = msg.output.find(
-				(item: any) => item.type === 'function_call' && item.call_id === callId && item.status === 'pending'
+				(item: any) =>
+					item.type === 'function_call' && item.call_id === callId && item.status === 'pending'
 			);
 			if (call) {
 				call.status = approved ? 'running' : 'rejected';
@@ -662,7 +717,9 @@
 
 		try {
 			const mode = get(toolApprovalMode);
-			const result = await apiSendMessage('', selectedModel, workspace, chatId, msg.parent_id, { tool_approval_mode: mode });
+			const result = await apiSendMessage('', selectedModel, workspace, chatId, msg.parent_id, {
+				tool_approval_mode: mode
+			});
 			await loadChat(result.chat_id);
 		} catch (e) {
 			console.error('[chat] regenerate error', e);
@@ -710,7 +767,13 @@
 		} else {
 			// Save As Copy: create new sibling assistant message (no LLM)
 			try {
-				await createMessage(chatId, msg.parent_id ?? null, 'assistant', content, output ?? undefined);
+				await createMessage(
+					chatId,
+					msg.parent_id ?? null,
+					'assistant',
+					content,
+					output ?? undefined
+				);
 				await loadChat(chatId);
 			} catch (e) {
 				console.error('[chat] save-as-copy error', e);
@@ -725,10 +788,8 @@
 				...ws,
 				groups: ws.groups.map((g) => ({
 					...g,
-					tabs: g.tabs.map((t) =>
-						t.id === tid ? { ...t, path: newChatId, label } : t
-					),
-				})),
+					tabs: g.tabs.map((t) => (t.id === tid ? { ...t, path: newChatId, label } : t))
+				}))
 			};
 		});
 	}
@@ -738,7 +799,7 @@
 	{#if isLanding}
 		<!-- Landing: input + recent chats -->
 		<div class="flex-1 overflow-y-auto flex items-center justify-center">
-		<div class="max-w-xl w-full mx-auto px-4 flex flex-col pb-[5vh]">
+			<div class="max-w-xl w-full mx-auto px-4 flex flex-col pb-[5vh]">
 				<!-- Greeting -->
 				<div class="mb-8 text-center">
 					<h1 class="text-lg font-normal text-gray-800 dark:text-gray-200 tracking-tight">
@@ -759,7 +820,18 @@
 					onqueueedit={handleQueueEdit}
 					onqueuedelete={handleQueueDelete}
 				/>
-				<ChatHistory chats={previousChats} onopen={openChat} ondelete={deleteChat} page={chatPage} {totalPages} perPage={CHATS_PAGE_SIZE} onpagechange={handlePageChange} sortBy={chatSortBy} sortDir={chatSortDir} onsort={handleSort} />
+				<ChatHistory
+					chats={previousChats}
+					onopen={openChat}
+					ondelete={deleteChat}
+					page={chatPage}
+					{totalPages}
+					perPage={CHATS_PAGE_SIZE}
+					onpagechange={handlePageChange}
+					sortBy={chatSortBy}
+					sortDir={chatSortDir}
+					onsort={handleSort}
+				/>
 			</div>
 		</div>
 	{:else}
@@ -767,58 +839,94 @@
 		{#if loading}
 			<div class="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
 				<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-					<style>.chat-load-spin{transform-origin:center;animation:chat-load-spin .75s infinite linear}@keyframes chat-load-spin{100%{transform:rotate(360deg)}}</style>
-					<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
-					<path d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z" fill="currentColor" class="chat-load-spin" />
+					<style>
+						.chat-load-spin {
+							transform-origin: center;
+							animation: chat-load-spin 0.75s infinite linear;
+						}
+						@keyframes chat-load-spin {
+							100% {
+								transform: rotate(360deg);
+							}
+						}
+					</style>
+					<circle
+						cx="12"
+						cy="12"
+						r="10"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						opacity="0.15"
+					/>
+					<path
+						d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z"
+						fill="currentColor"
+						class="chat-load-spin"
+					/>
 				</svg>
 			</div>
 		{:else}
-		<div bind:this={messagesEl} class="flex-1 overflow-y-auto" onscroll={handleMessagesScroll}>
-			<div class="max-w-2xl mx-auto px-4 pt-4 pb-16 flex flex-col gap-4">
-				{#if hasHiddenMessages}
-					<div bind:this={loadSentinelEl} class="h-1 w-full" aria-hidden="true"></div>
-				{/if}
-				{#each visiblePath as { msg, siblingIds, siblingIndex } (msg.id)}
-					{#if msg.role === 'user'}
-						<UserMessage
-							content={msg.content}
-							{siblingIndex}
-							siblingTotal={siblingIds.length}
-							onnavigate={(dir) => handleNavigate(msg.id, dir)}
-							onedit={(c, submit) => handleEditMessage(msg.id, c, null, submit)}
-						/>
-					{:else}
-						<AssistantMessage
-							content={msg.content}
-							done={msg.done}
-							output={msg.output}
-							{chatId}
-							messageId={msg.id}
-							{siblingIndex}
-							siblingTotal={siblingIds.length}
-							onnavigate={(dir) => handleNavigate(msg.id, dir)}
-							onregenerate={() => handleRegenerate(msg.id)}
-							onedit={(c, o, submit) => handleEditMessage(msg.id, c, o, submit)}
-							onapprove={handleApprove}
-						/>
+			<div bind:this={messagesEl} class="flex-1 overflow-y-auto" onscroll={handleMessagesScroll}>
+				<div class="max-w-2xl mx-auto px-4 pt-4 pb-16 flex flex-col gap-4">
+					{#if hasHiddenMessages}
+						<div bind:this={loadSentinelEl} class="h-1 w-full" aria-hidden="true"></div>
 					{/if}
-				{/each}
+					{#each visiblePath as { msg, siblingIds, siblingIndex } (msg.id)}
+						{#if msg.role === 'user'}
+							<UserMessage
+								content={msg.content}
+								{siblingIndex}
+								siblingTotal={siblingIds.length}
+								onnavigate={(dir) => handleNavigate(msg.id, dir)}
+								onedit={(c, submit) => handleEditMessage(msg.id, c, null, submit)}
+							/>
+						{:else}
+							<AssistantMessage
+								content={msg.content}
+								done={msg.done}
+								output={msg.output}
+								{chatId}
+								messageId={msg.id}
+								{siblingIndex}
+								siblingTotal={siblingIds.length}
+								onnavigate={(dir) => handleNavigate(msg.id, dir)}
+								onregenerate={() => handleRegenerate(msg.id)}
+								onedit={(c, o, submit) => handleEditMessage(msg.id, c, o, submit)}
+								onapprove={handleApprove}
+							/>
+						{/if}
+					{/each}
+				</div>
 			</div>
-		</div>
 		{/if}
 
 		<!-- Input area -->
 		<div class="px-4 py-3">
 			<div class="max-w-2xl mx-auto relative">
 				{#if !autoScroll && activePath.length > 0}
-					<div class="absolute -top-10 left-0 right-0 pr-2 flex justify-end z-30 pointer-events-none">
+					<div
+						class="absolute -top-10 left-0 right-0 pr-2 flex justify-end z-30 pointer-events-none"
+					>
 						<button
 							class="bg-white dark:bg-white/20 border border-gray-200 dark:border-gray-700 p-1 rounded-full pointer-events-auto shadow-sm hover:bg-gray-50 dark:hover:bg-white/30 transition-colors"
-							onclick={() => { autoScroll = true; scrollToBottom(); }}
+							onclick={() => {
+								autoScroll = true;
+								scrollToBottom();
+							}}
 							aria-label="Scroll to bottom"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 dark:text-gray-400">
-								<path fill-rule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clip-rule="evenodd" />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 20 20"
+								fill="currentColor"
+								class="w-4 h-4 text-gray-500 dark:text-gray-400"
+							>
+								<path
+									fill-rule="evenodd"
+									d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z"
+									clip-rule="evenodd"
+								/>
 							</svg>
 						</button>
 					</div>

@@ -29,9 +29,9 @@ class TerminalSession:
     _scrollback: bytearray = field(default_factory=bytearray, repr=False)
 
     # Platform handles
-    _fd: int = -1              # Unix: master pty fd
-    _pid: int = -1             # Unix: child pid
-    _process: object = None    # Windows: winpty PtyProcess
+    _fd: int = -1  # Unix: master pty fd
+    _pid: int = -1  # Unix: child pid
+    _process: object = None  # Windows: winpty PtyProcess
 
     def write(self, data: bytes) -> None:
         if IS_WINDOWS:
@@ -69,6 +69,7 @@ class TerminalSession:
         else:
             import fcntl
             import termios
+
             winsize = struct.pack("HHHH", rows, cols, 0, 0)
             fcntl.ioctl(self._fd, termios.TIOCSWINSZ, winsize)
 
@@ -89,6 +90,7 @@ class TerminalSession:
                 pass
         else:
             import signal
+
             try:
                 os.kill(self._pid, signal.SIGTERM)
             except ProcessLookupError:
@@ -142,20 +144,14 @@ def _create_unix(
             mode="w", prefix="cptr_bash_", suffix=".sh", delete=False
         )
         tmpf.write(
-            f'[[ -f "{home}/.bashrc" ]] && source "{home}/.bashrc"\n'
-            f"cd {shlex.quote(work_dir)}\n"
+            f'[[ -f "{home}/.bashrc" ]] && source "{home}/.bashrc"\ncd {shlex.quote(work_dir)}\n'
         )
         tmpf.close()
         shell_args = [shell, "--rcfile", tmpf.name, "-i"]
     else:
         # Generic POSIX: use ENV variable
-        tmpf = tempfile.NamedTemporaryFile(
-            mode="w", prefix="cptr_sh_", suffix=".sh", delete=False
-        )
-        tmpf.write(
-            f'[ -f "$HOME/.profile" ] && . "$HOME/.profile"\n'
-            f"cd {shlex.quote(work_dir)}\n"
-        )
+        tmpf = tempfile.NamedTemporaryFile(mode="w", prefix="cptr_sh_", suffix=".sh", delete=False)
+        tmpf.write(f'[ -f "$HOME/.profile" ] && . "$HOME/.profile"\ncd {shlex.quote(work_dir)}\n')
         tmpf.close()
         env["ENV"] = tmpf.name
         shell_args = [shell, "-i"]
@@ -219,9 +215,7 @@ class SessionManager:
     def __init__(self) -> None:
         self._sessions: Dict[str, TerminalSession] = {}
 
-    def create(
-        self, rows: int = 24, cols: int = 80, cwd: Optional[str] = None
-    ) -> TerminalSession:
+    def create(self, rows: int = 24, cols: int = 80, cwd: Optional[str] = None) -> TerminalSession:
         session_id = uuid.uuid4().hex[:12]
         work_dir = cwd or os.path.expanduser("~")
 

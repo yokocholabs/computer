@@ -32,6 +32,7 @@ async def _get_user_id(request: Request) -> str | None:
 
 # ── Preferences ──────────────────────────────────────────────────
 
+
 @router.get("/preferences")
 async def get_preferences(request: Request):
     """Return global user preferences (theme, locale, etc.)."""
@@ -54,6 +55,7 @@ async def put_preferences(request: Request):
 
 # ── Workspace list ───────────────────────────────────────────────
 
+
 @router.get("/workspaces")
 async def get_workspace_list(request: Request):
     """Return list of all workspace summaries for the sidebar."""
@@ -65,6 +67,7 @@ async def get_workspace_list(request: Request):
 
 
 # ── Single workspace CRUD ────────────────────────────────────────
+
 
 @router.get("/workspace")
 async def get_workspace(request: Request, path: str = Query(...)):
@@ -108,6 +111,7 @@ async def delete_workspace(request: Request, path: str = Query(...)):
 
 # ── Welcome ──────────────────────────────────────────────────────
 
+
 @router.get("/welcome")
 async def get_welcome(request: Request):
     """Return data for the welcome/landing page."""
@@ -135,13 +139,19 @@ async def get_welcome(request: Request):
     try:
         if platform.system() == "Darwin":
             import subprocess
+
             result = subprocess.run(
                 ["sysctl", "-n", "hw.memsize"],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             system["memory_total"] = int(result.stdout.strip())
             vm = subprocess.run(
-                ["vm_stat"], capture_output=True, text=True, timeout=2,
+                ["vm_stat"],
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             pages_free = 0
             page_size = 4096
@@ -163,6 +173,7 @@ async def get_welcome(request: Request):
                 system["memory_available"] = mem.get("MemAvailable", 0)
         elif platform.system() == "Windows":
             import ctypes
+
             class MEMORYSTATUSEX(ctypes.Structure):
                 _fields_ = [
                     ("dwLength", ctypes.c_ulong),
@@ -175,6 +186,7 @@ async def get_welcome(request: Request):
                     ("ullAvailVirtual", ctypes.c_ulonglong),
                     ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
                 ]
+
             mem_info = MEMORYSTATUSEX()
             mem_info.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
             ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_info))
@@ -196,9 +208,12 @@ async def get_welcome(request: Request):
     try:
         if platform.system() == "Darwin":
             import subprocess
+
             result = subprocess.run(
                 ["sysctl", "-n", "kern.boottime"],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             sec_str = result.stdout.split("sec =")[1].split(",")[0].strip()
             boot_time = int(sec_str)
@@ -208,6 +223,7 @@ async def get_welcome(request: Request):
                 system["uptime_seconds"] = int(float(f.read().split()[0]))
         elif platform.system() == "Windows":
             import ctypes
+
             ms = ctypes.windll.kernel32.GetTickCount64()
             system["uptime_seconds"] = ms // 1000
     except Exception:
@@ -223,6 +239,7 @@ async def get_welcome(request: Request):
     # CPU usage
     try:
         import subprocess
+
         if platform.system() == "Linux":
             with open("/proc/stat") as f:
                 line = f.readline()
@@ -239,7 +256,9 @@ async def get_welcome(request: Request):
         elif platform.system() == "Windows":
             result = subprocess.run(
                 ["wmic", "cpu", "get", "loadpercentage", "/value"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             for line in result.stdout.splitlines():
                 if line.startswith("LoadPercentage="):
@@ -251,10 +270,14 @@ async def get_welcome(request: Request):
     # Network interfaces
     try:
         import subprocess
+
         interfaces = []
         if platform.system() == "Darwin":
             result = subprocess.run(
-                ["ifconfig"], capture_output=True, text=True, timeout=2,
+                ["ifconfig"],
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             current_iface = ""
             for line in result.stdout.split("\n"):
@@ -266,7 +289,9 @@ async def get_welcome(request: Request):
         elif platform.system() == "Linux":
             result = subprocess.run(
                 ["ip", "-4", "-o", "addr", "show"],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             for line in result.stdout.strip().split("\n"):
                 parts = line.split()
@@ -274,7 +299,10 @@ async def get_welcome(request: Request):
                     interfaces.append({"name": parts[1], "ip": parts[3].split("/")[0]})
         elif platform.system() == "Windows":
             result = subprocess.run(
-                ["ipconfig"], capture_output=True, text=True, timeout=3,
+                ["ipconfig"],
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             current_iface = ""
             for line in result.stdout.splitlines():
@@ -294,41 +322,53 @@ async def get_welcome(request: Request):
     processes = []
     try:
         import subprocess
+
         if platform.system() == "Darwin":
             result = subprocess.run(
                 ["ps", "-Arco", "pid,pcpu,pmem,comm"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             for line in result.stdout.strip().split("\n")[1:6]:
                 parts = line.split(None, 3)
                 if len(parts) >= 4:
-                    processes.append({
-                        "pid": int(parts[0]),
-                        "cpu": float(parts[1]),
-                        "mem": float(parts[2]),
-                        "name": parts[3],
-                    })
+                    processes.append(
+                        {
+                            "pid": int(parts[0]),
+                            "cpu": float(parts[1]),
+                            "mem": float(parts[2]),
+                            "name": parts[3],
+                        }
+                    )
         elif platform.system() == "Linux":
             result = subprocess.run(
                 ["ps", "-eo", "pid,pcpu,pmem,comm", "--sort=-pcpu", "--no-headers"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             for line in result.stdout.strip().split("\n")[:5]:
                 parts = line.split(None, 3)
                 if len(parts) >= 4:
-                    processes.append({
-                        "pid": int(parts[0]),
-                        "cpu": float(parts[1]),
-                        "mem": float(parts[2]),
-                        "name": parts[3],
-                    })
+                    processes.append(
+                        {
+                            "pid": int(parts[0]),
+                            "cpu": float(parts[1]),
+                            "mem": float(parts[2]),
+                            "name": parts[3],
+                        }
+                    )
         elif platform.system() == "Windows":
             result = subprocess.run(
                 ["tasklist", "/FO", "CSV", "/NH"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             import csv
             from io import StringIO
+
             reader = csv.reader(StringIO(result.stdout))
             mem_total = system.get("memory_total", 1)
             entries = []
@@ -339,13 +379,17 @@ async def get_welcome(request: Request):
                         # Memory is in "N,NNN K" format
                         mem_str = row[4].replace(",", "").replace(" K", "").strip()
                         mem_kb = int(mem_str) if mem_str.isdigit() else 0
-                        entries.append({
-                            "pid": pid,
-                            "cpu": 0,  # tasklist doesn't provide CPU%
-                            "mem": round(mem_kb * 1024 / mem_total * 100, 1) if mem_total else 0,
-                            "name": row[0],
-                            "_mem_kb": mem_kb,
-                        })
+                        entries.append(
+                            {
+                                "pid": pid,
+                                "cpu": 0,  # tasklist doesn't provide CPU%
+                                "mem": round(mem_kb * 1024 / mem_total * 100, 1)
+                                if mem_total
+                                else 0,
+                                "name": row[0],
+                                "_mem_kb": mem_kb,
+                            }
+                        )
                     except (ValueError, IndexError):
                         pass
             # Sort by memory usage (best we can do without psutil)
@@ -358,6 +402,7 @@ async def get_welcome(request: Request):
 
     # Suggested directories
     import tempfile
+
     home = str(Path.home())
     candidates = [
         home,
@@ -373,10 +418,12 @@ async def get_welcome(request: Request):
         str(Path.home() / "src"),
     ]
     if platform.system() == "Windows":
-        candidates.extend([
-            str(Path.home() / "source" / "repos"),
-            str(Path.home() / "OneDrive" / "Documents"),
-        ])
+        candidates.extend(
+            [
+                str(Path.home() / "source" / "repos"),
+                str(Path.home() / "OneDrive" / "Documents"),
+            ]
+        )
     candidates.append(tempfile.gettempdir())
     suggestions = []
     seen = set()

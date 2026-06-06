@@ -102,13 +102,13 @@ def _find_last_json_block(text: str) -> str | None:
     Respects string quoting so braces inside strings are ignored.
     """
     # Find the last opening brace/bracket
-    for opener, closer in [('{', '}'), ('[', ']')]:
+    for opener, closer in [("{", "}"), ("[", "]")]:
         # Search backwards for the last opener
         start = _find_last_opener(text, opener, closer)
         if start is not None:
             end = _find_matching_close(text, start, opener, closer)
             if end is not None:
-                return text[start:end + 1]
+                return text[start : end + 1]
     return None
 
 
@@ -138,7 +138,7 @@ def _find_last_opener(text: str, opener: str, closer: str) -> int | None:
         if escape:
             escape = False
             continue
-        if ch == '\\' and in_string:
+        if ch == "\\" and in_string:
             escape = True
             continue
         if ch == '"' and not escape:
@@ -166,7 +166,7 @@ def _find_matching_close(text: str, start: int, opener: str, closer: str) -> int
         if escape:
             escape = False
             continue
-        if ch == '\\' and in_string:
+        if ch == "\\" and in_string:
             escape = True
             continue
         if ch == '"' and not escape:
@@ -194,13 +194,13 @@ def _fix_json(text: str) -> str:
         s = s.replace("'", '"')
 
     # Remove trailing commas before } or ]
-    s = re.sub(r',\s*([}\]])', r'\1', s)
+    s = re.sub(r",\s*([}\]])", r"\1", s)
 
     # Fix unquoted keys: word: → "word":
-    s = re.sub(r'(?<=[{,])\s*(\w+)\s*:', r' "\1":', s)
+    s = re.sub(r"(?<=[{,])\s*(\w+)\s*:", r' "\1":', s)
 
     # Remove JavaScript-style comments
-    s = re.sub(r'//[^\n]*', '', s)
+    s = re.sub(r"//[^\n]*", "", s)
 
     return s
 
@@ -220,7 +220,7 @@ def _close_json(text: str) -> str:
         if escape:
             escape = False
             continue
-        if ch == '\\' and in_string:
+        if ch == "\\" and in_string:
             escape = True
             continue
         if ch == '"':
@@ -228,11 +228,11 @@ def _close_json(text: str) -> str:
             continue
         if in_string:
             continue
-        if ch == '{':
-            stack.append('}')
-        elif ch == '[':
-            stack.append(']')
-        elif ch in ('}', ']') and stack and stack[-1] == ch:
+        if ch == "{":
+            stack.append("}")
+        elif ch == "[":
+            stack.append("]")
+        elif ch in ("}", "]") and stack and stack[-1] == ch:
             stack.pop()
 
     # Close any open string
@@ -240,7 +240,7 @@ def _close_json(text: str) -> str:
         s += '"'
 
     # Remove any trailing comma before we close
-    s = re.sub(r',\s*$', '', s)
+    s = re.sub(r",\s*$", "", s)
 
     # Append missing closers in reverse order
     while stack:

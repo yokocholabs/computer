@@ -36,7 +36,10 @@ export function bindGlobalChatListener() {
 
 	const tryBind = () => {
 		const socket = socketStore.getSocket();
-		if (!socket) { setTimeout(tryBind, 200); return; }
+		if (!socket) {
+			setTimeout(tryBind, 200);
+			return;
+		}
 
 		socket.on('events:chat', (data: { chat_id: string; done?: boolean }) => {
 			if (!data.done) return;
@@ -67,7 +70,9 @@ export const defaultModel = writable<string | null>(null);
 
 export async function refreshChatState() {
 	try {
-		const data = await fetchJSON<{ models: ChatModel[]; default: string | null }>('/api/chats/models');
+		const data = await fetchJSON<{ models: ChatModel[]; default: string | null }>(
+			'/api/chats/models'
+		);
 		chatModels.set(data.models);
 		defaultModel.set(data.default);
 		chatEnabled.set(data.models.length > 0);

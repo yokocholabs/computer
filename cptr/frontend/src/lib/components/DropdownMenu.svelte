@@ -35,7 +35,17 @@
 		align?: 'start' | 'end';
 	}
 
-	let { items, anchor, onclose, matchWidth = false, preferAbove = false, maxHeight, header, className = '', align = 'start' }: Props = $props();
+	let {
+		items,
+		anchor,
+		onclose,
+		matchWidth = false,
+		preferAbove = false,
+		maxHeight,
+		header,
+		className = '',
+		align = 'start'
+	}: Props = $props();
 
 	let menuEl: HTMLDivElement | undefined = $state();
 	let pos = $state<{ x: number; top?: number; bottom?: number }>({ x: -9999 });
@@ -111,13 +121,24 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 z-[100]" onclick={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}></div>
+<div
+	class="fixed inset-0 z-[100]"
+	onclick={onclose}
+	oncontextmenu={(e) => {
+		e.preventDefault();
+		onclose();
+	}}
+></div>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	bind:this={menuEl}
 	class="fixed z-[101] min-w-36 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-150 dark:border-white/6 shadow-xl p-0.5 {className}"
-	style="left: {pos.x}px; {pos.bottom != null ? `bottom: ${pos.bottom}px` : `top: ${pos.top ?? -9999}px`}; {anchorWidth ? `width: ${anchorWidth}px;` : ''} opacity: {ready ? 1 : 0}; pointer-events: {ready ? 'auto' : 'none'};"
+	style="left: {pos.x}px; {pos.bottom != null
+		? `bottom: ${pos.bottom}px`
+		: `top: ${pos.top ?? -9999}px`}; {anchorWidth ? `width: ${anchorWidth}px;` : ''} opacity: {ready
+		? 1
+		: 0}; pointer-events: {ready ? 'auto' : 'none'};"
 	onclick={(e) => e.stopPropagation()}
 	onmousedown={(e) => e.stopPropagation()}
 >
@@ -133,8 +154,13 @@
 			{:else}
 				<button
 					class="flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs transition-colors duration-75
-						{item.active ? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
-					onclick={() => { item.onclick(); onclose(); }}
+						{item.active
+						? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5'
+						: 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
+					onclick={() => {
+						item.onclick();
+						onclose();
+					}}
 				>
 					{#if item.image}
 						<img src={item.image} alt="" class="w-4 h-4 rounded-full object-cover shrink-0" />
@@ -146,7 +172,15 @@
 						<KeyPill text={item.shortcut} class="ml-auto shrink-0" />
 					{/if}
 					{#if item.check && item.active}
-						<svg class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+						<svg
+							class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
 							<polyline points="20 6 9 17 4 12" />
 						</svg>
 					{/if}

@@ -47,10 +47,12 @@
 		if (initialDir) {
 			fetchDirectories(initialDir);
 		} else {
-			getWelcome().then(d => {
-				const home = d.suggestions?.[0]?.path || '/';
-				fetchDirectories(home);
-			}).catch(() => fetchDirectories('/'));
+			getWelcome()
+				.then((d) => {
+					const home = d.suggestions?.[0]?.path || '/';
+					fetchDirectories(home);
+				})
+				.catch(() => fetchDirectories('/'));
 		}
 	});
 
@@ -118,7 +120,11 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" onmousedown={onclose} onkeydown={() => {}}>
+<div
+	class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center"
+	onmousedown={onclose}
+	onkeydown={() => {}}
+>
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="w-full max-w-[520px] mx-4 bg-white dark:bg-[#111] dark:border dark:border-white/8 rounded-3xl overflow-hidden shadow-2xl max-h-[420px] flex flex-col"
@@ -137,11 +143,16 @@
 				spellcheck="false"
 				autocomplete="off"
 			/>
-			<span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/6 text-gray-400 shrink-0">ESC</span>
+			<span
+				class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/6 text-gray-400 shrink-0"
+				>ESC</span
+			>
 		</div>
 
 		<!-- Location breadcrumb -->
-		<div class="flex items-center gap-2 px-4 h-8 border-b border-gray-200 dark:border-white/6 shrink-0">
+		<div
+			class="flex items-center gap-2 px-4 h-8 border-b border-gray-200 dark:border-white/6 shrink-0"
+		>
 			{#if history.length > 0}
 				<button
 					class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100"
@@ -151,7 +162,9 @@
 					<Icon name="chevron-left" size={13} />
 				</button>
 			{/if}
-			<span class="flex-1 text-[11px] text-gray-400 dark:text-gray-500 font-mono truncate">{currentPath}</span>
+			<span class="flex-1 text-[11px] text-gray-400 dark:text-gray-500 font-mono truncate"
+				>{currentPath}</span
+			>
 			<label class="flex items-center gap-1.5 cursor-pointer select-none shrink-0">
 				<input type="checkbox" bind:checked={showHidden} class="w-3 h-3 rounded accent-gray-500" />
 				<span class="text-[10px] text-gray-400">{$t('saveDialog.hidden')}</span>
@@ -162,15 +175,17 @@
 		<div bind:this={listEl} class="flex-1 overflow-y-auto p-1 min-h-0">
 			{#if loading}
 				<div class="flex items-center justify-center py-8">
-					<div class="w-4 h-4 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"></div>
+					<div
+						class="w-4 h-4 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"
+					></div>
 				</div>
 			{:else if error}
 				<div class="flex flex-col items-center justify-center gap-2 py-8 text-center">
 					<p class="text-xs text-red-400">{error}</p>
 					<button
 						class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/6 transition-colors duration-100"
-						onclick={() => fetchDirectories(currentPath)}
-					>Retry</button>
+						onclick={() => fetchDirectories(currentPath)}>Retry</button
+					>
 				</div>
 			{:else if filteredDirs.length === 0}
 				<div class="flex flex-col items-center justify-center py-8">
@@ -182,35 +197,46 @@
 						data-index={i}
 						class="flex items-center gap-2 w-full h-7 px-2 rounded-lg text-left transition-colors duration-75
 							{i === selectedIndex
-								? 'bg-gray-200/50 text-gray-900 dark:bg-white/6 dark:text-white'
-								: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/4'}"
+							? 'bg-gray-200/50 text-gray-900 dark:bg-white/6 dark:text-white'
+							: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/4'}"
 						onclick={() => navigateTo(dir.name)}
-						onmouseenter={() => { selectedIndex = i; }}
+						onmouseenter={() => {
+							selectedIndex = i;
+						}}
 					>
 						<Icon name="folder" size={14} class="shrink-0 text-gray-400" />
 						<span class="flex-1 truncate text-xs">{dir.name}</span>
-						<Icon name="chevron-right" size={12} class="shrink-0 text-gray-300 dark:text-gray-700" />
+						<Icon
+							name="chevron-right"
+							size={12}
+							class="shrink-0 text-gray-300 dark:text-gray-700"
+						/>
 					</button>
 				{/each}
 			{/if}
 		</div>
 
 		<!-- Footer -->
-		<div class="flex items-center gap-2 px-3 py-2 border-t border-gray-200 dark:border-white/6 shrink-0">
+		<div
+			class="flex items-center gap-2 px-3 py-2 border-t border-gray-200 dark:border-white/6 shrink-0"
+		>
 			{#if fileName.trim()}
-				<span class="flex-1 text-[11px] text-gray-400 dark:text-gray-600 font-mono truncate min-w-0" title={savePath}>{savePath}</span>
+				<span
+					class="flex-1 text-[11px] text-gray-400 dark:text-gray-600 font-mono truncate min-w-0"
+					title={savePath}>{savePath}</span
+				>
 			{:else}
 				<span class="flex-1"></span>
 			{/if}
 			<button
 				class="text-xs font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg transition-colors duration-100 shrink-0"
-				onclick={onclose}
-				>{$t('saveDialog.cancel')}</button>
+				onclick={onclose}>{$t('saveDialog.cancel')}</button
+			>
 			<button
 				class="text-xs font-medium text-white dark:text-black bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors duration-100 disabled:opacity-30 disabled:pointer-events-none shrink-0"
 				onclick={doSave}
-				disabled={!fileName.trim()}
-				>{$t('saveDialog.save')}</button>
+				disabled={!fileName.trim()}>{$t('saveDialog.save')}</button
+			>
 		</div>
 	</div>
 </div>

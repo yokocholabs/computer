@@ -75,12 +75,20 @@ def resolve_cached_port(path: str) -> int | None:
 # ── Headers ────────────────────────────────────────────────────
 
 _HOP_BY_HOP = {
-    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-    "te", "trailers", "transfer-encoding", "upgrade",
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
 }
 
 _SKIP_REQUEST_HEADERS = {
-    "host", "connection", "accept-encoding",
+    "host",
+    "connection",
+    "accept-encoding",
 }
 
 
@@ -124,6 +132,7 @@ def _build_response_headers(upstream_headers: httpx.Headers) -> dict[str, str]:
 
 # ── Core proxy function (reused by middleware) ──────────────────
 
+
 async def proxy_http_request(port: int, path: str, request: Request) -> Response:
     """Proxy an HTTP request to localhost:{port}/{path}.
 
@@ -159,13 +168,19 @@ async def proxy_http_request(port: int, path: str, request: Request) -> Response
         except httpx.ConnectError:
             continue
         except httpx.TimeoutException:
-            return Response(content=f"Timeout connecting to localhost:{port}", status_code=504, media_type="text/plain")
+            return Response(
+                content=f"Timeout connecting to localhost:{port}",
+                status_code=504,
+                media_type="text/plain",
+            )
         except Exception as e:
             logger.error(f"Proxy error for port {port}: {e}")
             return Response(content=f"Proxy error: {e}", status_code=502, media_type="text/plain")
 
     if upstream is None:
-        return Response(content=f"Cannot connect to localhost:{port}", status_code=502, media_type="text/plain")
+        return Response(
+            content=f"Cannot connect to localhost:{port}", status_code=502, media_type="text/plain"
+        )
 
     response_headers = _build_response_headers(upstream.headers)
 
@@ -179,7 +194,10 @@ async def proxy_http_request(port: int, path: str, request: Request) -> Response
 
 # ── HTTP proxy route ────────────────────────────────────────────
 
-@router.api_route("/{port}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+
+@router.api_route(
+    "/{port}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+)
 async def proxy_route(port: int, path: str, request: Request) -> Response:
     """Proxy an HTTP request to localhost:{port}/{path}."""
     # Cache this path so the middleware can resolve sub-resources
@@ -188,6 +206,7 @@ async def proxy_route(port: int, path: str, request: Request) -> Response:
 
 
 # ── WebSocket proxy route ──────────────────────────────────────
+
 
 @router.websocket("/{port}/ws-proxy")
 @router.websocket("/{port}/ws-proxy/{path:path}")
@@ -211,6 +230,7 @@ async def proxy_websocket(websocket: WebSocket, port: int, path: str = ""):
         ws_url = f"ws://{host}:{port}/{path}{qs}"
         try:
             import websockets
+
             upstream_ws = await asyncio.wait_for(
                 websockets.connect(ws_url, additional_headers={"host": f"127.0.0.1:{port}"}),
                 timeout=5.0,

@@ -78,16 +78,72 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
 # Extensions we know are text
 TEXT_EXTENSIONS = {
-    ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx", ".svelte",
-    ".css", ".html", ".htm", ".json", ".xml", ".yaml", ".yml",
-    ".toml", ".ini", ".cfg", ".conf", ".sh", ".bash", ".zsh",
-    ".fish", ".env", ".gitignore", ".dockerignore", ".editorconfig",
-    ".rs", ".go", ".java", ".c", ".h", ".cpp", ".hpp", ".rb",
-    ".php", ".pl", ".swift", ".kt", ".scala", ".sql", ".r",
-    ".lua", ".vim", ".el", ".ex", ".exs", ".erl", ".hs",
-    ".ml", ".clj", ".lisp", ".csv", ".tsv", ".log", ".diff",
-    ".patch", ".makefile", ".cmake", ".gradle", ".sbt",
-    ".tf", ".hcl", ".nix", ".lock", ".svg",
+    ".txt",
+    ".md",
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".svelte",
+    ".css",
+    ".html",
+    ".htm",
+    ".json",
+    ".xml",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
+    ".env",
+    ".gitignore",
+    ".dockerignore",
+    ".editorconfig",
+    ".rs",
+    ".go",
+    ".java",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".rb",
+    ".php",
+    ".pl",
+    ".swift",
+    ".kt",
+    ".scala",
+    ".sql",
+    ".r",
+    ".lua",
+    ".vim",
+    ".el",
+    ".ex",
+    ".exs",
+    ".erl",
+    ".hs",
+    ".ml",
+    ".clj",
+    ".lisp",
+    ".csv",
+    ".tsv",
+    ".log",
+    ".diff",
+    ".patch",
+    ".makefile",
+    ".cmake",
+    ".gradle",
+    ".sbt",
+    ".tf",
+    ".hcl",
+    ".nix",
+    ".lock",
+    ".svg",
 }
 
 
@@ -104,18 +160,42 @@ def _detect_language(name: str) -> Optional[str]:
     """Map file extension to a language identifier for syntax highlighting."""
     ext = Path(name).suffix.lower()
     lang_map = {
-        ".py": "python", ".js": "javascript", ".ts": "typescript",
-        ".jsx": "jsx", ".tsx": "tsx", ".svelte": "svelte",
-        ".css": "css", ".html": "html", ".json": "json",
-        ".xml": "xml", ".yaml": "yaml", ".yml": "yaml",
-        ".toml": "toml", ".md": "markdown", ".sh": "bash",
-        ".bash": "bash", ".zsh": "bash", ".rs": "rust",
-        ".go": "go", ".java": "java", ".c": "c", ".h": "c",
-        ".cpp": "cpp", ".hpp": "cpp", ".rb": "ruby",
-        ".php": "php", ".swift": "swift", ".kt": "kotlin",
-        ".sql": "sql", ".r": "r", ".lua": "lua",
-        ".dockerfile": "dockerfile", ".makefile": "makefile",
-        ".tf": "hcl", ".hcl": "hcl", ".nix": "nix",
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".jsx": "jsx",
+        ".tsx": "tsx",
+        ".svelte": "svelte",
+        ".css": "css",
+        ".html": "html",
+        ".json": "json",
+        ".xml": "xml",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".toml": "toml",
+        ".md": "markdown",
+        ".sh": "bash",
+        ".bash": "bash",
+        ".zsh": "bash",
+        ".rs": "rust",
+        ".go": "go",
+        ".java": "java",
+        ".c": "c",
+        ".h": "c",
+        ".cpp": "cpp",
+        ".hpp": "cpp",
+        ".rb": "ruby",
+        ".php": "php",
+        ".swift": "swift",
+        ".kt": "kotlin",
+        ".sql": "sql",
+        ".r": "r",
+        ".lua": "lua",
+        ".dockerfile": "dockerfile",
+        ".makefile": "makefile",
+        ".tf": "hcl",
+        ".hcl": "hcl",
+        ".nix": "nix",
     }
     return lang_map.get(ext)
 
@@ -126,8 +206,14 @@ def _is_text_file(filepath: Path) -> bool:
         return True
     # Also check common extensionless files
     if filepath.name.lower() in {
-        "makefile", "dockerfile", "gemfile", "rakefile",
-        "procfile", "license", "readme", "changelog",
+        "makefile",
+        "dockerfile",
+        "gemfile",
+        "rakefile",
+        "procfile",
+        "license",
+        "readme",
+        "changelog",
     }:
         return True
     # Content sniff: read first 8KB and check for null bytes
@@ -208,9 +294,21 @@ async def write_file(req: WriteFileRequest):
 
 
 SEARCH_IGNORE_DIRS = {
-    ".git", "node_modules", "__pycache__", ".svelte-kit", ".next",
-    "dist", "build", ".venv", "venv", ".tox", ".mypy_cache",
-    ".pytest_cache", ".eggs", "*.egg-info", ".DS_Store",
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".svelte-kit",
+    ".next",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".eggs",
+    "*.egg-info",
+    ".DS_Store",
 }
 
 
@@ -264,18 +362,30 @@ async def search_files(
                         score = 1
                     else:
                         score = 2
-                    matches.append((score, len(item.name), SearchResult(
-                        path=str(item),
-                        name=item.name,
-                        type="directory" if item.is_dir() else "file",
-                    )))
+                    matches.append(
+                        (
+                            score,
+                            len(item.name),
+                            SearchResult(
+                                path=str(item),
+                                name=item.name,
+                                type="directory" if item.is_dir() else "file",
+                            ),
+                        )
+                    )
                 elif not query_lower:
                     # Empty query: return top-level files
-                    matches.append((2, len(item.name), SearchResult(
-                        path=str(item),
-                        name=item.name,
-                        type="directory" if item.is_dir() else "file",
-                    )))
+                    matches.append(
+                        (
+                            2,
+                            len(item.name),
+                            SearchResult(
+                                path=str(item),
+                                name=item.name,
+                                type="directory" if item.is_dir() else "file",
+                            ),
+                        )
+                    )
 
                 if item.is_dir():
                     walk(item, depth + 1)
@@ -506,7 +616,7 @@ async def serve_static(file_path: str):
     E.g. /api/files/serve/home/user/project/index.html
     """
     # Windows paths arrive as "C:/Users/..." - don't prepend /
-    if len(file_path) >= 2 and file_path[1] == ':':
+    if len(file_path) >= 2 and file_path[1] == ":":
         target = Path(file_path).resolve()
     else:
         target = Path("/" + file_path).resolve()

@@ -8,7 +8,7 @@ import { clearSession } from '$lib/session';
 export async function fetchHandler(path: string, init?: RequestInit): Promise<Response> {
 	const res = await fetch(path, {
 		...init,
-		credentials: 'include',
+		credentials: 'include'
 	});
 	// 401 on non-auth endpoints means the session expired; auto-logout.
 	// Auth endpoints (login, session check) naturally return 401; don't intercept those.
@@ -40,5 +40,5 @@ export class ApiError extends Error {
 export const jsonBody = (data: unknown): RequestInit => ({
 	method: 'POST',
 	headers: { 'Content-Type': 'application/json' },
-	body: JSON.stringify(data),
+	body: JSON.stringify(data)
 });

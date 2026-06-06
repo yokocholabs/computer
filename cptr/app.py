@@ -28,11 +28,14 @@ app = FastAPI()
 async def startup():
     await init_db()
     from cptr.env import STARTUP_TOKEN
+
     app.state.startup_token = STARTUP_TOKEN
     # Reconcile stuck chat state from prior crash/restart
     from cptr.env import ENABLE_CHAT_RECONCILE_ON_STARTUP
+
     if ENABLE_CHAT_RECONCILE_ON_STARTUP:
         from cptr.utils.chat_task import reconcile_chat_state
+
         await reconcile_chat_state()
 
 
@@ -41,7 +44,13 @@ async def startup():
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     # Skip auth for: auth endpoints, health, static assets, HTML pages
-    if path.startswith("/api/auth") or path == "/api/health" or path == "/api/config" or path == "/api/changelog" or path == "/manifest.json":
+    if (
+        path.startswith("/api/auth")
+        or path == "/api/health"
+        or path == "/api/config"
+        or path == "/api/changelog"
+        or path == "/manifest.json"
+    ):
         return await call_next(request)
     if path.startswith("/_app/") or not path.startswith("/api/"):
         return await call_next(request)
@@ -73,20 +82,21 @@ async def auth_middleware(request: Request, call_next):
 # Added after auth middleware so it wraps outermost (runs before auth),
 # since proxied sub-resources don't need cptr auth.
 from cptr.utils.proxy_middleware import ProxyFallbackMiddleware
+
 app.add_middleware(ProxyFallbackMiddleware)
 
 
 # Path normalization middleware (Windows: \ → / in JSON responses)
 import platform
+
 if platform.system() == "Windows":
     import json as _json
 
     @app.middleware("http")
     async def normalize_paths_middleware(request: Request, call_next):
         response = await call_next(request)
-        if (
-            response.headers.get("content-type", "").startswith("application/json")
-            and hasattr(response, "body")
+        if response.headers.get("content-type", "").startswith("application/json") and hasattr(
+            response, "body"
         ):
             try:
                 body = b""
@@ -99,6 +109,7 @@ if platform.system() == "Windows":
                 _normalize_obj(data)
                 new_body = _json.dumps(data, ensure_ascii=False).encode("utf-8")
                 from starlette.responses import Response as StarletteResponse
+
                 return StarletteResponse(
                     content=new_body,
                     status_code=response.status_code,
@@ -148,7 +159,7 @@ async def get_config():
         version = "dev"
 
     return {
-        "auth_mode": mode.value if hasattr(mode, 'value') else str(mode),
+        "auth_mode": mode.value if hasattr(mode, "value") else str(mode),
         "needs_setup": needs_setup,
         "signup_enabled": signup_enabled,
         "version": version,
@@ -172,6 +183,7 @@ app.include_router(workspace_router)
 @app.get("/api/health")
 async def health():
     import os
+
     return {"status": "ok", "uptime_seconds": int(time.time() - START_TIME), "pid": os.getpid()}
 
 
@@ -179,6 +191,7 @@ async def health():
 async def get_changelog():
     """Return parsed CHANGELOG.md as structured JSON (max 5 versions)."""
     from cptr.utils.changelog import CHANGELOG
+
     return {key: CHANGELOG[key] for idx, key in enumerate(CHANGELOG) if idx < 5}
 
 
@@ -212,7 +225,12 @@ async def pwa_manifest():
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
             {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
-            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+            {
+                "src": "/icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable",
+            },
         ],
         "categories": ["developer", "productivity", "utilities"],
     }
@@ -221,7 +239,9 @@ async def pwa_manifest():
 # Frontend (unchanged)
 FRONTEND_BUILD_DIR = Path(__file__).parent / "frontend" / "build"
 if FRONTEND_BUILD_DIR.exists():
-    app.mount("/_app", StaticFiles(directory=str(FRONTEND_BUILD_DIR / "_app")), name="frontend-assets")
+    app.mount(
+        "/_app", StaticFiles(directory=str(FRONTEND_BUILD_DIR / "_app")), name="frontend-assets"
+    )
 
     @app.get("/{full_path:path}")
     async def serve_spa(request: Request, full_path: str):

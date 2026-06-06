@@ -179,6 +179,7 @@ async def create_connection(body: CreateConnectionRequest, request: Request):
     """Add a new AI connection."""
     require_admin(request)
     import uuid as _uuid
+
     connections = await _get_connections()
     conn = {
         "id": str(_uuid.uuid4()),
@@ -259,17 +260,27 @@ async def verify_connection(conn_id: str, request: Request):
         if provider == "anthropic":
             url = (base_url or "https://api.anthropic.com/v1") + "/messages"
             async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.post(url, headers={
-                    "x-api-key": api_key or "",
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                }, json={"model": "claude-sonnet-4-20250514", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]})
+                r = await client.post(
+                    url,
+                    headers={
+                        "x-api-key": api_key or "",
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": "claude-sonnet-4-20250514",
+                        "max_tokens": 1,
+                        "messages": [{"role": "user", "content": "hi"}],
+                    },
+                )
                 if r.status_code in (200, 201):
                     return {"ok": True, "message": "Connected"}
                 elif r.status_code == 401:
                     return JSONResponse({"ok": False, "message": "Invalid API key"}, 400)
                 else:
-                    return JSONResponse({"ok": False, "message": f"API returned {r.status_code}"}, 400)
+                    return JSONResponse(
+                        {"ok": False, "message": f"API returned {r.status_code}"}, 400
+                    )
 
         elif provider == "openai":
             url = (base_url or "https://api.openai.com/v1") + "/models"
@@ -280,7 +291,9 @@ async def verify_connection(conn_id: str, request: Request):
                 elif r.status_code == 401:
                     return JSONResponse({"ok": False, "message": "Invalid API key"}, 400)
                 else:
-                    return JSONResponse({"ok": False, "message": f"API returned {r.status_code}"}, 400)
+                    return JSONResponse(
+                        {"ok": False, "message": f"API returned {r.status_code}"}, 400
+                    )
 
         else:
             return JSONResponse({"ok": False, "message": f"Unknown provider: {provider}"}, 400)

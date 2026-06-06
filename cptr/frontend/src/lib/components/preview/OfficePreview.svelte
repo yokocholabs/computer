@@ -58,7 +58,7 @@
 		const workbook = XLSX.read(buf, { type: 'array' });
 		sheetNames = workbook.SheetNames;
 
-		sheetHtmls = workbook.SheetNames.map(name => {
+		sheetHtmls = workbook.SheetNames.map((name) => {
 			const sheet = workbook.Sheets[name];
 			const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 			if (rows.length === 0) return '<p>Empty sheet</p>';
@@ -67,7 +67,10 @@
 			const colLetter = (i: number) => {
 				let s = '';
 				let n = i;
-				while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; }
+				while (n >= 0) {
+					s = String.fromCharCode(65 + (n % 26)) + s;
+					n = Math.floor(n / 26) - 1;
+				}
 				return s;
 			};
 
@@ -98,7 +101,8 @@
 		const zip = await JSZip.loadAsync(buf);
 
 		// Slide dimensions
-		let slideW = 960, slideH = 540;
+		let slideW = 960,
+			slideH = 540;
 		const presXml = zip.file('ppt/presentation.xml');
 		if (presXml) {
 			const presText = await presXml.async('text');
@@ -113,20 +117,25 @@
 
 		// Collect media
 		const media: Record<string, string> = {};
-		const mediaFiles = Object.keys(zip.files).filter(f => f.startsWith('ppt/media/'));
-		await Promise.all(mediaFiles.map(async path => {
-			const file = zip.file(path);
-			if (!file) return;
-			const b64 = await file.async('base64');
-			const ext = path.split('.').pop()?.toLowerCase() ?? '';
-			const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
-			media[path] = `data:${mime};base64,${b64}`;
-		}));
+		const mediaFiles = Object.keys(zip.files).filter((f) => f.startsWith('ppt/media/'));
+		await Promise.all(
+			mediaFiles.map(async (path) => {
+				const file = zip.file(path);
+				if (!file) return;
+				const b64 = await file.async('base64');
+				const ext = path.split('.').pop()?.toLowerCase() ?? '';
+				const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+				media[path] = `data:${mime};base64,${b64}`;
+			})
+		);
 
 		// Discover slides
 		const slideFiles = Object.keys(zip.files)
-			.filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f))
-			.sort((a, b) => parseInt(a.match(/slide(\d+)/)?.[1] ?? '0') - parseInt(b.match(/slide(\d+)/)?.[1] ?? '0'));
+			.filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))
+			.sort(
+				(a, b) =>
+					parseInt(a.match(/slide(\d+)/)?.[1] ?? '0') - parseInt(b.match(/slide(\d+)/)?.[1] ?? '0')
+			);
 
 		const images: string[] = [];
 
@@ -139,7 +148,10 @@
 			const rels: Record<string, string> = {};
 			const relsFile = zip.file(relsPath);
 			if (relsFile) {
-				const relsDoc = new DOMParser().parseFromString(await relsFile.async('text'), 'application/xml');
+				const relsDoc = new DOMParser().parseFromString(
+					await relsFile.async('text'),
+					'application/xml'
+				);
 				const relEls = relsDoc.getElementsByTagName('Relationship');
 				for (let i = 0; i < relEls.length; i++) {
 					const id = relEls[i].getAttribute('Id') ?? '';
@@ -157,7 +169,10 @@
 
 			const spTree = slideDoc.getElementsByTagName('p:spTree')[0];
 			if (spTree) {
-				const shapes = [...Array.from(spTree.getElementsByTagName('p:sp')), ...Array.from(spTree.getElementsByTagName('p:pic'))];
+				const shapes = [
+					...Array.from(spTree.getElementsByTagName('p:sp')),
+					...Array.from(spTree.getElementsByTagName('p:pic'))
+				];
 
 				for (const shape of shapes) {
 					const xfrm = shape.getElementsByTagName('a:xfrm')[0];
@@ -203,7 +218,10 @@
 
 					for (let pi = 0; pi < paragraphs.length; pi++) {
 						const runs = paragraphs[pi].getElementsByTagName('a:r');
-						if (runs.length === 0) { cursorY += 18; continue; }
+						if (runs.length === 0) {
+							cursorY += 18;
+							continue;
+						}
 
 						let maxPt = 12;
 						for (let ri = 0; ri < runs.length; ri++) {
@@ -221,7 +239,10 @@
 							const text = run.getElementsByTagName('a:t')[0]?.textContent ?? '';
 							if (!text) continue;
 
-							let fontPt = 12, bold = false, italic = false, color = '#000000';
+							let fontPt = 12,
+								bold = false,
+								italic = false,
+								color = '#000000';
 							if (rPr) {
 								if (rPr.getAttribute('b') === '1') bold = true;
 								if (rPr.getAttribute('i') === '1') italic = true;
@@ -268,7 +289,9 @@
 		});
 	}
 
-	onMount(() => { loadFile(); });
+	onMount(() => {
+		loadFile();
+	});
 </script>
 
 <div class="office-view">
@@ -283,9 +306,12 @@
 			<div class="sheet-tabs">
 				{#each sheetNames as name, i}
 					<button
-						class="sheet-tab" class:active={activeSheet === i}
-						onclick={() => { activeSheet = i; }}
-					>{name}</button>
+						class="sheet-tab"
+						class:active={activeSheet === i}
+						onclick={() => {
+							activeSheet = i;
+						}}>{name}</button
+					>
 				{/each}
 			</div>
 		{/if}
@@ -334,7 +360,9 @@
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	/* ── DOCX ────────────────────────────────────── */
@@ -352,13 +380,38 @@
 		color: var(--color-gray-200);
 	}
 
-	.docx-content :global(h1) { font-size: 24px; font-weight: 600; margin: 0 0 8px; }
-	.docx-content :global(h2) { font-size: 20px; font-weight: 600; margin: 24px 0 8px; }
-	.docx-content :global(h3) { font-size: 16px; font-weight: 600; margin: 20px 0 6px; }
-	.docx-content :global(p) { margin: 0 0 12px; }
-	.docx-content :global(table) { border-collapse: collapse; margin: 12px 0; font-size: 13px; }
-	.docx-content :global(td), .docx-content :global(th) { border: 1px solid var(--color-gray-200); padding: 4px 8px; }
-	.docx-content :global(img) { max-width: 100%; height: auto; }
+	.docx-content :global(h1) {
+		font-size: 24px;
+		font-weight: 600;
+		margin: 0 0 8px;
+	}
+	.docx-content :global(h2) {
+		font-size: 20px;
+		font-weight: 600;
+		margin: 24px 0 8px;
+	}
+	.docx-content :global(h3) {
+		font-size: 16px;
+		font-weight: 600;
+		margin: 20px 0 6px;
+	}
+	.docx-content :global(p) {
+		margin: 0 0 12px;
+	}
+	.docx-content :global(table) {
+		border-collapse: collapse;
+		margin: 12px 0;
+		font-size: 13px;
+	}
+	.docx-content :global(td),
+	.docx-content :global(th) {
+		border: 1px solid var(--color-gray-200);
+		padding: 4px 8px;
+	}
+	.docx-content :global(img) {
+		max-width: 100%;
+		height: auto;
+	}
 
 	/* ── XLSX ────────────────────────────────────── */
 
@@ -408,7 +461,11 @@
 		white-space: nowrap;
 	}
 
-	.xlsx-content :global(thead) { position: sticky; top: 0; z-index: 2; }
+	.xlsx-content :global(thead) {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+	}
 
 	.xlsx-content :global(th) {
 		background: var(--color-gray-50);
@@ -455,8 +512,13 @@
 		color: var(--color-gray-600);
 	}
 
-	.xlsx-content :global(.num) { text-align: right; color: #d97706; }
-	:global(.dark) .xlsx-content :global(.num) { color: #fbbf24; }
+	.xlsx-content :global(.num) {
+		text-align: right;
+		color: #d97706;
+	}
+	:global(.dark) .xlsx-content :global(.num) {
+		color: #fbbf24;
+	}
 
 	/* ── PPTX ────────────────────────────────────── */
 

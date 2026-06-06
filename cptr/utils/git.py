@@ -19,7 +19,8 @@ async def _run(
 ) -> tuple[int, str, str]:
     """Run a git command and return (returncode, stdout, stderr)."""
     proc = await asyncio.create_subprocess_exec(
-        "git", *args,
+        "git",
+        *args,
         cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -44,15 +45,19 @@ class GitError(Exception):
 async def is_repo(root: str) -> bool:
     """Check if directory is inside a git repo."""
     code, _, _ = await _run(
-        "rev-parse", "--is-inside-work-tree",
-        cwd=root, check=False,
+        "rev-parse",
+        "--is-inside-work-tree",
+        cwd=root,
+        check=False,
     )
     return code == 0
 
 
 async def status(root: str) -> dict[str, Any]:
     """Get repo status using porcelain v2 format."""
-    _, out, _ = await _run("status", "--porcelain=v2", "--branch", "--untracked-files=all", cwd=root)
+    _, out, _ = await _run(
+        "status", "--porcelain=v2", "--branch", "--untracked-files=all", cwd=root
+    )
 
     branch = ""
     upstream = ""
@@ -80,17 +85,21 @@ async def status(root: str) -> dict[str, Any]:
             staged_code = xy[0]
             unstaged_code = xy[1]
             if staged_code != ".":
-                files.append({
-                    "path": path,
-                    "status": _status_char(staged_code),
-                    "staged": True,
-                })
+                files.append(
+                    {
+                        "path": path,
+                        "status": _status_char(staged_code),
+                        "staged": True,
+                    }
+                )
             if unstaged_code != ".":
-                files.append({
-                    "path": path,
-                    "status": _status_char(unstaged_code),
-                    "staged": False,
-                })
+                files.append(
+                    {
+                        "path": path,
+                        "status": _status_char(unstaged_code),
+                        "staged": False,
+                    }
+                )
         elif line.startswith("? "):
             # Untracked
             path = line[2:]
@@ -133,9 +142,14 @@ async def diff(
         # Untracked files: use --no-index to diff against empty
         null_device = "NUL" if sys.platform == "win32" else "/dev/null"
         _, out, _ = await _run(
-            "diff", "--no-index", "--unified=3",
-            "--", null_device, file,
-            cwd=root, check=False,
+            "diff",
+            "--no-index",
+            "--unified=3",
+            "--",
+            null_device,
+            file,
+            cwd=root,
+            check=False,
         )
         return _parse_diff(out)
 
@@ -211,8 +225,11 @@ async def discard(root: str, files: list[str]) -> None:
 
     # Determine which files are untracked
     _, st_out, _ = await _run(
-        "status", "--porcelain=v2", "--untracked-files=all",
-        cwd=root, check=False,
+        "status",
+        "--porcelain=v2",
+        "--untracked-files=all",
+        cwd=root,
+        check=False,
     )
     untracked = set()
     for line in st_out.splitlines():
@@ -254,7 +271,10 @@ async def log(
     """Get commit log."""
     fmt = "%H%x00%h%x00%an%x00%aI%x00%s"
     _, out, _ = await _run(
-        "log", f"--format={fmt}", f"-n{limit}", f"--skip={offset}",
+        "log",
+        f"--format={fmt}",
+        f"-n{limit}",
+        f"--skip={offset}",
         "--no-merges",
         cwd=root,
         check=False,
@@ -264,13 +284,15 @@ async def log(
     for line in out.strip().splitlines():
         parts = line.split("\x00")
         if len(parts) >= 5:
-            commits.append({
-                "hash": parts[0],
-                "short_hash": parts[1],
-                "author": parts[2],
-                "date": parts[3],
-                "message": parts[4],
-            })
+            commits.append(
+                {
+                    "hash": parts[0],
+                    "short_hash": parts[1],
+                    "author": parts[2],
+                    "date": parts[3],
+                    "message": parts[4],
+                }
+            )
     return commits
 
 
@@ -278,7 +300,10 @@ async def show(root: str, ref: str) -> dict[str, Any]:
     """Show a commit's diff."""
     fmt = "%H%x00%h%x00%an%x00%aI%x00%s"
     _, out, _ = await _run(
-        "show", ref, f"--format={fmt}", "--patch",
+        "show",
+        ref,
+        f"--format={fmt}",
+        "--patch",
         cwd=root,
     )
 
@@ -305,13 +330,18 @@ async def branches(root: str) -> dict[str, Any]:
     """List branches."""
     # Local branches
     _, local_out, _ = await _run(
-        "branch", "--format=%(refname:short)\t%(HEAD)",
-        cwd=root, check=False,
+        "branch",
+        "--format=%(refname:short)\t%(HEAD)",
+        cwd=root,
+        check=False,
     )
     # Remote branches
     _, remote_out, _ = await _run(
-        "branch", "-r", "--format=%(refname:short)",
-        cwd=root, check=False,
+        "branch",
+        "-r",
+        "--format=%(refname:short)",
+        cwd=root,
+        check=False,
     )
 
     current = ""
@@ -338,22 +368,26 @@ async def branches(root: str) -> dict[str, Any]:
     local_set = set(local)
     all_branches: list[dict[str, Any]] = []
     for name in local:
-        all_branches.append({
-            "name": name,
-            "is_current": name == current,
-            "is_local": True,
-            "is_remote": any(r.endswith(f"/{name}") for r in remote),
-        })
+        all_branches.append(
+            {
+                "name": name,
+                "is_current": name == current,
+                "is_local": True,
+                "is_remote": any(r.endswith(f"/{name}") for r in remote),
+            }
+        )
     for rname in remote:
         # Strip first remote prefix (e.g. "origin/feature-x" -> "feature-x")
         short = rname.split("/", 1)[1] if "/" in rname else rname
         if short not in local_set:
-            all_branches.append({
-                "name": short,
-                "is_current": False,
-                "is_local": False,
-                "is_remote": True,
-            })
+            all_branches.append(
+                {
+                    "name": short,
+                    "is_current": False,
+                    "is_local": False,
+                    "is_remote": True,
+                }
+            )
 
     return {"current": current, "local": local, "remote": remote, "all": all_branches}
 

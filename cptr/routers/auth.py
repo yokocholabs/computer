@@ -33,8 +33,11 @@ def _ok_with_cookie(jwt_token: str, data: dict | None = None) -> JSONResponse:
     """Return a JSONResponse with the session cookie set."""
     resp = JSONResponse(data or {"ok": True})
     resp.set_cookie(
-        key=COOKIE_NAME, value=jwt_token,
-        httponly=True, samesite="lax", path="/",
+        key=COOKIE_NAME,
+        value=jwt_token,
+        httponly=True,
+        samesite="lax",
+        path="/",
         max_age=SESSION_MAX_AGE,
     )
     return resp
@@ -43,7 +46,7 @@ def _ok_with_cookie(jwt_token: str, data: dict | None = None) -> JSONResponse:
 @router.get("")
 async def get_auth(request: Request):
     """Session check. Returns user info or {authenticated: false}.
-    
+
     Implements sliding sessions: if the token is past its halfway point,
     a fresh token is issued so active users never get logged out.
     """
@@ -57,6 +60,7 @@ async def get_auth(request: Request):
         user = await User.get_by_id(auth.user_id)
         if user is None:
             from starlette.responses import JSONResponse as StarletteJSONResponse
+
             response = StarletteJSONResponse({"authenticated": False})
             response.delete_cookie(COOKIE_NAME, path="/")
             return response
@@ -88,7 +92,8 @@ async def setup(body: SetupRequest, request: Request):
     if await has_any_user():
         return JSONResponse({"error": "already set up"}, 400)
     import secrets as _secrets
-    expected = getattr(request.app.state, 'startup_token', None)
+
+    expected = getattr(request.app.state, "startup_token", None)
     if not body.token or not expected or not _secrets.compare_digest(body.token, expected):
         return JSONResponse({"error": "invalid startup token"}, 403)
     if not body.username or not body.username.strip():
@@ -124,7 +129,7 @@ async def login(body: LoginRequest, request: Request):
         if not result or not verify_password(body.password, result[0].password):
             return JSONResponse({"error": "incorrect credentials"}, 401)
         auth, user = result
-        if user.role == 'pending':
+        if user.role == "pending":
             return JSONResponse({"error": "account pending approval"}, 403)
         return _ok_with_cookie(create_token(auth.user_id, auth.username, role=user.role))
 

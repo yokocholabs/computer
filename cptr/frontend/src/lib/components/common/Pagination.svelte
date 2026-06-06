@@ -30,7 +30,16 @@
 			onclick={() => onpagechange(page - 1)}
 			aria-label="Previous page"
 		>
-			<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 12 12"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M7.5 2.5L4 6L7.5 9.5" />
 			</svg>
 		</button>
@@ -57,7 +66,16 @@
 			onclick={() => onpagechange(page + 1)}
 			aria-label="Next page"
 		>
-			<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 12 12"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M4.5 2.5L8 6L4.5 9.5" />
 			</svg>
 		</button>
@@ -87,7 +105,9 @@
 		font-size: 10.5px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: background 0.15s ease, color 0.15s ease;
+		transition:
+			background 0.15s ease,
+			color 0.15s ease;
 		user-select: none;
 	}
 

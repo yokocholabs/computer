@@ -9,7 +9,7 @@
 		sidebarOpen,
 		sidebarWidth,
 		appVersion,
-		showChangelog,
+		showChangelog
 	} from '$lib/stores';
 	import Sortable from 'sortablejs';
 	import Icon from './Icon.svelte';
@@ -72,7 +72,9 @@
 	const currentPath = $derived($page.url.searchParams.get('workspace'));
 
 	function isTouchDevice(): boolean {
-		return typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+		return (
+			typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+		);
 	}
 
 	function handleWorkspaceClick(e: MouseEvent, path: string) {
@@ -120,7 +122,6 @@
 	}
 
 	onMount(() => {
-
 		// Enable drag-reorder on non-touch devices
 		if (wsListEl && !isTouchDevice()) {
 			sortable = Sortable.create(wsListEl, {
@@ -132,7 +133,7 @@
 					if (evt.oldIndex != null && evt.newIndex != null && evt.oldIndex !== evt.newIndex) {
 						reorderWorkspaces(evt.oldIndex, evt.newIndex);
 					}
-				},
+				}
 			});
 		}
 	});
@@ -143,7 +144,11 @@
 </script>
 
 {#if $sidebarOpen}
-	<button class="fixed inset-0 bg-black/50 z-40 cursor-default md:hidden" onclick={closeSidebar} aria-label={$t('sidebar.closeSidebar')}></button>
+	<button
+		class="fixed inset-0 bg-black/50 z-40 cursor-default md:hidden"
+		onclick={closeSidebar}
+		aria-label={$t('sidebar.closeSidebar')}
+	></button>
 
 	<aside class="sidebar" style="--sw: {$sidebarWidth}px;">
 		<!-- Resize handle (md+ only) -->
@@ -156,12 +161,18 @@
 			ondblclick={() => sidebarWidth.set(220)}
 		></div>
 		<!-- Logo header with collapse button -->
-		<div class="flex items-center justify-between h-9 pl-3.5 pr-1.5 shrink-0 border-b border-gray-200 dark:border-white/6">
+		<div
+			class="flex items-center justify-between h-9 pl-3.5 pr-1.5 shrink-0 border-b border-gray-200 dark:border-white/6"
+		>
 			<a
-			href="/"
-			class="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-gray-900 dark:text-white"
-			onclick={(e) => { e.preventDefault(); goto('/'); if (typeof window !== 'undefined' && window.innerWidth < 768) sidebarOpen.set(false); }}
-		><img src="/favicon.png" alt="cptr logo" class="w-4 h-4" />cptr</a>
+				href="/"
+				class="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-gray-900 dark:text-white"
+				onclick={(e) => {
+					e.preventDefault();
+					goto('/');
+					if (typeof window !== 'undefined' && window.innerWidth < 768) sidebarOpen.set(false);
+				}}><img src="/favicon.png" alt="cptr logo" class="w-4 h-4" />cptr</a
+			>
 			<button
 				class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors duration-100"
 				onclick={() => sidebarOpen.set(false)}
@@ -177,7 +188,7 @@
 			<span class="text-xs text-gray-400 dark:text-gray-500">{$t('sidebar.workspaces')}</span>
 			<button
 				class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors duration-100"
-				onclick={() => showPicker = true}
+				onclick={() => (showPicker = true)}
 				aria-label={$t('sidebar.addWorkspace')}
 				use:tooltip={$t('sidebar.addWorkspace')}
 			>
@@ -192,12 +203,14 @@
 					href="/?workspace={encodeURIComponent(ws.path)}"
 					class="group flex items-center gap-1.5 w-full h-7 px-2 rounded-lg text-xs font-medium transition-colors duration-100 no-underline
 						{ws.path === currentPath
-							? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
-							: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
+						: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 					onclick={(e) => handleWorkspaceClick(e, ws.path)}
 				>
 					<Icon name="folder" size={14} />
-					<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{ws.name}</span>
+					<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap"
+						>{ws.name}</span
+					>
 					<span
 						class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
 						role="button"
@@ -219,21 +232,25 @@
 
 		<!-- Settings and profile footer pinned to the bottom -->
 		<div class="relative px-1 pb-0.5 shrink-0">
-
 			<button
 				bind:this={menuButtonEl}
 				class="flex items-center gap-2 w-full h-8 px-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100"
-				onclick={() => showMenu = !showMenu}
+				onclick={() => (showMenu = !showMenu)}
 			>
 				<img
 					src={$session?.profile_image_url || '/user.png'}
 					alt="Avatar"
 					class="w-5 h-5 rounded-full object-cover shrink-0"
 				/>
-				<span class="truncate">{$session?.display_name || $session?.username || $t('sidebar.settings')}</span>
+				<span class="truncate"
+					>{$session?.display_name || $session?.username || $t('sidebar.settings')}</span
+				>
 				{#if $appVersion}
 					<button
-						onclick={(e) => { e.stopPropagation(); showChangelog.set(true); }}
+						onclick={(e) => {
+							e.stopPropagation();
+							showChangelog.set(true);
+						}}
 						class="ml-auto text-[10px] text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 font-mono hover:underline cursor-pointer"
 					>
 						v{$appVersion}
@@ -249,37 +266,69 @@
 		anchor={menuButtonEl}
 		matchWidth
 		items={[
-			...$session ? [{ label: $session.display_name || $session.username, image: $session.profile_image_url || '/user.png', onclick: () => { settingsTab = 'account'; showSettings = true; } }] : [],
-			...$session ? [{ divider: true, label: '', onclick: () => {} }] : [],
+			...($session
+				? [
+						{
+							label: $session.display_name || $session.username,
+							image: $session.profile_image_url || '/user.png',
+							onclick: () => {
+								settingsTab = 'account';
+								showSettings = true;
+							}
+						}
+					]
+				: []),
+			...($session ? [{ divider: true, label: '', onclick: () => {} }] : []),
 			{ label: $t('sidebar.settings'), icon: 'settings', onclick: openSettings },
-			...$session?.role === 'admin' ? [{ label: $t('sidebar.admin'), icon: 'shield', onclick: () => { showMenu = false; showAdmin = true; } }] : [],
+			...($session?.role === 'admin'
+				? [
+						{
+							label: $t('sidebar.admin'),
+							icon: 'shield',
+							onclick: () => {
+								showMenu = false;
+								showAdmin = true;
+							}
+						}
+					]
+				: []),
 			{ divider: true, label: '', onclick: () => {} },
-			{ label: $t('sidebar.logOut'), icon: 'log-out', onclick: logout },
+			{ label: $t('sidebar.logOut'), icon: 'log-out', onclick: logout }
 		]}
-		onclose={() => showMenu = false}
+		onclose={() => (showMenu = false)}
 	/>
 {/if}
 
 {#if showPicker}
-	<DirectoryPicker onclose={() => showPicker = false} />
+	<DirectoryPicker onclose={() => (showPicker = false)} />
 {/if}
 
 {#if wsMenuPath && wsMenuAnchor}
 	<DropdownMenu
 		anchor={wsMenuAnchor}
 		items={[
-			{ label: $t('sidebar.remove'), icon: 'xmark', onclick: () => handleRemoveWorkspace(wsMenuPath!) },
+			{
+				label: $t('sidebar.remove'),
+				icon: 'xmark',
+				onclick: () => handleRemoveWorkspace(wsMenuPath!)
+			}
 		]}
 		onclose={closeWsMenu}
 	/>
 {/if}
 
 {#if showSettings}
-	<SettingsModal initialTab={settingsTab} onclose={() => { showSettings = false; settingsTab = 'general'; }} />
+	<SettingsModal
+		initialTab={settingsTab}
+		onclose={() => {
+			showSettings = false;
+			settingsTab = 'general';
+		}}
+	/>
 {/if}
 
 {#if showAdmin}
-	<AdminPanel onclose={() => showAdmin = false} />
+	<AdminPanel onclose={() => (showAdmin = false)} />
 {/if}
 
 <style>

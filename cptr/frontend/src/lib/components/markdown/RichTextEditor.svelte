@@ -66,7 +66,7 @@
 			extensions: [
 				StarterKit.configure({
 					codeBlock: false, // Use CodeBlockLowlight instead
-					heading: { levels: [1, 2, 3, 4, 5, 6] },
+					heading: { levels: [1, 2, 3, 4, 5, 6] }
 				}),
 				Markdown,
 				TaskList,
@@ -79,17 +79,17 @@
 				Link.configure({
 					openOnClick: false,
 					autolink: true,
-					linkOnPaste: true,
+					linkOnPaste: true
 				}),
 				Placeholder.configure({
-					placeholder: 'Start writing…',
+					placeholder: 'Start writing…'
 				}),
 				Typography,
 				Highlight.configure({ multicolor: false }),
 				Underline,
 				Superscript,
 				Subscript,
-				CodeBlockLowlight.configure({ lowlight }),
+				CodeBlockLowlight.configure({ lowlight })
 			],
 			content: content,
 			contentType: 'markdown',
@@ -97,7 +97,7 @@
 			editorProps: {
 				attributes: {
 					class: 'rte-prosemirror',
-					spellcheck: 'true',
+					spellcheck: 'true'
 				},
 				// Handle image drops: upload to same directory as .md file
 				handleDrop: (view, event, _slice, moved) => {
@@ -123,11 +123,11 @@
 						}
 					}
 					return false;
-				},
+				}
 			},
 			onUpdate: () => {
 				onchange?.();
-			},
+			}
 		});
 
 		// ⌘S / Ctrl+S save
@@ -145,7 +145,10 @@
 				editorEl.closest('.rte-container')?.classList.toggle('dark-mode', isDarkMode());
 			}
 		});
-		themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
 	});
 
 	let themeObserver: MutationObserver | null = null;
@@ -301,22 +304,22 @@
 
 	/* ── Task lists ────────────────────────────────── */
 
-	.rte-container :global(.rte-prosemirror ul[data-type="taskList"]) {
+	.rte-container :global(.rte-prosemirror ul[data-type='taskList']) {
 		list-style: none;
 		padding-left: 4px;
 	}
 
-	.rte-container :global(.rte-prosemirror ul[data-type="taskList"] li) {
+	.rte-container :global(.rte-prosemirror ul[data-type='taskList'] li) {
 		display: flex;
 		align-items: flex-start;
 		gap: 6px;
 	}
 
-	.rte-container :global(.rte-prosemirror ul[data-type="taskList"] li label) {
+	.rte-container :global(.rte-prosemirror ul[data-type='taskList'] li label) {
 		margin-top: 3px;
 	}
 
-	.rte-container :global(.rte-prosemirror ul[data-type="taskList"] li > div) {
+	.rte-container :global(.rte-prosemirror ul[data-type='taskList'] li > div) {
 		flex: 1;
 	}
 
@@ -463,17 +466,44 @@
 
 	/* ── Syntax highlighting in code blocks ────────── */
 
-	.rte-container :global(.hljs-keyword) { color: #c678dd; }
-	.rte-container :global(.hljs-string) { color: #98c379; }
-	.rte-container :global(.hljs-number) { color: #d19a66; }
-	.rte-container :global(.hljs-comment) { color: #5c6370; font-style: italic; }
-	.rte-container :global(.hljs-function) { color: #61afef; }
-	.rte-container :global(.hljs-title) { color: #61afef; }
-	.rte-container :global(.hljs-built_in) { color: #e5c07b; }
-	.rte-container :global(.hljs-attr) { color: #d19a66; }
-	.rte-container :global(.hljs-tag) { color: #e06c75; }
-	.rte-container :global(.hljs-name) { color: #e06c75; }
-	.rte-container :global(.hljs-selector-class) { color: #d19a66; }
-	.rte-container :global(.hljs-variable) { color: #e06c75; }
-	.rte-container :global(.hljs-type) { color: #e5c07b; }
+	.rte-container :global(.hljs-keyword) {
+		color: #c678dd;
+	}
+	.rte-container :global(.hljs-string) {
+		color: #98c379;
+	}
+	.rte-container :global(.hljs-number) {
+		color: #d19a66;
+	}
+	.rte-container :global(.hljs-comment) {
+		color: #5c6370;
+		font-style: italic;
+	}
+	.rte-container :global(.hljs-function) {
+		color: #61afef;
+	}
+	.rte-container :global(.hljs-title) {
+		color: #61afef;
+	}
+	.rte-container :global(.hljs-built_in) {
+		color: #e5c07b;
+	}
+	.rte-container :global(.hljs-attr) {
+		color: #d19a66;
+	}
+	.rte-container :global(.hljs-tag) {
+		color: #e06c75;
+	}
+	.rte-container :global(.hljs-name) {
+		color: #e06c75;
+	}
+	.rte-container :global(.hljs-selector-class) {
+		color: #d19a66;
+	}
+	.rte-container :global(.hljs-variable) {
+		color: #e06c75;
+	}
+	.rte-container :global(.hljs-type) {
+		color: #e5c07b;
+	}
 </style>

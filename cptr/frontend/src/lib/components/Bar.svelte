@@ -4,7 +4,7 @@
 		sidebarOpen,
 		splitActive,
 		splitCurrentTab,
-		setSplitDirection,
+		setSplitDirection
 	} from '$lib/stores';
 	import type { SplitDirection } from '$lib/stores';
 	import Icon from './Icon.svelte';
@@ -33,14 +33,20 @@
 				label: 'Split Right',
 				icon: 'split-horizontal',
 				active: direction === 'horizontal',
-				onclick: () => { setSplitDirection('horizontal'); if (!$splitActive) splitCurrentTab('horizontal'); },
+				onclick: () => {
+					setSplitDirection('horizontal');
+					if (!$splitActive) splitCurrentTab('horizontal');
+				}
 			},
 			{
 				label: 'Split Down',
 				icon: 'split-vertical',
 				active: direction === 'vertical',
-				onclick: () => { setSplitDirection('vertical'); if (!$splitActive) splitCurrentTab('vertical'); },
-			},
+				onclick: () => {
+					setSplitDirection('vertical');
+					if (!$splitActive) splitCurrentTab('vertical');
+				}
+			}
 		];
 	});
 
@@ -57,17 +63,26 @@
 	});
 </script>
 
-<nav class="flex items-center h-9 px-1.5 gap-1 shrink-0 select-none border-b border-gray-200 dark:border-white/6">
+<nav
+	class="flex items-center h-9 px-1.5 gap-1 shrink-0 select-none border-b border-gray-200 dark:border-white/6"
+>
 	<!-- Sidebar toggle (only when closed) -->
 	{#if !$sidebarOpen}
-		<button class="flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100" onclick={toggleSidebar} aria-label={$t('bar.toggleSidebar')} use:tooltip={$t('bar.sidebar')}>
+		<button
+			class="flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100"
+			onclick={toggleSidebar}
+			aria-label={$t('bar.toggleSidebar')}
+			use:tooltip={$t('bar.sidebar')}
+		>
 			<Icon name="sidebar-expand" size={14} />
 		</button>
 	{/if}
 
 	<!-- Workspace name -->
 	{#if $activeWorkspace}
-		<span class="text-[11px] font-medium text-gray-500 dark:text-gray-500 px-1 truncate flex-1 min-w-0">
+		<span
+			class="text-[11px] font-medium text-gray-500 dark:text-gray-500 px-1 truncate flex-1 min-w-0"
+		>
 			{$activeWorkspace.name}
 		</span>
 	{:else}
@@ -82,20 +97,27 @@
 				bind:this={splitBtnEl}
 				class="flex items-center justify-center w-7 h-7 rounded-lg transition-colors duration-100 shrink-0
 					{$splitActive
-						? 'bg-gray-200 text-gray-900 dark:bg-white/8 dark:text-white'
-						: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
-				onclick={() => showSplitMenu = !showSplitMenu}
+					? 'bg-gray-200 text-gray-900 dark:bg-white/8 dark:text-white'
+					: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
+				onclick={() => (showSplitMenu = !showSplitMenu)}
 				aria-label="Split Editor"
 				use:tooltip={'Split Editor'}
 			>
-				<Icon name={$activeWorkspace?.splitDirection === 'vertical' ? 'split-vertical' : 'split-horizontal'} size={14} />
+				<Icon
+					name={$activeWorkspace?.splitDirection === 'vertical'
+						? 'split-vertical'
+						: 'split-horizontal'}
+					size={14}
+				/>
 			</button>
 		{/if}
-
-
 	</div>
 </nav>
 
 {#if showSplitMenu && splitBtnEl}
-	<DropdownMenu items={splitMenuItems} anchor={splitBtnEl} onclose={() => showSplitMenu = false} />
+	<DropdownMenu
+		items={splitMenuItems}
+		anchor={splitBtnEl}
+		onclose={() => (showSplitMenu = false)}
+	/>
 {/if}

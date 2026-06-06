@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # ── Task registry ───────────────────────────────────────────
 
 _tasks: dict[str, asyncio.Task] = {}  # message_id → asyncio.Task
-_task_state: dict[str, dict] = {}     # message_id → {content, output}
-_task_chat: dict[str, str] = {}       # message_id → chat_id
+_task_state: dict[str, dict] = {}  # message_id → {content, output}
+_task_chat: dict[str, str] = {}  # message_id → chat_id
 _queue_locks: dict[str, asyncio.Lock] = {}  # chat_id → Lock
 
 
@@ -48,7 +48,9 @@ def start_task(
 ):
     """Launch the agentic loop as a background asyncio.Task."""
     task = asyncio.create_task(
-        run_chat_task(message_id, chat_id, user_id, connection, workspace, model, regeneration_prompt)
+        run_chat_task(
+            message_id, chat_id, user_id, connection, workspace, model, regeneration_prompt
+        )
     )
     _tasks[message_id] = task
     _task_chat[message_id] = chat_id
@@ -92,10 +94,7 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
             return
 
         # Find queued messages (ordered by created_at)
-        queued = [
-            m for m in all_msgs
-            if m.role == "user" and m.meta and m.meta.get("queued")
-        ]
+        queued = [m for m in all_msgs if m.role == "user" and m.meta and m.meta.get("queued")]
         if not queued:
             return
 
@@ -103,12 +102,8 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
         combined_content = "\n\n".join(m.content for m in queued if m.content)
 
         # Find the current leaf (latest done assistant message)
-        done_assistants = [
-            m for m in all_msgs if m.role == "assistant" and m.done
-        ]
-        parent_id = (
-            done_assistants[-1].id if done_assistants else queued[0].parent_id
-        )
+        done_assistants = [m for m in all_msgs if m.role == "assistant" and m.done]
+        parent_id = done_assistants[-1].id if done_assistants else queued[0].parent_id
 
         # Delete individual queued messages, create one combined message
         for m in queued:
@@ -138,6 +133,7 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
         # Resolve connection
         try:
             from cptr.routers.chat import _resolve_connection
+
             connection, bare_model = await _resolve_connection(model_id)
         except Exception:
             logger.exception("[queue] Failed to resolve connection for model %s", model_id)
@@ -172,7 +168,8 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
         )
         logger.info(
             "[queue] Processed %d queued message(s) for chat %s",
-            len(queued), chat_id[:8],
+            len(queued),
+            chat_id[:8],
         )
 
 
@@ -229,8 +226,19 @@ def _get_file_tree(workspace: str, max_entries: int = 200) -> str:
     ws = Path(workspace)
     if not ws.is_dir():
         return ""
-    ignore = {".git", "node_modules", "__pycache__", ".venv", "venv", ".next",
-              "build", "dist", ".cptr", ".svelte-kit", ".DS_Store"}
+    ignore = {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".next",
+        "build",
+        "dist",
+        ".cptr",
+        ".svelte-kit",
+        ".DS_Store",
+    }
     entries = []
     for item in sorted(ws.iterdir()):
         if item.name in ignore:
@@ -253,6 +261,7 @@ def _get_file_tree(workspace: str, max_entries: int = 200) -> str:
             break
     return "\n".join(entries)
 
+
 def _load_system_prompt(workspace: str) -> str:
     """Load system prompt: .cptr/system.md > default. Appends file tree."""
     ws_prompt = Path(workspace) / ".cptr" / "system.md"
@@ -272,13 +281,12 @@ def _load_system_prompt(workspace: str) -> str:
     return base
 
 
-
 # ── Title generation ────────────────────────────────────────
 
 
 TITLE_PROMPT = (
     "Generate a concise title (max 8 words) for this conversation based on the user's message. "
-    "Respond with ONLY a JSON object: {\"title\": \"Your Title Here\"}. "
+    'Respond with ONLY a JSON object: {"title": "Your Title Here"}. '
     "Do not include quotes around the JSON. Do not explain."
 )
 
@@ -385,14 +393,16 @@ async def _load_message_history(chat_id: str, message_id: str) -> list[dict]:
             tool_calls = []
             for item in m.output:
                 if item.get("type") == "function_call" and item.get("status") == "completed":
-                    tool_calls.append({
-                        "id": item["call_id"],
-                        "type": "function",
-                        "function": {
-                            "name": item["name"],
-                            "arguments": json.dumps(item.get("arguments", {})),
-                        },
-                    })
+                    tool_calls.append(
+                        {
+                            "id": item["call_id"],
+                            "type": "function",
+                            "function": {
+                                "name": item["name"],
+                                "arguments": json.dumps(item.get("arguments", {})),
+                            },
+                        }
+                    )
             if tool_calls:
                 entry["tool_calls"] = tool_calls
 
@@ -410,29 +420,33 @@ async def _load_message_history(chat_id: str, message_id: str) -> list[dict]:
     return result
 
 
-def _append_tool_to_messages(
-    messages: list[dict], event: dict, result: str, provider: str
-):
+def _append_tool_to_messages(messages: list[dict], event: dict, result: str, provider: str):
     """Append a tool call + result to the message history for the next API call."""
     # Add assistant message with tool_call
-    messages.append({
-        "role": "assistant",
-        "content": "",
-        "tool_calls": [{
-            "id": event["call_id"],
-            "type": "function",
-            "function": {
-                "name": event["name"],
-                "arguments": json.dumps(event["arguments"]),
-            },
-        }],
-    })
+    messages.append(
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": event["call_id"],
+                    "type": "function",
+                    "function": {
+                        "name": event["name"],
+                        "arguments": json.dumps(event["arguments"]),
+                    },
+                }
+            ],
+        }
+    )
     # Add tool result
-    messages.append({
-        "role": "tool",
-        "tool_call_id": event["call_id"],
-        "content": result,
-    })
+    messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": event["call_id"],
+            "content": result,
+        }
+    )
 
 
 # ── Connection resolution ───────────────────────────────────
@@ -461,9 +475,7 @@ async def run_chat_task(
 
     async def emit(**data):
         """Stream an output delta to the user."""
-        await emit_to_user(
-            user_id, {"chat_id": chat_id, "message_id": message_id, **data}
-        )
+        await emit_to_user(user_id, {"chat_id": chat_id, "message_id": message_id, **data})
 
     # Load existing state so continuations don't overwrite previous output
     msg = await ChatMessage.get_by_id(message_id)
@@ -471,16 +483,21 @@ async def run_chat_task(
     output_items: list[dict] = list(msg.output or []) if msg else []
     text_buffer = ""  # Accumulates text between tool calls
 
-    logger.info("[task %s] start: existing content=%d chars, output=%d items",
-                message_id[:8], len(content), len(output_items))
+    logger.info(
+        "[task %s] start: existing content=%d chars, output=%d items",
+        message_id[:8],
+        len(content),
+        len(output_items),
+    )
 
     def _flush_text() -> dict | None:
         """Flush accumulated text into a message output item."""
         nonlocal text_buffer
         if not text_buffer:
             return None
-        logger.info("[task %s] flush_text: %d chars into message item",
-                    message_id[:8], len(text_buffer))
+        logger.info(
+            "[task %s] flush_text: %d chars into message item", message_id[:8], len(text_buffer)
+        )
         item = {
             "type": "message",
             "id": str(uuid.uuid4()),
@@ -509,9 +526,7 @@ async def run_chat_task(
 
         # Load chat params for approval mode
         chat_obj = await Chat.get_by_id(chat_id)
-        chat_params = (
-            (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
-        )
+        chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
 
         # Tool approval mode: 'ask' | 'auto' | 'full'
         #   ask  = require approval for ALL tools (including reads)
@@ -561,9 +576,8 @@ async def run_chat_task(
                     }
 
                     # Decide whether to auto-approve
-                    should_auto = (
-                        approval_mode == "full"
-                        or (approval_mode == "auto" and tool and tool["auto"])
+                    should_auto = approval_mode == "full" or (
+                        approval_mode == "auto" and tool and tool["auto"]
                     )
 
                     if should_auto:
@@ -587,6 +601,7 @@ async def run_chat_task(
                         artifact_type = args.get("artifact_type", "")
                         if artifact_type:
                             from datetime import datetime, timezone
+
                             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
                             artifact_dir = Path(workspace) / ".cptr" / "artifacts" / chat_id
                             artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -595,7 +610,9 @@ async def run_chat_task(
                             artifact_item = {
                                 "type": "artifact",
                                 "artifact_type": artifact_type,
-                                "title": Path(args.get("path", artifact_type)).stem.replace("_", " ").title(),
+                                "title": Path(args.get("path", artifact_type))
+                                .stem.replace("_", " ")
+                                .title(),
                                 "content": args.get("content", ""),
                                 "path": str(artifact_path.relative_to(Path(workspace))),
                             }
@@ -627,9 +644,13 @@ async def run_chat_task(
                 elif event["type"] == "usage":
                     _flush_text()
                     usage = {k: v for k, v in event.items() if k != "type"}
-                    logger.info("[task %s] save (usage): content=%d chars, output=%d items, types=%s",
-                                message_id[:8], len(content), len(output_items),
-                                [i.get('type') for i in output_items])
+                    logger.info(
+                        "[task %s] save (usage): content=%d chars, output=%d items, types=%s",
+                        message_id[:8],
+                        len(content),
+                        len(output_items),
+                        [i.get("type") for i in output_items],
+                    )
                     await ChatMessage.update(
                         message_id,
                         content=content,
@@ -646,9 +667,13 @@ async def run_chat_task(
 
             if not restart:
                 _flush_text()
-                logger.info("[task %s] save (end): content=%d chars, output=%d items, types=%s",
-                            message_id[:8], len(content), len(output_items),
-                            [i.get('type') for i in output_items])
+                logger.info(
+                    "[task %s] save (end): content=%d chars, output=%d items, types=%s",
+                    message_id[:8],
+                    len(content),
+                    len(output_items),
+                    [i.get("type") for i in output_items],
+                )
                 await ChatMessage.update(
                     message_id,
                     content=content,
@@ -670,9 +695,7 @@ async def run_chat_task(
 
     except asyncio.CancelledError:
         _flush_text()
-        await ChatMessage.update(
-            message_id, content=content, output=output_items, done=True
-        )
+        await ChatMessage.update(message_id, content=content, output=output_items, done=True)
         await emit(done=True)
     except Exception as e:
         logger.exception(f"Chat task error for message {message_id}")
@@ -698,7 +721,11 @@ async def run_chat_task(
             if chat_obj:
                 all_msgs = await ChatMessage.get_all_by_chat(chat_id)
                 first_user = next(
-                    (m for m in all_msgs if m.role == "user" and not (m.meta and m.meta.get("queued"))),
+                    (
+                        m
+                        for m in all_msgs
+                        if m.role == "user" and not (m.meta and m.meta.get("queued"))
+                    ),
                     None,
                 )
                 if first_user:
@@ -710,7 +737,9 @@ async def run_chat_task(
                             chat_id, user_id, connection, model, first_user.content
                         )
         except Exception:
-            logger.debug("[title] Error in title generation for chat %s", chat_id[:8], exc_info=True)
+            logger.debug(
+                "[title] Error in title generation for chat %s", chat_id[:8], exc_info=True
+            )
         # Process any queued follow-up messages
         try:
             await _process_queue(chat_id, user_id, workspace)

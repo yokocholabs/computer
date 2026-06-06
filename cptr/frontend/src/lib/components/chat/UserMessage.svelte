@@ -86,7 +86,9 @@
 	function copyContent() {
 		navigator.clipboard.writeText(content);
 		copied = true;
-		setTimeout(() => { copied = false; }, 1500);
+		setTimeout(() => {
+			copied = false;
+		}, 1500);
 	}
 </script>
 
@@ -94,7 +96,9 @@
 	{#if edit}
 		<!-- Edit mode: full width -->
 		<div class="w-full">
-			<div class="bg-gray-50 dark:bg-white/4 rounded-xl border border-gray-200 dark:border-white/8 px-3.5 py-2.5">
+			<div
+				class="bg-gray-50 dark:bg-white/4 rounded-xl border border-gray-200 dark:border-white/8 px-3.5 py-2.5"
+			>
 				<textarea
 					bind:this={textareaEl}
 					bind:value={editedContent}
@@ -107,17 +111,17 @@
 			<div class="flex justify-between mt-2 text-[12px] font-medium">
 				<button
 					class="px-3 py-1 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 bg-gray-100 dark:bg-white/6 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors duration-100"
-					onclick={saveEdit}
-				>Save</button>
+					onclick={saveEdit}>Save</button
+				>
 				<div class="flex gap-1.5">
 					<button
 						class="px-3 py-1 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100"
-						onclick={cancelEdit}
-					>Cancel</button>
+						onclick={cancelEdit}>Cancel</button
+					>
 					<button
 						class="px-3 py-1 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors duration-100"
-						onclick={sendEdit}
-					>Send</button>
+						onclick={sendEdit}>Send</button
+					>
 				</div>
 			</div>
 		</div>
@@ -125,7 +129,30 @@
 		<!-- Bubble: right-aligned -->
 		<div class="flex justify-end">
 			<div class="max-w-[90%] px-4 py-2 rounded-3xl bg-gray-50 dark:bg-white/[0.06]">
-				<div class="text-[13px] leading-relaxed text-gray-900 dark:text-gray-200 whitespace-pre-wrap break-words">{#each parsedContent as segment}{#if segment.type === 'text'}{segment.value}{:else}{@const isDir = segment.path.endsWith('/')}{@const cleanPath = isDir ? segment.path.slice(0, -1) : segment.path}<button class="inline-flex items-center gap-0.5 bg-blue-500/10 text-blue-400 rounded px-1.5 py-px mx-0.5 text-xs font-mono align-baseline border-none cursor-pointer hover:bg-blue-500/20 transition-colors" title={cleanPath} onclick={(e) => { e.preventDefault(); if (isDir) { setFileBrowserCwd(cleanPath); setActiveTab('files'); } else { openFileTab(cleanPath); } }}><Icon name={isDir ? 'folder' : fileIconName(segment.label, 'file')} size={11} />{segment.label}</button>{/if}{/each}</div>
+				<div
+					class="text-[13px] leading-relaxed text-gray-900 dark:text-gray-200 whitespace-pre-wrap break-words"
+				>
+					{#each parsedContent as segment}{#if segment.type === 'text'}{segment.value}{:else}{@const isDir =
+								segment.path.endsWith('/')}{@const cleanPath = isDir
+								? segment.path.slice(0, -1)
+								: segment.path}<button
+								class="inline-flex items-center gap-0.5 bg-blue-500/10 text-blue-400 rounded px-1.5 py-px mx-0.5 text-xs font-mono align-baseline border-none cursor-pointer hover:bg-blue-500/20 transition-colors"
+								title={cleanPath}
+								onclick={(e) => {
+									e.preventDefault();
+									if (isDir) {
+										setFileBrowserCwd(cleanPath);
+										setActiveTab('files');
+									} else {
+										openFileTab(cleanPath);
+									}
+								}}
+								><Icon
+									name={isDir ? 'folder' : fileIconName(segment.label, 'file')}
+									size={11}
+								/>{segment.label}</button
+							>{/if}{/each}
+				</div>
 			</div>
 		</div>
 		{#if siblingTotal > 1 || onedit}
@@ -137,16 +164,32 @@
 						onclick={() => onnavigate?.(-1)}
 						aria-label="Previous message"
 					>
-						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 19l-7-7 7-7"
+							/></svg
+						>
 					</button>
-					<span class="text-[11px] tabular-nums text-gray-400 dark:text-gray-600 select-none">{siblingIndex + 1}/{siblingTotal}</span>
+					<span class="text-[11px] tabular-nums text-gray-400 dark:text-gray-600 select-none"
+						>{siblingIndex + 1}/{siblingTotal}</span
+					>
 					<button
 						class="p-0.5 rounded text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-default transition-colors duration-100"
 						disabled={siblingIndex === siblingTotal - 1}
 						onclick={() => onnavigate?.(1)}
 						aria-label="Next message"
 					>
-						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5l7 7-7 7"
+							/></svg
+						>
 					</button>
 				{/if}
 				{#if onedit}
@@ -155,8 +198,19 @@
 						onclick={startEdit}
 						aria-label="Edit message"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="2"
+							stroke="currentColor"
+							class="w-3.5 h-3.5"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+							/>
 						</svg>
 					</button>
 				{/if}
@@ -166,9 +220,33 @@
 					aria-label="Copy message"
 				>
 					{#if copied}
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="2.5"
+							stroke="currentColor"
+							class="w-3.5 h-3.5"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M4.5 12.75l6 6 9-13.5"
+							/></svg
+						>
 					{:else}
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="2"
+							stroke="currentColor"
+							class="w-3.5 h-3.5"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+							/></svg
+						>
 					{/if}
 				</button>
 			</div>

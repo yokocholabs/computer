@@ -34,7 +34,7 @@ async def _collect_bg_output(task_id: str, proc: asyncio.subprocess.Process):
                 task["output"].extend(chunk)
                 # Cap buffer at 256KB
                 if len(task["output"]) > 256 * 1024:
-                    task["output"] = task["output"][-256 * 1024:]
+                    task["output"] = task["output"][-256 * 1024 :]
     except Exception:
         pass
     finally:
@@ -44,6 +44,7 @@ async def _collect_bg_output(task_id: str, proc: asyncio.subprocess.Process):
 
 
 # ── Helper ──────────────────────────────────────────────────
+
 
 def _human_size(size: int) -> str:
     """Format byte size for display."""
@@ -120,8 +121,16 @@ async def list_directory(
         return f"Error: not a directory: {path}"
 
     ignore = {
-        ".git", "node_modules", "__pycache__", ".venv", "venv",
-        ".next", "build", "dist", ".cptr", ".svelte-kit",
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".next",
+        "build",
+        "dist",
+        ".cptr",
+        ".svelte-kit",
     }
     entries = []
 
@@ -438,7 +447,9 @@ async def run_command(
             active = sum(1 for t in _bg_tasks.values() if not t.get("done"))
             if active >= _BG_TASK_LIMIT:
                 proc.kill()
-                return f"Error: too many background tasks ({active}/{_BG_TASK_LIMIT}). Kill one first."
+                return (
+                    f"Error: too many background tasks ({active}/{_BG_TASK_LIMIT}). Kill one first."
+                )
 
             task_id = uuid.uuid4().hex[:8]
             _bg_tasks[task_id] = {
@@ -516,6 +527,7 @@ async def web_search(query: str, *, workspace: str) -> str:
     """
     # Defer to web module
     from cptr.utils.web import web_search_handler
+
     return await web_search_handler(query)
 
 
@@ -524,6 +536,7 @@ async def read_url(url: str, *, workspace: str) -> str:
     :param url: The URL to fetch.
     """
     from cptr.utils.web import read_url_handler
+
     return await read_url_handler(url)
 
 
@@ -543,20 +556,19 @@ def _resolve_path(path: str, workspace: str) -> Path:
 
 TOOLS: dict[str, dict] = {
     # Read-only (auto-approve)
-    "read_file":       {"fn": read_file,       "auto": True},
-    "list_directory":  {"fn": list_directory,   "auto": True},
-    "search_files":    {"fn": search_files,     "auto": True},
-    "check_task":      {"fn": check_task,       "auto": True},
-    "web_search":      {"fn": web_search,       "auto": True},
-    "read_url":        {"fn": read_url,         "auto": True},
-
+    "read_file": {"fn": read_file, "auto": True},
+    "list_directory": {"fn": list_directory, "auto": True},
+    "search_files": {"fn": search_files, "auto": True},
+    "check_task": {"fn": check_task, "auto": True},
+    "web_search": {"fn": web_search, "auto": True},
+    "read_url": {"fn": read_url, "auto": True},
     # Write / mutate (require approval unless auto_approve_all)
-    "create_file":     {"fn": create_file,      "auto": False},
-    "edit_file":       {"fn": edit_file,         "auto": False},
-    "multi_edit_file": {"fn": multi_edit_file,   "auto": False},
-    "write_file":      {"fn": write_file,        "auto": False},
-    "run_command":     {"fn": run_command,       "auto": False},
-    "kill_task":       {"fn": kill_task,          "auto": False},
+    "create_file": {"fn": create_file, "auto": False},
+    "edit_file": {"fn": edit_file, "auto": False},
+    "multi_edit_file": {"fn": multi_edit_file, "auto": False},
+    "write_file": {"fn": write_file, "auto": False},
+    "run_command": {"fn": run_command, "auto": False},
+    "kill_task": {"fn": kill_task, "auto": False},
 }
 
 
@@ -598,7 +610,10 @@ def _fn_to_schema(name: str, fn) -> dict:
             prop["description"] = param_descs[pname]
         properties[pname] = prop
         # Positional with no default → required
-        if param.default is inspect.Parameter.empty and param.kind != inspect.Parameter.KEYWORD_ONLY:
+        if (
+            param.default is inspect.Parameter.empty
+            and param.kind != inspect.Parameter.KEYWORD_ONLY
+        ):
             required.append(pname)
     return {
         "name": name,

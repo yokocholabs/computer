@@ -22,9 +22,18 @@
 	const isSetup = mode === 'password' && needsSetup;
 
 	async function submit() {
-		if (isSetup && password.length < 6) { toast.error($t('auth.minChars')); return; }
-		if (!username.trim()) { toast.error($t('auth.usernameRequired')); return; }
-		if (!password) { toast.error($t('auth.passwordRequired')); return; }
+		if (isSetup && password.length < 6) {
+			toast.error($t('auth.minChars'));
+			return;
+		}
+		if (!username.trim()) {
+			toast.error($t('auth.usernameRequired'));
+			return;
+		}
+		if (!password) {
+			toast.error($t('auth.passwordRequired'));
+			return;
+		}
 
 		loading = true;
 		try {
@@ -65,13 +74,19 @@
 		<h1 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white mb-3">cptr</h1>
 
 		{#if isSetup}
-			<p class="text-xs text-gray-400 dark:text-gray-600 -mt-2 mb-3">{$t('auth.createAccountHint')}</p>
+			<p class="text-xs text-gray-400 dark:text-gray-600 -mt-2 mb-3">
+				{$t('auth.createAccountHint')}
+			</p>
 		{:else if mode === 'pam'}
-			<p class="text-xs text-gray-400 dark:text-gray-600 -mt-2 mb-3">{$t('auth.signInSystemHint')}</p>
+			<p class="text-xs text-gray-400 dark:text-gray-600 -mt-2 mb-3">
+				{$t('auth.signInSystemHint')}
+			</p>
 		{/if}
 
 		<form onsubmit={handleSubmit} action="javascript:void(0)">
-			<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-1">{isSetup ? $t('auth.setup') : isSignup ? $t('auth.signUp') : $t('auth.signIn')}</h2>
+			<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-1">
+				{isSetup ? $t('auth.setup') : isSignup ? $t('auth.signUp') : $t('auth.signIn')}
+			</h2>
 			<input
 				type="text"
 				placeholder={$t('auth.username')}
@@ -96,9 +111,15 @@
 					disabled:opacity-30 disabled:pointer-events-none mt-2"
 			>
 				{#if loading}
-					<div class="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"></div>
+					<div
+						class="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 dark:border-gray-700 dark:border-t-gray-400 rounded-full animate-spin"
+					></div>
 				{:else}
-					{isSetup ? $t('auth.createAccountBtn') : isSignup ? $t('auth.signUpBtn') : $t('auth.signInBtn')}
+					{isSetup
+						? $t('auth.createAccountBtn')
+						: isSignup
+							? $t('auth.signUpBtn')
+							: $t('auth.signInBtn')}
 				{/if}
 			</button>
 		</form>
@@ -107,10 +128,24 @@
 			<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-4">
 				{#if isSignup}
 					{$t('auth.alreadyHaveAccount')}
-					<button type="button" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" onclick={() => { isSignup = false; password = ''; }}>{$t('auth.signInLink')}</button>
+					<button
+						type="button"
+						class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+						onclick={() => {
+							isSignup = false;
+							password = '';
+						}}>{$t('auth.signInLink')}</button
+					>
 				{:else}
 					{$t('auth.dontHaveAccount')}
-					<button type="button" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" onclick={() => { isSignup = true; password = ''; }}>{$t('auth.signUpLink')}</button>
+					<button
+						type="button"
+						class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+						onclick={() => {
+							isSignup = true;
+							password = '';
+						}}>{$t('auth.signUpLink')}</button
+					>
 				{/if}
 			</p>
 		{/if}

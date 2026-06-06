@@ -19,6 +19,7 @@ def _uuid() -> str:
 
 class Workspace(Base):
     """Per-workspace state. One row per (user, filesystem path)."""
+
     __tablename__ = "workspaces"
 
     id = Column(Text, primary_key=True, default=_uuid)
@@ -38,9 +39,7 @@ class Workspace(Base):
         """List all workspaces for a user."""
         async with await get_db() as db:
             result = await db.execute(
-                select(Workspace)
-                .where(Workspace.user_id == user_id)
-                .order_by(Workspace.created_at)
+                select(Workspace).where(Workspace.user_id == user_id).order_by(Workspace.created_at)
             )
             return list(result.scalars().all())
 

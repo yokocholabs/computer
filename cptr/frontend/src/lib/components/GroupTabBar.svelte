@@ -16,9 +16,8 @@
 		splitCurrentTab,
 		setSplitDirection,
 		sidebarOpen,
-
 		type EditorGroup,
-		type Tab,
+		type Tab
 	} from '$lib/stores';
 	import { openChatTab } from '$lib/stores';
 	import { chatEnabled, streamingChatTabs } from '$lib/stores/chat';
@@ -55,21 +54,26 @@
 	// Drop target highlight for cross-group drag
 	let dropHighlight = $state(false);
 
-	const displayTabs = $derived(
-		(group?.tabs ?? []).filter((t) => t.type !== 'git')
-	);
+	const displayTabs = $derived((group?.tabs ?? []).filter((t) => t.type !== 'git'));
 
 	const isActiveGroup = $derived($activeWorkspace?.activeGroupId === group?.id);
 
 	function tabIconName(tab: Tab): string {
 		switch (tab.type) {
-			case 'files': return 'folder';
-			case 'terminal': return 'terminal';
-			case 'file': return 'page';
-			case 'git': return 'git-diff';
-			case 'chat': return 'chat-bubble';
-			case 'preview': return 'monitor';
-			default: return 'page';
+			case 'files':
+				return 'folder';
+			case 'terminal':
+				return 'terminal';
+			case 'file':
+				return 'page';
+			case 'git':
+				return 'git-diff';
+			case 'chat':
+				return 'chat-bubble';
+			case 'preview':
+				return 'monitor';
+			default:
+				return 'page';
 		}
 	}
 
@@ -131,20 +135,30 @@
 			label: $t('bar.newFile'),
 			icon: 'page',
 			shortcut: formatChord($keybindings.newFile),
-			onclick: () => { openUntitledFileTab(group.id); },
+			onclick: () => {
+				openUntitledFileTab(group.id);
+			}
 		},
-		...($chatEnabled ? [{
-			label: $t('bar.newChat'),
-			icon: 'chat-bubble',
-			shortcut: formatChord($keybindings.newChat),
-			onclick: () => { openChatTab(undefined, group.id); },
-		}] : []),
+		...($chatEnabled
+			? [
+					{
+						label: $t('bar.newChat'),
+						icon: 'chat-bubble',
+						shortcut: formatChord($keybindings.newChat),
+						onclick: () => {
+							openChatTab(undefined, group.id);
+						}
+					}
+				]
+			: []),
 		{
 			label: $t('bar.newTerminal'),
 			icon: 'terminal',
 			shortcut: formatChord($keybindings.newTerminal),
-			onclick: () => { openTerminalTab(group.id); },
-		},
+			onclick: () => {
+				openTerminalTab(group.id);
+			}
+		}
 	]);
 
 	const contextMenuItems = $derived.by(() => {
@@ -156,12 +170,12 @@
 			items.push({
 				label: 'Split Right',
 				icon: 'split-horizontal',
-				onclick: () => openInSplit(tab.filePath!, 'horizontal'),
+				onclick: () => openInSplit(tab.filePath!, 'horizontal')
 			});
 			items.push({
 				label: 'Split Down',
 				icon: 'split-vertical',
-				onclick: () => openInSplit(tab.filePath!, 'vertical'),
+				onclick: () => openInSplit(tab.filePath!, 'vertical')
 			});
 		}
 
@@ -170,7 +184,7 @@
 			items.push({
 				label: $t('bar.closeTab'),
 				icon: 'xmark',
-				onclick: () => closeTab(tab.id, group.id),
+				onclick: () => closeTab(tab.id, group.id)
 			});
 		}
 
@@ -184,14 +198,20 @@
 				label: 'Split Right',
 				icon: 'split-horizontal',
 				active: direction === 'horizontal',
-				onclick: () => { setSplitDirection('horizontal'); if (!$splitActive) splitCurrentTab('horizontal'); },
+				onclick: () => {
+					setSplitDirection('horizontal');
+					if (!$splitActive) splitCurrentTab('horizontal');
+				}
 			},
 			{
 				label: 'Split Down',
 				icon: 'split-vertical',
 				active: direction === 'vertical',
-				onclick: () => { setSplitDirection('vertical'); if (!$splitActive) splitCurrentTab('vertical'); },
-			},
+				onclick: () => {
+					setSplitDirection('vertical');
+					if (!$splitActive) splitCurrentTab('vertical');
+				}
+			}
 		];
 	});
 
@@ -218,7 +238,7 @@
 					if (evt.oldIndex != null && evt.newIndex != null && evt.oldIndex !== evt.newIndex) {
 						reorderTabs(evt.oldIndex, evt.newIndex, group.id);
 					}
-				},
+				}
 			});
 		}
 		window.addEventListener('resize', handleResize);
@@ -234,8 +254,8 @@
 <div
 	class="flex items-center h-9 px-1.5 gap-1 shrink-0 select-none border-b transition-colors duration-100
 		{dropHighlight
-			? 'border-blue-400 bg-blue-50 dark:bg-blue-500/5 dark:border-blue-500/40'
-			: 'border-gray-200 dark:border-white/6'}
+		? 'border-blue-400 bg-blue-50 dark:bg-blue-500/5 dark:border-blue-500/40'
+		: 'border-gray-200 dark:border-white/6'}
 		{isActiveGroup ? '' : 'opacity-50'}"
 	onclick={handlePaneClick}
 	ondragover={handleBarDragOver}
@@ -244,7 +264,12 @@
 >
 	<!-- Sidebar toggle (only in primary group when sidebar is closed) -->
 	{#if isPrimary && !$sidebarOpen}
-		<button class="flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100" onclick={toggleSidebar} aria-label={$t('bar.toggleSidebar')} use:tooltip={$t('bar.sidebar')}>
+		<button
+			class="flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100"
+			onclick={toggleSidebar}
+			aria-label={$t('bar.toggleSidebar')}
+			use:tooltip={$t('bar.sidebar')}
+		>
 			<Icon name="sidebar-expand" size={14} />
 		</button>
 	{/if}
@@ -257,8 +282,8 @@
 				<button
 					class="flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-100
 						{isActive
-							? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
-							: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
+						: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 					data-tab-id={tab.id}
 					onclick={() => handleTabClick(tab)}
 					oncontextmenu={(e) => handleContextMenu(e, tab)}
@@ -277,7 +302,9 @@
 						<span
 							class="flex items-center justify-center w-4 h-4 rounded text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
 							onclick={(e) => handleClose(e, tab.id)}
-							onkeydown={(e) => { if (e.key === 'Enter') handleClose(e, tab.id); }}
+							onkeydown={(e) => {
+								if (e.key === 'Enter') handleClose(e, tab.id);
+							}}
 							role="button"
 							tabindex="-1"
 							aria-label={$t('bar.closeTab')}
@@ -293,7 +320,7 @@
 		<button
 			bind:this={plusBtnEl}
 			class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
-			onclick={() => showPlusMenu = !showPlusMenu}
+			onclick={() => (showPlusMenu = !showPlusMenu)}
 			aria-label={$t('bar.new')}
 			use:tooltip={$t('bar.new')}
 		>
@@ -309,17 +336,20 @@
 				bind:this={splitBtnEl}
 				class="flex items-center justify-center w-7 h-7 rounded-lg transition-colors duration-100 shrink-0
 					{$splitActive
-						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
-						: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
-				onclick={() => showSplitMenu = !showSplitMenu}
+					? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
+					: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
+				onclick={() => (showSplitMenu = !showSplitMenu)}
 				aria-label="Split Editor"
 				use:tooltip={'Split Editor'}
 			>
-				<Icon name={$activeWorkspace?.splitDirection === 'vertical' ? 'split-vertical' : 'split-horizontal'} size={14} />
+				<Icon
+					name={$activeWorkspace?.splitDirection === 'vertical'
+						? 'split-vertical'
+						: 'split-horizontal'}
+					size={14}
+				/>
 			</button>
 		{/if}
-
-
 
 		<!-- Close group button (when split is active) -->
 		{#if canClose}
@@ -336,21 +366,32 @@
 </div>
 
 {#if showPlusMenu && plusBtnEl}
-	<DropdownMenu items={plusMenuItems} anchor={plusBtnEl} onclose={() => showPlusMenu = false} className="min-w-52" />
+	<DropdownMenu
+		items={plusMenuItems}
+		anchor={plusBtnEl}
+		onclose={() => (showPlusMenu = false)}
+		className="min-w-52"
+	/>
 {/if}
 
 {#if contextMenu}
-	<DropdownMenu items={contextMenuItems} anchor={{ x: contextMenu.x, y: contextMenu.y }} onclose={() => contextMenu = null} />
+	<DropdownMenu
+		items={contextMenuItems}
+		anchor={{ x: contextMenu.x, y: contextMenu.y }}
+		onclose={() => (contextMenu = null)}
+	/>
 {/if}
 
 {#if showSplitMenu && splitBtnEl}
-	<DropdownMenu items={splitMenuItems} anchor={splitBtnEl} onclose={() => showSplitMenu = false} />
+	<DropdownMenu
+		items={splitMenuItems}
+		anchor={splitBtnEl}
+		onclose={() => (showSplitMenu = false)}
+	/>
 {/if}
 
 <style>
 	@reference "../../app.css";
-
-
 
 	.group-tabs-row {
 		scrollbar-width: none;
@@ -371,6 +412,8 @@
 	}
 
 	@keyframes tab-spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>

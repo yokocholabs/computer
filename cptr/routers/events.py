@@ -201,9 +201,19 @@ async def _fs_watcher_loop(ws: WebSocket, initial_path: str, path_holder: dict) 
 
 # System processes to ignore
 _IGNORED_PROCESSES = {
-    "sshd", "cupsd", "mDNSResponder", "rapportd", "systemd-resolve",
-    "avahi-daemon", "dnsmasq", "launchd", "systemd", "ntpd",
-    "bluetoothd", "AirPlayXPCHelper", "ControlCenter",
+    "sshd",
+    "cupsd",
+    "mDNSResponder",
+    "rapportd",
+    "systemd-resolve",
+    "avahi-daemon",
+    "dnsmasq",
+    "launchd",
+    "systemd",
+    "ntpd",
+    "bluetoothd",
+    "AirPlayXPCHelper",
+    "ControlCenter",
 }
 
 # Ports that are almost certainly system services
@@ -215,8 +225,18 @@ def _get_ppid(pid: int) -> int:
     try:
         if sys.platform == "win32":
             r = subprocess.run(
-                ["wmic", "process", "where", f"ProcessId={pid}", "get", "ParentProcessId", "/value"],
-                capture_output=True, text=True, timeout=3,
+                [
+                    "wmic",
+                    "process",
+                    "where",
+                    f"ProcessId={pid}",
+                    "get",
+                    "ParentProcessId",
+                    "/value",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             for line in r.stdout.splitlines():
                 if line.startswith("ParentProcessId="):
@@ -228,7 +248,9 @@ def _get_ppid(pid: int) -> int:
         else:
             r = subprocess.run(
                 ["ps", "-o", "ppid=", "-p", str(pid)],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             return int(r.stdout.strip())
     except Exception:
@@ -262,7 +284,9 @@ def _get_process_name(pid: int) -> str:
         if sys.platform == "win32":
             r = subprocess.run(
                 ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             # Output: "name.exe","1234",...
             line = r.stdout.strip()
@@ -275,7 +299,9 @@ def _get_process_name(pid: int) -> str:
         else:
             r = subprocess.run(
                 ["ps", "-o", "comm=", "-p", str(pid)],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             name = r.stdout.strip()
             # macOS returns full path, extract basename
@@ -289,7 +315,9 @@ def _scan_ports_darwin() -> list[dict]:
     try:
         r = subprocess.run(
             ["lsof", "-iTCP", "-sTCP:LISTEN", "-nP", "-F", "pcn"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if r.returncode != 0:
             return []
@@ -309,11 +337,13 @@ def _scan_ports_darwin() -> list[dict]:
                     port_str = addr.rsplit(":", 1)[1]
                     try:
                         port = int(port_str)
-                        ports.append({
-                            "port": port,
-                            "pid": current_pid,
-                            "process": current_process,
-                        })
+                        ports.append(
+                            {
+                                "port": port,
+                                "pid": current_pid,
+                                "process": current_process,
+                            }
+                        )
                     except ValueError:
                         pass
         return ports
@@ -369,7 +399,9 @@ def _scan_ports_windows() -> list[dict]:
     try:
         r = subprocess.run(
             ["netstat", "-ano", "-p", "TCP"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         ports = []
         for line in r.stdout.splitlines():
@@ -381,11 +413,13 @@ def _scan_ports_windows() -> list[dict]:
                     try:
                         port = int(port_str)
                         pid = int(parts[-1])
-                        ports.append({
-                            "port": port,
-                            "pid": pid,
-                            "process": _get_process_name(pid),
-                        })
+                        ports.append(
+                            {
+                                "port": port,
+                                "pid": pid,
+                                "process": _get_process_name(pid),
+                            }
+                        )
                     except ValueError:
                         pass
         return ports
@@ -455,13 +489,15 @@ async def _port_scanner_loop(ws: WebSocket) -> None:
         for port, info in current_ports.items():
             if port not in known:
                 try:
-                    await ws.send_json({
-                        "type": "port_added",
-                        "port": info["port"],
-                        "pid": info["pid"],
-                        "process": info["process"],
-                        "session_id": info.get("session_id"),
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "port_added",
+                            "port": info["port"],
+                            "pid": info["pid"],
+                            "process": info["process"],
+                            "session_id": info.get("session_id"),
+                        }
+                    )
                 except Exception:
                     return
 
@@ -469,10 +505,12 @@ async def _port_scanner_loop(ws: WebSocket) -> None:
         for port in list(known.keys()):
             if port not in current_ports:
                 try:
-                    await ws.send_json({
-                        "type": "port_removed",
-                        "port": port,
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "port_removed",
+                            "port": port,
+                        }
+                    )
                 except Exception:
                     return
 
@@ -480,6 +518,7 @@ async def _port_scanner_loop(ws: WebSocket) -> None:
 
 
 # ── Receive loop ──────────────────────────────────────────────────
+
 
 async def _receive_loop(ws: WebSocket, path_holder: dict) -> None:
     """Handle incoming messages from the client."""
@@ -496,8 +535,11 @@ async def _receive_loop(ws: WebSocket, path_holder: dict) -> None:
 
 # ── WebSocket endpoint ────────────────────────────────────────────
 
+
 @router.websocket("/ws")
-async def events_ws(websocket: WebSocket, path: str = Query("/", description="Initial fs watch path")):
+async def events_ws(
+    websocket: WebSocket, path: str = Query("/", description="Initial fs watch path")
+):
     """Unified system events WebSocket.
 
     Pushes:

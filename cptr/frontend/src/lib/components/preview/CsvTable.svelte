@@ -7,7 +7,7 @@
 	let { content, separator = ',' }: Props = $props();
 
 	let parsed = $derived(() => {
-		const lines = content.split('\n').filter(l => l.trim());
+		const lines = content.split('\n').filter((l) => l.trim());
 		if (lines.length === 0) return { headers: [], rows: [] };
 
 		// Simple CSV parse (handles quoted fields)
@@ -36,7 +36,7 @@
 		}
 
 		const headers = parseLine(lines[0]);
-		const rows = lines.slice(1).map(l => parseLine(l));
+		const rows = lines.slice(1).map((l) => parseLine(l));
 		return { headers, rows };
 	});
 </script>

@@ -17,7 +17,9 @@
 	let pzInstance: PanZoom | null = null;
 	let zoomLevel = $state(1);
 
-	let sanitizedSvg = $derived(DOMPurify.sanitize(content, { USE_PROFILES: { svg: true, svgFilters: true } }));
+	let sanitizedSvg = $derived(
+		DOMPurify.sanitize(content, { USE_PROFILES: { svg: true, svgFilters: true } })
+	);
 
 	function initPanzoom() {
 		if (!contentEl) return;
@@ -70,15 +72,21 @@
 		</div>
 		<div class="toolbar-right">
 			<button
-				class="toolbar-btn" class:active={mode === 'visual'}
-				onclick={() => { mode = 'visual'; }}
-				use:tooltip={'Visual'}
-			><Icon name="eye" size={14} /></button>
+				class="toolbar-btn"
+				class:active={mode === 'visual'}
+				onclick={() => {
+					mode = 'visual';
+				}}
+				use:tooltip={'Visual'}><Icon name="eye" size={14} /></button
+			>
 			<button
-				class="toolbar-btn" class:active={mode === 'source'}
-				onclick={() => { mode = 'source'; }}
-				use:tooltip={'Source'}
-			><Icon name="code" size={14} /></button>
+				class="toolbar-btn"
+				class:active={mode === 'source'}
+				onclick={() => {
+					mode = 'source';
+				}}
+				use:tooltip={'Source'}><Icon name="code" size={14} /></button
+			>
 			{#if mode === 'visual'}
 				<button class="toolbar-btn" onclick={resetView} use:tooltip={'Reset zoom'}>
 					<span class="zoom-text">{Math.round(zoomLevel * 100)}%</span>
@@ -184,17 +192,13 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		background: repeating-conic-gradient(
-			var(--color-gray-100) 0% 25%,
-			transparent 0% 50%
-		) 50% / 16px 16px;
+		background: repeating-conic-gradient(var(--color-gray-100) 0% 25%, transparent 0% 50%) 50% /
+			16px 16px;
 	}
 
 	:global(.dark) .visual-container {
-		background: repeating-conic-gradient(
-			rgba(255, 255, 255, 0.04) 0% 25%,
-			transparent 0% 50%
-		) 50% / 16px 16px;
+		background: repeating-conic-gradient(rgba(255, 255, 255, 0.04) 0% 25%, transparent 0% 50%) 50% /
+			16px 16px;
 	}
 
 	.visual-content {

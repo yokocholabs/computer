@@ -7,8 +7,7 @@ export interface TerminalSession {
 	session_id: string;
 }
 
-export const listSessions = () =>
-	fetchJSON<TerminalSession[]>('/api/terminal');
+export const listSessions = () => fetchJSON<TerminalSession[]>('/api/terminal');
 
 export const createSession = (cwd: string) =>
 	fetchJSON<TerminalSession>('/api/terminal', jsonBody({ cwd }));

@@ -22,7 +22,7 @@ import {
 	savePreferences,
 	getWorkspaceList,
 	getWorkspaceState,
-	saveWorkspaceState,
+	saveWorkspaceState
 } from '$lib/apis/state';
 import { listSessions, createSession, deleteSession } from '$lib/apis/terminal';
 import { changeLocale, i18next } from '$lib/i18n';
@@ -36,7 +36,7 @@ export interface Tab {
 	type: 'files' | 'terminal' | 'file' | 'git' | 'chat' | 'preview';
 	label: string;
 	filePath?: string;
-	path?: string;        // generic path (e.g. for chat)
+	path?: string; // generic path (e.g. for chat)
 	sessionId?: string;
 	port?: number;
 	unsaved?: boolean;
@@ -91,7 +91,7 @@ function createDefaultGroup(): EditorGroup {
 	return {
 		id: 'default',
 		tabs: [{ id: 'files', type: 'files', label: 'Files', permanent: true }],
-		activeTabId: 'files',
+		activeTabId: 'files'
 	};
 }
 
@@ -104,7 +104,7 @@ function createDefaultWorkspace(path: string): WorkspaceState {
 		activeGroupId: 'default',
 		splitDirection: 'horizontal',
 		splitRatio: 0.5,
-		fileBrowserCwd: path,
+		fileBrowserCwd: path
 	};
 }
 
@@ -117,7 +117,9 @@ export const currentWorkspace = writable<WorkspaceState | null>(null);
 export const workspaceList = writable<{ path: string; name: string }[]>([]);
 
 /** Global user preferences. */
-export const sidebarOpen = writable(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
+export const sidebarOpen = writable(
+	typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+);
 export const sidebarWidth = writable(220);
 export const theme = writable<Theme>('dark');
 export const toolApprovalMode = writable<ToolApprovalMode>('auto');
@@ -128,7 +130,8 @@ export const showChangelog = writable(false);
 export const autoApproveTools = {
 	subscribe: toolApprovalMode.subscribe,
 	set: (v: boolean) => toolApprovalMode.set(v ? 'full' : 'ask'),
-	update: (fn: (v: boolean) => boolean) => toolApprovalMode.update((m) => fn(m === 'full') ? 'full' : 'ask'),
+	update: (fn: (v: boolean) => boolean) =>
+		toolApprovalMode.update((m) => (fn(m === 'full') ? 'full' : 'ask'))
 };
 export const stateLoaded = writable(false);
 export const gitReviewOpen = writable(false);
@@ -145,16 +148,14 @@ export const workspaceOrder = writable<string[]>([]);
 export const activeWorkspace = currentWorkspace;
 
 export const activeGroup = derived(currentWorkspace, ($ws) =>
-	$ws ? $ws.groups.find((g) => g.id === $ws.activeGroupId) ?? $ws.groups[0] ?? null : null
+	$ws ? ($ws.groups.find((g) => g.id === $ws.activeGroupId) ?? $ws.groups[0] ?? null) : null
 );
 
 export const activeTab = derived(activeGroup, ($g) =>
-	$g ? $g.tabs.find((t) => t.id === $g.activeTabId) ?? null : null
+	$g ? ($g.tabs.find((t) => t.id === $g.activeTabId) ?? null) : null
 );
 
-export const splitActive = derived(currentWorkspace, ($ws) =>
-	($ws?.groups.length ?? 0) > 1
-);
+export const splitActive = derived(currentWorkspace, ($ws) => ($ws?.groups.length ?? 0) > 1);
 
 // ── Compat aliases for old split-pane API ──────────────────────
 
@@ -197,7 +198,7 @@ export function openTabInSplit(tabId: string, direction?: SplitDirection): void 
 	const newGroup: EditorGroup = {
 		id: nextId(),
 		tabs: [newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	};
 
 	currentWorkspace.update((ws) => {
@@ -207,7 +208,7 @@ export function openTabInSplit(tabId: string, direction?: SplitDirection): void 
 			groups: [...ws.groups, newGroup],
 			activeGroupId: newGroup.id,
 			splitDirection: dir,
-			splitRatio: ws.splitRatio ?? 0.5,
+			splitRatio: ws.splitRatio ?? 0.5
 		};
 	});
 }
@@ -268,7 +269,7 @@ function persistPreferences(): void {
 			locale: i18next.language,
 			workspaceOrder: get(workspaceOrder),
 			keybindings: get(keybindings),
-			version: get(lastSeenVersion),
+			version: get(lastSeenVersion)
 		};
 		savePreferences(prefs as unknown as Record<string, unknown>).catch(() => {});
 	}, 300);
@@ -278,15 +279,33 @@ let _subscribed = false;
 function subscribeForPersistence() {
 	if (_subscribed) return;
 	_subscribed = true;
-	currentWorkspace.subscribe(() => { if (get(stateLoaded)) persistWorkspace(); });
-	theme.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	sidebarOpen.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	sidebarWidth.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	toolApprovalMode.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	workspaceOrder.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	keybindings.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	lastSeenVersion.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	i18next.on('languageChanged', () => { if (get(stateLoaded)) persistPreferences(); });
+	currentWorkspace.subscribe(() => {
+		if (get(stateLoaded)) persistWorkspace();
+	});
+	theme.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	sidebarOpen.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	sidebarWidth.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	toolApprovalMode.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	workspaceOrder.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	keybindings.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	lastSeenVersion.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	i18next.on('languageChanged', () => {
+		if (get(stateLoaded)) persistPreferences();
+	});
 }
 
 // ── Load preferences (called once at app startup) ───────────────
@@ -347,25 +366,27 @@ export async function loadWorkspace(path: string): Promise<void> {
 			const ws = wsData as unknown as WorkspaceState;
 
 			// Remove dead terminal tabs from all groups
-			const cleanedGroups = ws.groups.map((g) => {
-				const filteredTabs = g.tabs.filter((t: Tab) => {
-					if (t.type === 'terminal' && t.sessionId && !aliveSessions.has(t.sessionId)) {
-						return false;
-					}
-					return true;
-				});
-				const activeStillExists = filteredTabs.some((t: Tab) => t.id === g.activeTabId);
-				return {
-					...g,
-					tabs: filteredTabs,
-					activeTabId: activeStillExists ? g.activeTabId : (filteredTabs[0]?.id ?? 'files'),
-				};
-			}).filter((g) => g.tabs.length > 0);
+			const cleanedGroups = ws.groups
+				.map((g) => {
+					const filteredTabs = g.tabs.filter((t: Tab) => {
+						if (t.type === 'terminal' && t.sessionId && !aliveSessions.has(t.sessionId)) {
+							return false;
+						}
+						return true;
+					});
+					const activeStillExists = filteredTabs.some((t: Tab) => t.id === g.activeTabId);
+					return {
+						...g,
+						tabs: filteredTabs,
+						activeTabId: activeStillExists ? g.activeTabId : (filteredTabs[0]?.id ?? 'files')
+					};
+				})
+				.filter((g) => g.tabs.length > 0);
 
 			const groups = cleanedGroups.length > 0 ? cleanedGroups : [createDefaultGroup()];
 			const activeGroupId = groups.some((g) => g.id === ws.activeGroupId)
 				? ws.activeGroupId
-				: groups[0]?.id ?? 'default';
+				: (groups[0]?.id ?? 'default');
 
 			currentWorkspace.set({
 				...ws,
@@ -374,7 +395,7 @@ export async function loadWorkspace(path: string): Promise<void> {
 				activeGroupId,
 				splitDirection: ws.splitDirection ?? 'horizontal',
 				splitRatio: ws.splitRatio ?? 0.5,
-				fileBrowserCwd: ws.fileBrowserCwd ?? path,
+				fileBrowserCwd: ws.fileBrowserCwd ?? path
 			});
 		} else {
 			// First time opening this workspace, create defaults
@@ -480,7 +501,10 @@ export function updateWorkspace(partial: Partial<WorkspaceState>): void {
 
 function updateGroupTabs(
 	groupId: string | undefined,
-	fn: (tabs: Tab[], group: EditorGroup) => { tabs: Tab[]; activeTabId?: string; tabHistory?: string[] }
+	fn: (
+		tabs: Tab[],
+		group: EditorGroup
+	) => { tabs: Tab[]; activeTabId?: string; tabHistory?: string[] }
 ): void {
 	currentWorkspace.update((ws) => {
 		if (!ws) return ws;
@@ -491,12 +515,11 @@ function updateGroupTabs(
 				if (g.id !== gid) return g;
 				const result = fn(g.tabs, g);
 				const newActiveId = result.activeTabId ?? g.activeTabId;
-				const tabHistory = result.tabHistory
-					?? (newActiveId !== g.activeTabId
-						? pushTabHistory(g, g.activeTabId)
-						: g.tabHistory);
+				const tabHistory =
+					result.tabHistory ??
+					(newActiveId !== g.activeTabId ? pushTabHistory(g, g.activeTabId) : g.tabHistory);
 				return { ...g, tabs: result.tabs, activeTabId: newActiveId, tabHistory };
-			}),
+			})
 		};
 	});
 }
@@ -532,12 +555,12 @@ export function openFileTab(filePath: string, targetGroupId?: string): void {
 		id: nextId(),
 		type: 'file',
 		label: name,
-		filePath,
+		filePath
 	};
 
 	updateGroupTabs(gid, (tabs) => ({
 		tabs: [...tabs, newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	}));
 }
 
@@ -560,12 +583,12 @@ export function openUntitledFileTab(targetGroupId?: string): void {
 		type: 'file',
 		label,
 		filePath: `untitled:${label}`,
-		unsaved: true,
+		unsaved: true
 	};
 
 	updateGroupTabs(targetGroupId, (tabs) => ({
 		tabs: [...tabs, newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	}));
 }
 
@@ -580,12 +603,12 @@ export async function openTerminalTab(targetGroupId?: string): Promise<void> {
 			id: nextId(),
 			type: 'terminal',
 			label: 'Terminal',
-			sessionId: data.session_id,
+			sessionId: data.session_id
 		};
 
 		updateGroupTabs(targetGroupId, (tabs) => ({
 			tabs: [...tabs, newTab],
-			activeTabId: newTab.id,
+			activeTabId: newTab.id
 		}));
 	} catch (e) {
 		console.error('Failed to create terminal:', e);
@@ -611,12 +634,12 @@ export function openPreviewTab(port: number, targetGroupId?: string): void {
 		id: nextId(),
 		type: 'preview',
 		label: `localhost:${port}`,
-		port,
+		port
 	};
 
 	updateGroupTabs(gid, (tabs) => ({
 		tabs: [...tabs, newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	}));
 }
 
@@ -641,12 +664,12 @@ export function openChatTab(chatId?: string, targetGroupId?: string): void {
 		id: nextId(),
 		type: 'chat',
 		label: 'New Chat',
-		path: chatId || `new-${Date.now()}`,
+		path: chatId || `new-${Date.now()}`
 	};
 
 	updateGroupTabs(gid, (tabs) => ({
 		tabs: [...tabs, newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	}));
 }
 
@@ -655,7 +678,8 @@ export function closeTab(tabId: string, groupId?: string): void {
 	if (!ws) return;
 
 	// Find the group containing this tab
-	const gid = groupId ?? ws.groups.find((g) => g.tabs.some((t) => t.id === tabId))?.id ?? ws.activeGroupId;
+	const gid =
+		groupId ?? ws.groups.find((g) => g.tabs.some((t) => t.id === tabId))?.id ?? ws.activeGroupId;
 	const group = ws.groups.find((g) => g.id === gid);
 	if (!group) return;
 
@@ -668,7 +692,11 @@ export function closeTab(tabId: string, groupId?: string): void {
 
 	// Clean up streaming indicator for closed chat tabs
 	if (tab.type === 'chat') {
-		streamingChatTabs.update((s) => { const n = new Set(s); n.delete(tabId); return n; });
+		streamingChatTabs.update((s) => {
+			const n = new Set(s);
+			n.delete(tabId);
+			return n;
+		});
 	}
 
 	currentWorkspace.update((ws) => {
@@ -712,7 +740,7 @@ export function closeTab(tabId: string, groupId?: string): void {
 		return {
 			...ws,
 			groups: newGroups,
-			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id,
+			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id
 		};
 	});
 }
@@ -730,23 +758,19 @@ export function setActiveTab(tabId: string, groupId?: string): void {
 				return {
 					...g,
 					activeTabId: tabId,
-					tabHistory: pushTabHistory(g, g.activeTabId),
+					tabHistory: pushTabHistory(g, g.activeTabId)
 				};
-			}),
+			})
 		};
 	});
 }
 
 export function setActiveGroup(groupId: string): void {
-	currentWorkspace.update((ws) =>
-		ws ? { ...ws, activeGroupId: groupId } : ws
-	);
+	currentWorkspace.update((ws) => (ws ? { ...ws, activeGroupId: groupId } : ws));
 }
 
 export function setFileBrowserCwd(cwd: string): void {
-	currentWorkspace.update((ws) =>
-		ws ? { ...ws, fileBrowserCwd: cwd } : ws
-	);
+	currentWorkspace.update((ws) => (ws ? { ...ws, fileBrowserCwd: cwd } : ws));
 }
 
 export function markTabUnsaved(tabId: string, unsaved: boolean): void {
@@ -756,8 +780,8 @@ export function markTabUnsaved(tabId: string, unsaved: boolean): void {
 			...ws,
 			groups: ws.groups.map((g) => ({
 				...g,
-				tabs: g.tabs.map((t) => (t.id === tabId ? { ...t, unsaved } : t)),
-			})),
+				tabs: g.tabs.map((t) => (t.id === tabId ? { ...t, unsaved } : t))
+			}))
 		};
 	});
 }
@@ -772,8 +796,8 @@ export function updateTabFilePath(tabId: string, newPath: string): void {
 				...g,
 				tabs: g.tabs.map((t) =>
 					t.id === tabId ? { ...t, filePath: newPath, label: name, unsaved: false } : t
-				),
-			})),
+				)
+			}))
 		};
 	});
 }
@@ -802,7 +826,7 @@ export function openInSplit(filePath: string, direction?: SplitDirection): void 
 	const newGroup: EditorGroup = {
 		id: nextId(),
 		tabs: [newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	};
 
 	currentWorkspace.update((ws) => {
@@ -812,7 +836,7 @@ export function openInSplit(filePath: string, direction?: SplitDirection): void 
 			groups: [...ws.groups, newGroup],
 			activeGroupId: newGroup.id,
 			splitDirection: dir,
-			splitRatio: ws.splitRatio ?? 0.5,
+			splitRatio: ws.splitRatio ?? 0.5
 		};
 	});
 }
@@ -842,7 +866,7 @@ export function splitCurrentTab(direction?: SplitDirection): void {
 	const newGroup: EditorGroup = {
 		id: nextId(),
 		tabs: [newTab],
-		activeTabId: newTab.id,
+		activeTabId: newTab.id
 	};
 
 	currentWorkspace.update((ws) => {
@@ -852,7 +876,7 @@ export function splitCurrentTab(direction?: SplitDirection): void {
 			groups: [...ws.groups, newGroup],
 			activeGroupId: newGroup.id,
 			splitDirection: dir,
-			splitRatio: ws.splitRatio ?? 0.5,
+			splitRatio: ws.splitRatio ?? 0.5
 		};
 	});
 }
@@ -878,7 +902,7 @@ export function closeGroup(groupId: string): void {
 		return {
 			...ws,
 			groups: newGroups,
-			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id,
+			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id
 		};
 	});
 }
@@ -895,9 +919,7 @@ export function moveTabToGroup(tabId: string, fromGroupId: string, toGroupId: st
 		let newGroups = ws.groups.map((g) => {
 			if (g.id === fromGroupId) {
 				const newTabs = g.tabs.filter((t) => t.id !== tabId);
-				const newActiveId = g.activeTabId === tabId
-					? (newTabs[0]?.id ?? 'files')
-					: g.activeTabId;
+				const newActiveId = g.activeTabId === tabId ? (newTabs[0]?.id ?? 'files') : g.activeTabId;
 				return { ...g, tabs: newTabs, activeTabId: newActiveId };
 			}
 			if (g.id === toGroupId) {
@@ -914,15 +936,13 @@ export function moveTabToGroup(tabId: string, fromGroupId: string, toGroupId: st
 		return {
 			...ws,
 			groups: newGroups,
-			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id,
+			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id
 		};
 	});
 }
 
 export function setSplitDirection(direction: SplitDirection): void {
-	currentWorkspace.update((ws) =>
-		ws ? { ...ws, splitDirection: direction } : ws
-	);
+	currentWorkspace.update((ws) => (ws ? { ...ws, splitDirection: direction } : ws));
 }
 
 export function setSplitRatio(ratio: number): void {

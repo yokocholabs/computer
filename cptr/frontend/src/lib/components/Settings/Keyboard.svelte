@@ -1,5 +1,13 @@
 <script lang="ts">
-	import { keybindings, ACTION_IDS, ACTION_LABELS, DEFAULT_KEYBINDINGS, formatChord, eventToChord, resetKeybindings } from '$lib/stores/keybindings';
+	import {
+		keybindings,
+		ACTION_IDS,
+		ACTION_LABELS,
+		DEFAULT_KEYBINDINGS,
+		formatChord,
+		eventToChord,
+		resetKeybindings
+	} from '$lib/stores/keybindings';
 	import type { ActionId } from '$lib/stores/keybindings';
 	import KeyPill from '../KeyPill.svelte';
 
@@ -14,7 +22,7 @@
 		quickOpen: 'Search and open files quickly',
 		openSettings: 'Open the settings panel',
 		toggleSplit: 'Toggle split editor view',
-		toggleSidebar: 'Show or hide the sidebar',
+		toggleSidebar: 'Show or hide the sidebar'
 	};
 
 	let recordingAction = $state<ActionId | null>(null);
@@ -43,7 +51,7 @@
 		// Save it
 		keybindings.update((current) => ({
 			...current,
-			[recordingAction!]: chord,
+			[recordingAction!]: chord
 		}));
 		recordingAction = null;
 	}
@@ -51,7 +59,7 @@
 	function clearBinding(actionId: ActionId) {
 		keybindings.update((current) => ({
 			...current,
-			[actionId]: '',
+			[actionId]: ''
 		}));
 	}
 
@@ -72,14 +80,16 @@
 		<h2 class="text-sm font-medium text-gray-900 dark:text-white">Keyboard Shortcuts</h2>
 		<button
 			class="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100"
-			onclick={resetKeybindings}
-		>Reset defaults</button>
+			onclick={resetKeybindings}>Reset defaults</button
+		>
 	</div>
 
 	<!-- Column headers -->
 	<div class="flex items-center gap-2 mb-0.5 px-1">
 		<span class="flex-1 text-[10px] font-medium text-gray-400 dark:text-gray-600">Command</span>
-		<span class="w-[140px] text-[10px] font-medium text-gray-400 dark:text-gray-600 text-right">Keybinding</span>
+		<span class="w-[140px] text-[10px] font-medium text-gray-400 dark:text-gray-600 text-right"
+			>Keybinding</span
+		>
 	</div>
 
 	<div class="flex flex-col">
@@ -90,8 +100,12 @@
 
 			<div class="shortcut-row">
 				<div class="flex-1 min-w-0">
-					<div class="text-[11.5px] text-gray-700 dark:text-gray-300">{ACTION_LABELS[actionId]}</div>
-					<div class="text-[10px] text-gray-400 dark:text-gray-600 truncate leading-tight">{ACTION_DESCRIPTIONS[actionId]}</div>
+					<div class="text-[11.5px] text-gray-700 dark:text-gray-300">
+						{ACTION_LABELS[actionId]}
+					</div>
+					<div class="text-[10px] text-gray-400 dark:text-gray-600 truncate leading-tight">
+						{ACTION_DESCRIPTIONS[actionId]}
+					</div>
 				</div>
 
 				<div class="w-[140px] flex items-center justify-end shrink-0">
@@ -108,12 +122,15 @@
 					{:else}
 						<button
 							class="text-[10px] text-gray-500 dark:text-gray-600 cursor-pointer hover:text-gray-400 transition-colors duration-75"
-							onclick={() => startRecording(actionId)}
-						>Unassigned</button>
+							onclick={() => startRecording(actionId)}>Unassigned</button
+						>
 					{/if}
 
 					{#if conflict}
-						<span class="text-[9px] text-amber-500 ml-1" title="Also bound to {ACTION_LABELS[conflict]}">!</span>
+						<span
+							class="text-[9px] text-amber-500 ml-1"
+							title="Also bound to {ACTION_LABELS[conflict]}">!</span
+						>
 					{/if}
 				</div>
 			</div>
@@ -137,7 +154,6 @@
 		border-bottom: none;
 	}
 
-
 	.recording-indicator {
 		display: inline-flex;
 		align-items: center;
@@ -152,12 +168,16 @@
 	}
 
 	@keyframes pulse-subtle {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.6; }
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.6;
+		}
 	}
 
 	.kbd-inline {
 		@apply inline px-0.5 py-px rounded text-[9px] font-mono bg-gray-100 dark:bg-white/6 text-gray-500;
 	}
 </style>
-

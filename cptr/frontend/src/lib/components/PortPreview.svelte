@@ -141,11 +141,7 @@
 		</button>
 
 		<!-- Refresh -->
-		<button
-			class="preview-btn"
-			onclick={refresh}
-			use:tooltip={'Refresh'}
-		>
+		<button class="preview-btn" onclick={refresh} use:tooltip={'Refresh'}>
 			<Icon name="refresh" size={12} />
 		</button>
 
@@ -162,11 +158,7 @@
 		</div>
 
 		<!-- Open external -->
-		<button
-			class="preview-btn"
-			onclick={openExternal}
-			use:tooltip={'Open in new tab'}
-		>
+		<button class="preview-btn" onclick={openExternal} use:tooltip={'Open in new tab'}>
 			<Icon name="external-link" size={12} />
 		</button>
 	</div>
@@ -195,7 +187,10 @@
 					sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
 					class="preview-iframe"
 					onload={onIframeLoad}
-					onerror={() => { loadError = true; isLoading = false; }}
+					onerror={() => {
+						loadError = true;
+						isLoading = false;
+					}}
 				></iframe>
 			{/key}
 		{/if}
@@ -314,9 +309,18 @@
 	}
 
 	@keyframes loading-bar {
-		0% { width: 0; margin-left: 0; }
-		50% { width: 60%; margin-left: 20%; }
-		100% { width: 0; margin-left: 100%; }
+		0% {
+			width: 0;
+			margin-left: 0;
+		}
+		50% {
+			width: 60%;
+			margin-left: 20%;
+		}
+		100% {
+			width: 0;
+			margin-left: 100%;
+		}
 	}
 
 	.preview-content {

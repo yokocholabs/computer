@@ -8,9 +8,9 @@
 import Mention from '@tiptap/extension-mention';
 
 export interface FileMentionAttrs {
-	id: string;   // full file path
+	id: string; // full file path
 	label: string; // display name (basename)
-	type: string;  // 'file' | 'directory'
+	type: string; // 'file' | 'directory'
 }
 
 /**
@@ -29,7 +29,7 @@ export function createFileMention(suggestionOptions: {
 }) {
 	return Mention.configure({
 		HTMLAttributes: {
-			class: 'bg-blue-500/10 text-blue-400 rounded px-1 py-px text-xs font-mono',
+			class: 'bg-blue-500/10 text-blue-400 rounded px-1 py-px text-xs font-mono'
 		},
 		renderText({ node }) {
 			const label = node.attrs.label ?? node.attrs.id;
@@ -38,8 +38,8 @@ export function createFileMention(suggestionOptions: {
 		suggestion: {
 			char: '@',
 			allowSpaces: false,
-			...suggestionOptions,
-		},
+			...suggestionOptions
+		}
 	});
 }
 
