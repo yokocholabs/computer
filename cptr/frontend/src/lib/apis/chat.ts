@@ -35,6 +35,7 @@ export interface ChatDetail {
 export interface SendMessageResult {
 	chat_id: string;
 	message_id: string;
+	queued?: boolean;
 }
 
 // ── Queries ─────────────────────────────────────────────────
@@ -113,4 +114,18 @@ export const createMessage = (
 	fetchJSON<{ ok: boolean; message_id: string }>(
 		`/api/chats/${chatId}/messages`,
 		jsonBody({ parent_id: parentId, role, content, output })
+	);
+
+// ── Queue management ────────────────────────────────────────
+
+export const queueSendNow = (chatId: string, messageId: string) =>
+	fetchJSON<{ ok: boolean; chat_id: string; message_id: string }>(
+		`/api/chats/${chatId}/queue/${messageId}/send`,
+		{ method: 'POST' }
+	);
+
+export const queueDelete = (chatId: string, messageId: string) =>
+	fetchJSON<{ ok: boolean }>(
+		`/api/chats/${chatId}/queue/${messageId}`,
+		{ method: 'DELETE' }
 	);

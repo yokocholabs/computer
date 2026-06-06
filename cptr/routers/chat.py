@@ -294,7 +294,7 @@ class SendMessageRequest(BaseModel):
 @router.post("")
 async def send_message(body: SendMessageRequest, request: Request):
     """Send a message. Omit chat_id to create a new chat.
-    Returns: { chat_id, message_id }
+    Returns: { chat_id, message_id, queued? }
     """
     user_id = _get_user(request)
 
@@ -323,6 +323,25 @@ async def send_message(body: SendMessageRequest, request: Request):
 
         # Auto-add .cptr to .gitignore if this is a git repo
         _ensure_gitignore(body.workspace)
+
+    # Check if the chat has an in-progress assistant message.
+    # If so, queue this message instead of starting a new task.
+    if body.chat_id and await _chat_has_active_generation(chat.id):
+        user_msg = await ChatMessage.create(
+            chat_id=chat.id,
+            role="user",
+            content=body.content,
+            parent_id=body.parent_id,
+            meta={"queued": True},
+            created_at=now_ms(),
+        )
+        # Double-check: if generation finished during our create,
+        # process queue now to close the race window.
+        if not await _chat_has_active_generation(chat.id):
+            from cptr.utils.chat_task import _process_queue
+            workspace = (chat.meta or {}).get("workspace", body.workspace)
+            await _process_queue(chat.id, user_id, workspace)
+        return {"chat_id": chat.id, "message_id": user_msg.id, "queued": True}
 
     # Resolve connection for model
     connection, bare_model = await _resolve_connection(body.model_id, request.app.state)
@@ -441,6 +460,10 @@ async def approve_tool(
     else:
         call["status"] = "rejected"
         await ChatMessage.update(message_id, output=output, done=True)
+        # Process queued messages since this chat is now idle
+        from cptr.utils.chat_task import _process_queue
+        workspace = chat.meta.get("workspace", "") if chat.meta else ""
+        await _process_queue(chat_id, user_id, workspace)
 
     return {"ok": True}
 
@@ -470,6 +493,11 @@ async def cancel_task_endpoint(
                 if item.get("type") == "function_call" and item.get("status") == "pending":
                     item["status"] = "rejected"
             await ChatMessage.update(message_id, output=output, done=True)
+
+    # Process queued messages since this chat may now be idle
+    from cptr.utils.chat_task import _process_queue
+    workspace = chat.meta.get("workspace", "") if chat.meta else ""
+    await _process_queue(chat_id, user_id, workspace)
 
     return {"ok": True}
 
@@ -550,6 +578,102 @@ async def create_message_endpoint(
     )
     await Chat.update_current_message(chat_id, msg.id, now_ms())
     return {"ok": True, "message_id": msg.id}
+
+async def _chat_has_active_generation(chat_id: str) -> bool:
+    """Check if any assistant message in this chat has done=False."""
+    messages = await ChatMessage.get_all_by_chat(chat_id)
+    return any(m.role == "assistant" and not m.done for m in messages)
+
+
+# ── Queue management ───────────────────────────────────────
+
+@router.post("/{chat_id}/queue/{message_id}/send")
+async def queue_send_now(
+    chat_id: str, message_id: str, request: Request
+):
+    """Cancel current generation, dequeue this message, send it immediately."""
+    user_id = _get_user(request)
+    chat = await Chat.get_by_id(chat_id)
+    if not chat or chat.user_id != user_id:
+        raise HTTPException(404, "chat not found")
+
+    msg = await ChatMessage.get_by_id(message_id)
+    if not msg or msg.chat_id != chat_id:
+        raise HTTPException(404, "message not found")
+    if not (msg.meta and msg.meta.get("queued")):
+        raise HTTPException(400, "message is not queued")
+
+    # Cancel any active task
+    all_msgs = await ChatMessage.get_all_by_chat(chat_id)
+    for m in all_msgs:
+        if m.role == "assistant" and not m.done:
+            from cptr.utils.chat_task import cancel_task
+            await cancel_task(m.id)
+            await ChatMessage.update(m.id, done=True)
+
+    # Delete all OTHER queued messages, keep this one
+    for m in all_msgs:
+        if m.role == "user" and m.meta and m.meta.get("queued") and m.id != message_id:
+            await ChatMessage.delete(m.id)
+
+    # Clear queued flag on this message
+    meta = dict(msg.meta or {})
+    meta.pop("queued", None)
+    await ChatMessage.update(message_id, meta=meta or None)
+
+    # Find parent: latest done assistant message, or the queued message's parent
+    done_assistants = [m for m in all_msgs if m.role == "assistant" and m.done]
+    parent_id = done_assistants[-1].id if done_assistants else msg.parent_id
+
+    # Re-parent the user message to the correct leaf
+    if msg.parent_id != parent_id:
+        await ChatMessage.update(message_id, parent_id=parent_id)
+
+    # Resolve connection and start task
+    model_id = msg.model or (all_msgs[-1].model if all_msgs else "")
+    if not model_id:
+        # Fall back to last used model from chat meta
+        model_id = (chat.meta or {}).get("last_model", "")
+    connection, bare_model = await _resolve_connection(model_id, request.app.state)
+    workspace = (chat.meta or {}).get("workspace", "")
+
+    assistant_msg = await ChatMessage.create(
+        chat_id=chat_id, role="assistant", content="",
+        parent_id=message_id, model=model_id,
+        done=False, created_at=now_ms(),
+    )
+    await Chat.update_current_message(chat_id, assistant_msg.id, now_ms())
+
+    from cptr.utils.chat_task import start_task
+    start_task(
+        message_id=assistant_msg.id,
+        chat_id=chat_id,
+        user_id=user_id,
+        connection=connection,
+        workspace=workspace,
+        model=bare_model,
+    )
+    return {"ok": True, "chat_id": chat_id, "message_id": assistant_msg.id}
+
+
+@router.delete("/{chat_id}/queue/{message_id}")
+async def queue_delete(
+    chat_id: str, message_id: str, request: Request
+):
+    """Remove a queued message."""
+    user_id = _get_user(request)
+    chat = await Chat.get_by_id(chat_id)
+    if not chat or chat.user_id != user_id:
+        raise HTTPException(404, "chat not found")
+
+    msg = await ChatMessage.get_by_id(message_id)
+    if not msg or msg.chat_id != chat_id:
+        raise HTTPException(404, "message not found")
+    if not (msg.meta and msg.meta.get("queued")):
+        raise HTTPException(400, "message is not queued")
+
+    await ChatMessage.delete(message_id)
+    return {"ok": True}
 
 
 async def _resolve_connection(model_id: str, app_state=None) -> tuple[dict, str]:

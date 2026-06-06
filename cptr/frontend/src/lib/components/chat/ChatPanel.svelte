@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { getChat, getChats, deleteChat as apiDeleteChat, sendMessage as apiSendMessage, approveToolCall, cancelTask, updateCurrentMessage, updateMessage, createMessage, type ChatMessageRow, type ChatInfo } from '$lib/apis/chat';
+	import { getChat, getChats, deleteChat as apiDeleteChat, sendMessage as apiSendMessage, approveToolCall, cancelTask, updateCurrentMessage, updateMessage, createMessage, queueSendNow as apiQueueSendNow, queueDelete as apiQueueDelete, type ChatMessageRow, type ChatInfo } from '$lib/apis/chat';
 	import { chatModels, defaultModel, streamingChatTabs, registerStreamingChat, unregisterStreamingChat } from '$lib/stores/chat';
 	import { socketStore } from '$lib/stores/socket.svelte';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { get } from 'svelte/store';
-	import { currentWorkspace, toolApprovalMode } from '$lib/stores';
+	import { currentWorkspace, toolApprovalMode, streamingBehavior } from '$lib/stores';
 
 	import ChatInput from './ChatInput.svelte';
 	import UserMessage from './UserMessage.svelte';
@@ -75,8 +75,12 @@
 	const activePath = $derived.by((): PathEntry[] => {
 		if (!allMessages.length) return [];
 
-		const msgMap = new Map(allMessages.map((m) => [m.id, m]));
-		const childrenMap = buildChildrenMap(allMessages);
+		// Exclude queued messages from the display path — they only appear in the queue UI
+		const displayMessages = allMessages.filter((m) => !(m.meta?.queued));
+		if (!displayMessages.length) return [];
+
+		const msgMap = new Map(displayMessages.map((m) => [m.id, m]));
+		const childrenMap = buildChildrenMap(displayMessages);
 
 		// Determine effective currentId: fall back to last message if unset
 		const effectiveId = currentMessageId && msgMap.has(currentMessageId)
@@ -118,8 +122,13 @@
 		hasHiddenMessages ? activePath.slice(activePath.length - visibleCount) : activePath
 	);
 
+	let loadSentinelEl: HTMLDivElement;
+	let loadObserver: IntersectionObserver | null = null;
+	let loadingMore = false;
+
 	function loadMoreMessages() {
-		if (!messagesEl) return;
+		if (!messagesEl || loadingMore) return;
+		loadingMore = true;
 		// Remember scroll height before loading more so we can maintain position
 		const prevScrollHeight = messagesEl.scrollHeight;
 
@@ -131,12 +140,42 @@
 				const newScrollHeight = messagesEl.scrollHeight;
 				messagesEl.scrollTop += newScrollHeight - prevScrollHeight;
 			}
+			loadingMore = false;
 		});
 	}
+
+	// Set up IntersectionObserver to auto-load earlier messages when sentinel is visible
+	$effect(() => {
+		if (hasHiddenMessages && loadSentinelEl && messagesEl) {
+			loadObserver = new IntersectionObserver(
+				(entries) => {
+					if (entries[0]?.isIntersecting && hasHiddenMessages) {
+						loadMoreMessages();
+					}
+				},
+				{ root: messagesEl, threshold: 0 }
+			);
+			loadObserver.observe(loadSentinelEl);
+		}
+
+		return () => {
+			if (loadObserver) {
+				loadObserver.disconnect();
+				loadObserver = null;
+			}
+		};
+	});
 
 	const streaming = $derived(allMessages.some((m) => m.role === 'assistant' && !m.done));
 	const isLanding = $derived(allMessages.length === 0 && !chatId);
 	const workspaceName = $derived(workspace.split('/').pop() || 'workspace');
+
+	// Queued messages: user messages with meta.queued flag (server-side queue)
+	const queuedMessages = $derived(
+		allMessages
+			.filter((m) => m.role === 'user' && m.meta?.queued)
+			.map((m) => ({ id: m.id, content: m.content }))
+	);
 
 	// ── Load chat from DB ───────────────────────────────────────
 
@@ -180,8 +219,16 @@
 		delta?: string;
 		output?: any;
 		done?: boolean;
+		queue_processed?: boolean;
 	}) {
 		if (data.chat_id !== chatId) return;
+
+		// Queue was processed server-side: reload to see combined message + new generation
+		if (data.queue_processed) {
+			loadChat(data.chat_id);
+			return;
+		}
+
 		const msg = allMessages.find((m) => m.id === data.message_id);
 		if (!msg) return;
 
@@ -327,7 +374,8 @@
 
 	async function send() {
 		const text = inputText.trim();
-		if (!text || !selectedModel || sending) return;
+		if (!text || !selectedModel) return;
+		if (sending) return;
 		sending = true;
 		inputText = '';
 		autoScroll = true;
@@ -339,7 +387,49 @@
 		const parentId = lastMsg?.id ?? null;
 		const isNew = !chatId;
 
-		// ── Optimistic UI: add user message immediately ──────────
+		// When streaming and behavior is 'queue', backend will enqueue
+		// When streaming and behavior is 'interrupt', cancel first then send normally
+		if (streaming && chatId) {
+			const behavior = get(streamingBehavior);
+			if (behavior === 'interrupt') {
+				// Cancel active generation, then fall through to normal send
+				const active = allMessages.find((m) => m.role === 'assistant' && !m.done);
+				if (active) {
+					try { await cancelTask(chatId, active.id); } catch {}
+					await loadChat(chatId);
+				}
+			} else {
+			try {
+				const mode = get(toolApprovalMode);
+				const result = await apiSendMessage(text, selectedModel, workspace, chatId, parentId, { tool_approval_mode: mode });
+				if (result.queued) {
+					// Add directly to allMessages so it appears in queue UI instantly
+					allMessages = [...allMessages, {
+						id: result.message_id,
+						parent_id: parentId,
+						role: 'user' as const,
+						content: text,
+						model: null,
+						done: true,
+						output: null,
+						usage: null,
+						meta: { queued: true },
+						created_at: Date.now(),
+					}];
+				} else {
+					await loadChat(result.chat_id);
+				}
+			} catch (e) {
+				console.error('[chat] send (queue) error', e);
+			} finally {
+				sending = false;
+				chatInputEl?.focus();
+			}
+			return;
+			} // end queue behavior
+		} // end streaming check
+
+		// ── Normal flow: optimistic UI ────────────────────────────
 		const tempId = `temp-${Date.now()}`;
 		const optimisticMsg: ChatMessageRow = {
 			id: tempId,
@@ -370,13 +460,50 @@
 			}
 		} catch (e) {
 			console.error('[chat] send error', e);
-			// Remove the optimistic message on failure
 			allMessages = allMessages.filter((m) => m.id !== tempId);
 			currentMessageId = parentId;
 			throw e;
 		} finally {
 			sending = false;
 			chatInputEl?.focus();
+		}
+	}
+
+	// ── Queue actions ──────────────────────────────────────────
+
+	async function handleQueueSendNow(messageId: string) {
+		if (!chatId) return;
+		try {
+			await apiQueueSendNow(chatId, messageId);
+			await loadChat(chatId);
+		} catch (e) {
+			console.error('[chat] queue send-now error', e);
+		}
+	}
+
+	async function handleQueueEdit(messageId: string) {
+		if (!chatId) return;
+		// Move content back to input, delete from queue
+		const msg = allMessages.find((m) => m.id === messageId);
+		if (msg) {
+			inputText = msg.content;
+			chatInputEl?.focus();
+		}
+		try {
+			await apiQueueDelete(chatId, messageId);
+			await loadChat(chatId);
+		} catch (e) {
+			console.error('[chat] queue edit error', e);
+		}
+	}
+
+	async function handleQueueDelete(messageId: string) {
+		if (!chatId) return;
+		try {
+			await apiQueueDelete(chatId, messageId);
+			await loadChat(chatId);
+		} catch (e) {
+			console.error('[chat] queue delete error', e);
 		}
 	}
 
@@ -538,6 +665,10 @@
 					{sending}
 					placeholder="Ask anything about {workspaceName}..."
 					onsend={send}
+					{queuedMessages}
+					onqueuesendnow={handleQueueSendNow}
+					onqueueedit={handleQueueEdit}
+					onqueuedelete={handleQueueDelete}
 				/>
 				<ChatHistory chats={previousChats} onopen={openChat} ondelete={deleteChat} />
 			</div>
@@ -556,14 +687,7 @@
 		<div bind:this={messagesEl} class="flex-1 overflow-y-auto" onscroll={handleMessagesScroll}>
 			<div class="max-w-2xl mx-auto px-4 pt-4 pb-16 flex flex-col gap-4">
 				{#if hasHiddenMessages}
-					<div class="flex justify-center py-2">
-						<button
-							class="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-gray-50 dark:bg-gray-800/50"
-							onclick={loadMoreMessages}
-						>
-							Load earlier messages ({activePath.length - visibleCount} hidden)
-						</button>
-					</div>
+					<div bind:this={loadSentinelEl} class="h-1 w-full" aria-hidden="true"></div>
 				{/if}
 				{#each visiblePath as { msg, siblingIds, siblingIndex } (msg.id)}
 					{#if msg.role === 'user'}
@@ -618,6 +742,10 @@
 					{streaming}
 					onsend={send}
 					oncancel={handleCancel}
+					{queuedMessages}
+					onqueuesendnow={handleQueueSendNow}
+					onqueueedit={handleQueueEdit}
+					onqueuedelete={handleQueueDelete}
 				/>
 			</div>
 		</div>

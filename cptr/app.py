@@ -29,6 +29,11 @@ async def startup():
     await init_db()
     from cptr.env import STARTUP_TOKEN
     app.state.startup_token = STARTUP_TOKEN
+    # Reconcile stuck chat state from prior crash/restart
+    from cptr.env import ENABLE_CHAT_RECONCILE_ON_STARTUP
+    if ENABLE_CHAT_RECONCILE_ON_STARTUP:
+        from cptr.utils.chat_task import reconcile_chat_state
+        await reconcile_chat_state()
 
 
 # Auth middleware
@@ -36,7 +41,7 @@ async def startup():
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     # Skip auth for: auth endpoints, health, static assets, HTML pages
-    if path.startswith("/api/auth") or path == "/api/health" or path == "/api/config":
+    if path.startswith("/api/auth") or path == "/api/health" or path == "/api/config" or path == "/manifest.json":
         return await call_next(request)
     if path.startswith("/_app/") or not path.startswith("/api/"):
         return await call_next(request)
@@ -168,6 +173,42 @@ app.include_router(workspace_router)
 async def health():
     import os
     return {"status": "ok", "uptime_seconds": int(time.time() - START_TIME), "pid": os.getpid()}
+
+
+# PWA manifest (backend-driven so each instance has its own identity)
+@app.get("/manifest.json")
+async def pwa_manifest():
+    import socket
+    from importlib.metadata import version as pkg_version
+
+    try:
+        hostname = socket.gethostname()
+    except Exception:
+        hostname = ""
+
+    try:
+        version = pkg_version("cptr")
+    except Exception:
+        version = "dev"
+
+    name = f"cptr @ {hostname}" if hostname else "cptr"
+
+    return {
+        "name": name,
+        "short_name": "cptr",
+        "description": f"Your computer, from anywhere. v{version}",
+        "start_url": "/",
+        "display": "standalone",
+        "orientation": "any",
+        "background_color": "#000000",
+        "theme_color": "#000000",
+        "icons": [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+        "categories": ["developer", "productivity", "utilities"],
+    }
 
 
 # Frontend (unchanged)

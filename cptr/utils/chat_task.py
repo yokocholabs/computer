@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 _tasks: dict[str, asyncio.Task] = {}  # message_id → asyncio.Task
 _task_state: dict[str, dict] = {}     # message_id → {content, output}
+_task_chat: dict[str, str] = {}       # message_id → chat_id
+_queue_locks: dict[str, asyncio.Lock] = {}  # chat_id → Lock
 
 
 def start_task(
@@ -47,6 +49,7 @@ def start_task(
         run_chat_task(message_id, chat_id, user_id, connection, workspace, model, regeneration_prompt)
     )
     _tasks[message_id] = task
+    _task_chat[message_id] = chat_id
 
 
 async def cancel_task(message_id: str) -> bool:
@@ -67,6 +70,153 @@ def is_running(message_id: str) -> bool:
 def get_live_state(message_id: str) -> dict | None:
     """Get live in-memory state for a running task."""
     return _task_state.get(message_id)
+
+
+# ── Queue processing ────────────────────────────────────────
+
+
+async def _process_queue(chat_id: str, user_id: str, workspace: str):
+    """Check for queued user messages and start the next task.
+
+    Uses a per-chat lock to prevent concurrent processing from
+    both the task's finally block and the API double-check.
+    """
+    lock = _queue_locks.setdefault(chat_id, asyncio.Lock())
+    async with lock:
+        all_msgs = await ChatMessage.get_all_by_chat(chat_id)
+
+        # Don't process queue if there's still an active generation
+        if any(m.role == "assistant" and not m.done for m in all_msgs):
+            return
+
+        # Find queued messages (ordered by created_at)
+        queued = [
+            m for m in all_msgs
+            if m.role == "user" and m.meta and m.meta.get("queued")
+        ]
+        if not queued:
+            return
+
+        # Combine all queued prompts into one user message
+        combined_content = "\n\n".join(m.content for m in queued if m.content)
+
+        # Find the current leaf (latest done assistant message)
+        done_assistants = [
+            m for m in all_msgs if m.role == "assistant" and m.done
+        ]
+        parent_id = (
+            done_assistants[-1].id if done_assistants else queued[0].parent_id
+        )
+
+        # Delete individual queued messages, create one combined message
+        for m in queued:
+            await ChatMessage.delete(m.id)
+
+        combined_msg = await ChatMessage.create(
+            chat_id=chat_id,
+            role="user",
+            content=combined_content,
+            parent_id=parent_id,
+            created_at=now_ms(),
+        )
+
+        # Resolve model from the chat's last used model
+        chat = await Chat.get_by_id(chat_id)
+        if not chat:
+            return
+        model_id = (chat.meta or {}).get("last_model", "")
+        if not model_id:
+            # Fall back to the model from the last assistant message
+            last_asst = done_assistants[-1] if done_assistants else None
+            model_id = (last_asst.model if last_asst else "") or ""
+        if not model_id:
+            logger.error("[queue] No model found for chat %s, cannot process queue", chat_id)
+            return
+
+        # Resolve connection
+        try:
+            from cptr.routers.chat import _resolve_connection
+            connection, bare_model = await _resolve_connection(model_id)
+        except Exception:
+            logger.exception("[queue] Failed to resolve connection for model %s", model_id)
+            return
+
+        # Create assistant placeholder
+        assistant_msg = await ChatMessage.create(
+            chat_id=chat_id,
+            role="assistant",
+            content="",
+            parent_id=combined_msg.id,
+            model=model_id,
+            done=False,
+            created_at=now_ms(),
+        )
+        await Chat.update_current_message(chat_id, assistant_msg.id, now_ms())
+
+        # Notify frontend that queue was processed (new messages appeared)
+        await emit_to_user(
+            user_id,
+            {"chat_id": chat_id, "message_id": assistant_msg.id, "queue_processed": True},
+        )
+
+        # Start new task
+        start_task(
+            message_id=assistant_msg.id,
+            chat_id=chat_id,
+            user_id=user_id,
+            connection=connection,
+            workspace=workspace,
+            model=bare_model,
+        )
+        logger.info(
+            "[queue] Processed %d queued message(s) for chat %s",
+            len(queued), chat_id[:8],
+        )
+
+
+async def reconcile_chat_state():
+    """Recover from server crash: fix stuck messages, process orphaned queues.
+
+    Called once on startup when ENABLE_CHAT_RECONCILE_ON_STARTUP=true (default).
+    Finds:
+      1. Assistant messages with done=False that have no running task → mark done
+      2. Chats with queued user messages → process them
+    """
+    from sqlalchemy import select, and_
+    from cptr.utils.db import get_db
+
+    async with await get_db() as db:
+        result = await db.execute(
+            select(ChatMessage).where(
+                and_(
+                    ChatMessage.role == "assistant",
+                    ChatMessage.done == False,  # noqa: E712
+                )
+            )
+        )
+        stuck = list(result.scalars().all())
+
+    healed_chats: set[str] = set()
+    for msg in stuck:
+        if not is_running(msg.id):
+            logger.warning("[reconcile] Marking stuck message %s as done", msg.id)
+            meta = dict(msg.meta or {})
+            meta["error"] = "interrupted by server restart"
+            await ChatMessage.update(msg.id, done=True, meta=meta)
+            healed_chats.add(msg.chat_id)
+
+    # Process orphaned queues for healed chats
+    for cid in healed_chats:
+        chat = await Chat.get_by_id(cid)
+        if chat:
+            workspace = (chat.meta or {}).get("workspace", "")
+            try:
+                await _process_queue(cid, chat.user_id, workspace)
+            except Exception:
+                logger.exception("[reconcile] Failed to process queue for chat %s", cid)
+
+    if healed_chats:
+        logger.info("[reconcile] Recovered %d chat(s) on startup", len(healed_chats))
 
 
 # ── System prompt ───────────────────────────────────────────
@@ -438,6 +588,7 @@ async def run_chat_task(
         await emit(done=True)
 
     except asyncio.CancelledError:
+        _flush_text()
         await ChatMessage.update(
             message_id, content=content, output=output_items, done=True
         )
@@ -455,7 +606,13 @@ async def run_chat_task(
     finally:
         _tasks.pop(message_id, None)
         _task_state.pop(message_id, None)
+        _task_chat.pop(message_id, None)
         try:
             await export_chat_to_file(chat_id)
         except Exception:
             logger.exception(f"Failed to export chat {chat_id}")
+        # Process any queued follow-up messages
+        try:
+            await _process_queue(chat_id, user_id, workspace)
+        except Exception:
+            logger.exception(f"Failed to process queue for chat {chat_id}")

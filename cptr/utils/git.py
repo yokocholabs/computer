@@ -204,10 +204,31 @@ async def unstage(root: str, files: list[str]) -> None:
 
 
 async def discard(root: str, files: list[str]) -> None:
-    """Discard unstaged changes in files."""
+    """Discard changes in files. Tracked files are restored via git checkout;
+    untracked files are deleted from disk."""
     if not files:
         return
-    await _run("checkout", "--", *files, cwd=root)
+
+    # Determine which files are untracked
+    _, st_out, _ = await _run(
+        "status", "--porcelain=v2", "--untracked-files=all",
+        cwd=root, check=False,
+    )
+    untracked = set()
+    for line in st_out.splitlines():
+        if line.startswith("? "):
+            untracked.add(line[2:])
+
+    tracked = [f for f in files if f not in untracked]
+    to_delete = [f for f in files if f in untracked]
+
+    if tracked:
+        await _run("checkout", "--", *tracked, cwd=root)
+
+    for f in to_delete:
+        full = os.path.join(root, f)
+        if os.path.isfile(full):
+            os.remove(full)
 
 
 async def commit(root: str, message: str) -> dict[str, str]:

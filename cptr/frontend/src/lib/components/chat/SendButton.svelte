@@ -6,9 +6,13 @@
 		oncancel?: () => void;
 	}
 	let { canSend, streaming, onsend, oncancel }: Props = $props();
+
+	// Show send when there's sendable text, even during streaming (enqueue).
+	// Show stop only when streaming with nothing to send.
+	const showStop = $derived(streaming && !canSend && !!oncancel);
 </script>
 
-{#if streaming && oncancel}
+{#if showStop}
 	<button
 		class="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600 transition rounded-full p-1"
 		onclick={oncancel}

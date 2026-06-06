@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 	import Icon from '../Icon.svelte';
-	import { theme } from '$lib/stores';
-	import type { Theme } from '$lib/stores';
+	import { theme, streamingBehavior } from '$lib/stores';
+	import type { Theme, StreamingBehavior } from '$lib/stores';
 	import { t, locale, changeLocale, supportedLocales } from '$lib/i18n';
 
 	function setTheme(v: Theme) { theme.set(v); }
@@ -39,6 +39,27 @@
 		<option value={loc.code}>{loc.label}</option>
 	{/each}
 </select>
+
+<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2 mt-5">Message queue</h3>
+<div class="flex gap-1">
+	{#each [
+		{ value: 'queue' as StreamingBehavior, label: 'Queue' },
+		{ value: 'interrupt' as StreamingBehavior, label: 'Interrupt' },
+	] as opt}
+		<button
+			class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs transition-colors duration-100
+				{$streamingBehavior === opt.value ? 'bg-gray-100 dark:bg-white/8 text-gray-900 dark:text-white font-medium' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+			onclick={() => streamingBehavior.set(opt.value)}
+		>
+			{opt.label}
+		</button>
+	{/each}
+</div>
+<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-1">
+	{$streamingBehavior === 'queue'
+		? 'Messages sent during generation are queued and sent after completion.'
+		: 'Sending a message cancels the current generation.'}
+</p>
 
 
 <div class="mt-auto pt-6 flex justify-end">

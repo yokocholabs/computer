@@ -11,6 +11,7 @@
 	import SendButton from './SendButton.svelte';
 	import PlusMenu from './PlusMenu.svelte';
 	import DictateButton from './DictateButton.svelte';
+	import QueuedMessageItem from './QueuedMessageItem.svelte';
 
 	interface Props {
 		inputText: string;
@@ -18,8 +19,12 @@
 		sending: boolean;
 		streaming?: boolean;
 		placeholder?: string;
+		queuedMessages?: { id: string; content: string }[];
 		onsend: () => void;
 		oncancel?: () => void;
+		onqueuesendnow?: (id: string) => void;
+		onqueueedit?: (id: string) => void;
+		onqueuedelete?: (id: string) => void;
 	}
 	let {
 		inputText = $bindable(),
@@ -27,8 +32,12 @@
 		sending,
 		streaming = false,
 		placeholder = 'Message...',
+		queuedMessages = [],
 		onsend,
 		oncancel,
+		onqueuesendnow,
+		onqueueedit,
+		onqueuedelete,
 	}: Props = $props();
 
 	let editorEl: HTMLDivElement | undefined = $state();
@@ -119,11 +128,30 @@
 		// TipTap auto-sizes; no-op kept for API compat
 	}
 
+	// Allow sending during streaming (message will be enqueued server-side)
 	const canSend = $derived(inputText.trim() && selectedModel && !sending);
 </script>
 
 <div class="relative">
+	<!-- Queued messages (above input, matching open-webui layout) -->
+	{#if queuedMessages.length > 0}
+		<div
+			class="mb-1 mx-2 py-0.5 px-1.5 rounded-2xl border border-gray-100 dark:border-white/5 overflow-x-hidden overflow-y-auto max-h-[25vh]"
+		>
+			{#each queuedMessages as qm (qm.id)}
+				<QueuedMessageItem
+					id={qm.id}
+					content={qm.content}
+					onsendnow={onqueuesendnow ?? (() => {})}
+					onedit={onqueueedit ?? (() => {})}
+					ondelete={onqueuedelete ?? (() => {})}
+				/>
+			{/each}
+		</div>
+	{/if}
+
 	<div class="rounded-3xl shadow-lg border border-gray-100/40 dark:border-white/4 focus-within:border-gray-200/50 focus-within:dark:border-white/8 transition px-1 bg-white dark:bg-gray-500/5">
+
 		<!-- Editor area -->
 		<div class="px-2.5">
 			<div

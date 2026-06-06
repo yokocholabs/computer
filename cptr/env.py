@@ -22,3 +22,6 @@ STARTUP_TOKEN: str | None = os.environ.pop("CPTR_STARTUP_TOKEN", None)
 
 # ── Chat settings ───────────────────────────────────────────
 CHAT_MAX_ITERATIONS = int(os.environ.get("CHAT_MAX_ITERATIONS", "2048"))
+ENABLE_CHAT_RECONCILE_ON_STARTUP: bool = os.environ.get(
+    "ENABLE_CHAT_RECONCILE_ON_STARTUP", "true"
+).lower() in ("true", "1", "yes")

@@ -125,6 +125,8 @@ export const autoApproveTools = {
 export const stateLoaded = writable(false);
 export const gitReviewOpen = writable(false);
 export const isGitRepo = writable(false);
+export type StreamingBehavior = 'queue' | 'interrupt';
+export const streamingBehavior = writable<StreamingBehavior>('queue');
 
 /** Saved workspace path order for sidebar drag-reorder. */
 export const workspaceOrder = writable<string[]>([]);

@@ -626,9 +626,7 @@
 	<DropdownMenu
 		anchor={contextMenu.anchor}
 		items={[
-			...(contextMenu.file.status !== 'untracked'
-				? [{ label: $t('git.discard'), icon: 'xmark', onclick: () => discardFile(contextMenu!.file.path) }]
-				: []),
+			{ label: $t('git.discard'), icon: 'xmark', onclick: () => discardFile(contextMenu!.file.path) },
 			{ label: $t('git.copyFilePath'), icon: 'copy', onclick: () => copyFilePath(contextMenu!.file.path) },
 			{ label: $t('git.copyRelativePath'), icon: 'copy', onclick: () => copyRelativePath(contextMenu!.file.path) },
 		]}
