@@ -8,8 +8,10 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
+		"format": "npm run format:frontend && cd ../.. && uv run ruff format cptr",
+		"format:check": "npm run format:check:frontend && cd ../.. && uv run ruff format --check cptr",
+		"format:frontend": "prettier --write .",
+		"format:check:frontend": "prettier --check .",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
