@@ -212,30 +212,28 @@
 		}
 	}
 
-	const CHATS_PAGE_SIZE = 50;
-	let hasMoreChats = $state(false);
+	const CHATS_PAGE_SIZE = 10;
+	let chatPage = $state(1);
+	let totalChats = $state(0);
 	let chatSortBy = $state<'title' | 'updated_at'>('updated_at');
 	let chatSortDir = $state<'asc' | 'desc'>('desc');
+	const totalPages = $derived(Math.max(1, Math.ceil(totalChats / CHATS_PAGE_SIZE)));
 
-	async function loadPreviousChats() {
+	async function loadPreviousChats(page = 1) {
 		try {
-			const data = await getChats(workspace, CHATS_PAGE_SIZE, 0, chatSortBy, chatSortDir);
+			const offset = (page - 1) * CHATS_PAGE_SIZE;
+			const data = await getChats(workspace, CHATS_PAGE_SIZE, offset, chatSortBy, chatSortDir);
 			previousChats = data.chats || [];
-			hasMoreChats = data.has_more;
+			totalChats = data.total;
+			chatPage = page;
 		} catch {
 			previousChats = [];
-			hasMoreChats = false;
+			totalChats = 0;
 		}
 	}
 
-	async function loadMoreChats() {
-		try {
-			const data = await getChats(workspace, CHATS_PAGE_SIZE, previousChats.length, chatSortBy, chatSortDir);
-			previousChats = [...previousChats, ...(data.chats || [])];
-			hasMoreChats = data.has_more;
-		} catch {
-			hasMoreChats = false;
-		}
+	function handlePageChange(page: number) {
+		loadPreviousChats(page);
 	}
 
 	function handleSort(field: 'title' | 'updated_at') {
@@ -245,7 +243,7 @@
 			chatSortBy = field;
 			chatSortDir = field === 'title' ? 'asc' : 'desc';
 		}
-		loadPreviousChats();
+		loadPreviousChats(1);
 	}
 
 	async function openChat(id: string) {
@@ -761,7 +759,7 @@
 					onqueueedit={handleQueueEdit}
 					onqueuedelete={handleQueueDelete}
 				/>
-				<ChatHistory chats={previousChats} onopen={openChat} ondelete={deleteChat} hasMore={hasMoreChats} onloadmore={loadMoreChats} sortBy={chatSortBy} sortDir={chatSortDir} onsort={handleSort} />
+				<ChatHistory chats={previousChats} onopen={openChat} ondelete={deleteChat} page={chatPage} {totalPages} perPage={CHATS_PAGE_SIZE} onpagechange={handlePageChange} sortBy={chatSortBy} sortDir={chatSortDir} onsort={handleSort} />
 			</div>
 		</div>
 	{:else}

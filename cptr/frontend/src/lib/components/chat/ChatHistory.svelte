@@ -1,13 +1,16 @@
 <script lang="ts">
 	import type { ChatInfo } from '$lib/apis/chat';
 	import DropdownMenu from '../DropdownMenu.svelte';
+	import Pagination from '../common/Pagination.svelte';
 
 	interface Props {
 		chats: ChatInfo[];
 		onopen: (id: string) => void;
 		ondelete: (id: string) => void;
-		hasMore?: boolean;
-		onloadmore?: () => void;
+		page?: number;
+		totalPages?: number;
+		perPage?: number;
+		onpagechange?: (page: number) => void;
 		sortBy?: 'title' | 'updated_at';
 		sortDir?: 'asc' | 'desc';
 		onsort?: (field: 'title' | 'updated_at') => void;
@@ -16,8 +19,10 @@
 		chats,
 		onopen,
 		ondelete,
-		hasMore = false,
-		onloadmore,
+		page = 1,
+		totalPages = 1,
+		perPage = 10,
+		onpagechange,
 		sortBy = 'updated_at',
 		sortDir = 'desc',
 		onsort,
@@ -40,8 +45,11 @@
 	function formatTime(ts: number): string {
 		const d = new Date(ts);
 		const now = new Date();
-		const diffH = Math.floor((now.getTime() - d.getTime()) / 3600000);
-		if (diffH < 1) return 'Just now';
+		const diffMs = now.getTime() - d.getTime();
+		const diffM = Math.floor(diffMs / 60000);
+		if (diffM < 1) return 'Just now';
+		if (diffM < 60) return `${diffM}m ago`;
+		const diffH = Math.floor(diffM / 60);
 		if (diffH < 24) return `${diffH}h ago`;
 		const diffD = Math.floor(diffH / 24);
 		if (diffD < 7) return `${diffD}d ago`;
@@ -123,13 +131,8 @@
 				</button>
 			</div>
 		{/each}
-		{#if hasMore && onloadmore}
-			<button
-				class="w-full h-7 mt-1 text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-75"
-				onclick={onloadmore}
-			>
-				Show more
-			</button>
+		{#if onpagechange}
+			<Pagination {page} {totalPages} {onpagechange} />
 		{/if}
 	</div>
 {/if}
