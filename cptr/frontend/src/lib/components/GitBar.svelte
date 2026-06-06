@@ -394,7 +394,10 @@
 			class="flex items-center h-7 px-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75"
 			onclick={() => {
 				expanded = !expanded;
-				if (expanded && view === 'history') loadHistory();
+				if (expanded) {
+					refresh();
+					if (view === 'history') loadHistory();
+				}
 			}}
 		>
 			<!-- Branch button (opens branch picker, stops expand) -->
