@@ -18,6 +18,32 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 COOKIE_NAME = "cptr_session"
 
 
+def _ensure_gitignore(workspace: str) -> None:
+    """If workspace is a git repo, ensure .cptr is listed in .gitignore."""
+    ws = Path(workspace)
+    if not (ws / ".git").exists():
+        return
+
+    gitignore = ws / ".gitignore"
+    entry = ".cptr"
+
+    # Check if already ignored
+    if gitignore.exists():
+        content = gitignore.read_text(encoding="utf-8", errors="replace")
+        # Match .cptr as a standalone line (not a substring of something else)
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped == entry or stripped == entry + "/":
+                return
+        # Append with a preceding newline if file doesn't end with one
+        if content and not content.endswith("\n"):
+            content += "\n"
+        content += f"{entry}\n"
+        gitignore.write_text(content, encoding="utf-8")
+    else:
+        gitignore.write_text(f"{entry}\n", encoding="utf-8")
+
+
 def _get_user(request: Request) -> str:
     """Extract user_id from cookie, raise 401 if not authenticated."""
     token = request.cookies.get(COOKIE_NAME)
@@ -294,6 +320,9 @@ async def send_message(body: SendMessageRequest, request: Request):
         # Ensure .cptr/chats/ dir exists (export will write the full JSON)
         chats_dir = Path(body.workspace) / ".cptr" / "chats"
         chats_dir.mkdir(parents=True, exist_ok=True)
+
+        # Auto-add .cptr to .gitignore if this is a git repo
+        _ensure_gitignore(body.workspace)
 
     # Resolve connection for model
     connection, bare_model = await _resolve_connection(body.model_id, request.app.state)
