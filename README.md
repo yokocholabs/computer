@@ -1,5 +1,7 @@
 # cptr
 
+![Cptr Demo](./demo.png)
+
 The computer used to be a room. Then a desk. Then a bag. Now it's a URL.
 
 Your phone goes everywhere with you. You run your life from it. Your computer used to stay home. Now it can come along.

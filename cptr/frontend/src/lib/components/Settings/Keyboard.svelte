@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { keybindings, ACTION_IDS, ACTION_LABELS, DEFAULT_KEYBINDINGS, formatChord, eventToChord, resetKeybindings } from '$lib/stores/keybindings';
 	import type { ActionId } from '$lib/stores/keybindings';
+	import KeyPill from '../KeyPill.svelte';
 
 	/** Action descriptions for the second line. */
 	const ACTION_DESCRIPTIONS: Record<ActionId, string> = {
@@ -98,11 +99,11 @@
 						<span class="recording-indicator">Press keys…</span>
 					{:else if chord}
 						<button
-							class="key-pill cursor-pointer"
+							class="cursor-pointer"
 							onclick={() => startRecording(actionId)}
 							title="Click to rebind"
 						>
-							{formatChord(chord)}
+							<KeyPill text={formatChord(chord)} />
 						</button>
 					{:else}
 						<button
@@ -136,24 +137,6 @@
 		border-bottom: none;
 	}
 
-	.key-pill {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: 22px;
-		padding: 0 6px;
-		border-radius: 9999px;
-		font-size: 10px;
-		font-weight: 500;
-		line-height: 1;
-		background: #e8e8e8;
-		color: #555;
-	}
-
-	:global(.dark) .key-pill {
-		background: #1e1e1e;
-		color: #999;
-	}
 
 	.recording-indicator {
 		display: inline-flex;

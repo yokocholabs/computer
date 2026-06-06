@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
+	import KeyPill from './KeyPill.svelte';
 
 	interface MenuItem {
 		label: string;
@@ -142,7 +143,7 @@
 					{/if}
 					<span class="flex-1 text-left truncate">{item.label}</span>
 					{#if item.shortcut}
-						<kbd class="ml-auto shrink-0 inline-flex items-center h-[18px] px-[5px] rounded-full text-[9px] font-medium leading-none bg-[#e8e8e8] text-[#555] dark:bg-[#1e1e1e] dark:text-[#999]">{item.shortcut}</kbd>
+						<KeyPill text={item.shortcut} class="ml-auto shrink-0" />
 					{/if}
 					{#if item.check && item.active}
 						<svg class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">

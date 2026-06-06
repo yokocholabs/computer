@@ -336,7 +336,7 @@
 </div>
 
 {#if showPlusMenu && plusBtnEl}
-	<DropdownMenu items={plusMenuItems} anchor={plusBtnEl} onclose={() => showPlusMenu = false} />
+	<DropdownMenu items={plusMenuItems} anchor={plusBtnEl} onclose={() => showPlusMenu = false} className="min-w-52" />
 {/if}
 
 {#if contextMenu}
