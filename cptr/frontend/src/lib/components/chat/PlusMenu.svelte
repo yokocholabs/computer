@@ -24,7 +24,7 @@
 	];
 
 	const currentModeLabel = $derived(
-		modes.find((m) => m.value === $toolApprovalMode)?.label ?? 'Tool level'
+		modes.find((m) => m.value === $toolApprovalMode)?.label ?? 'Tool permissions'
 	);
 
 	function toggle() {
@@ -107,7 +107,7 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		bind:this={menuEl}
-		class="fixed z-[101] w-48 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-150 dark:border-white/6 shadow-xl p-0.5 overflow-hidden"
+		class="fixed z-[101] w-56 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-150 dark:border-white/6 shadow-xl p-0.5 overflow-hidden"
 		style="left: {pos.x}px; bottom: {pos.bottom}px; opacity: {ready ? 1 : 0}; pointer-events: {ready ? 'auto' : 'none'};"
 		onclick={(e) => e.stopPropagation()}
 	>
@@ -131,20 +131,20 @@
 					onclick={() => tab = 'tools'}
 				>
 					<Icon name="shield" size={14} />
-					<span class="flex-1 text-left truncate">Tool level</span>
+					<span class="flex-1 text-left truncate">Tool permissions</span>
 					<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-16">{currentModeLabel}</span>
 					<Icon name="chevron-right" size={12} class="shrink-0 text-gray-400 dark:text-gray-500" />
 				</button>
 			</div>
 		{:else if tab === 'tools'}
-			<!-- Tool level submenu -->
+			<!-- Tool permissions submenu -->
 			<div class="plus-menu-slide-in-right">
 				<button
 					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
 					onclick={() => tab = ''}
 				>
 					<Icon name="chevron-left" size={12} />
-					<span class="flex-1 text-left font-medium">Tool level</span>
+					<span class="flex-1 text-left font-medium">Tool permissions</span>
 				</button>
 
 				<div class="h-px bg-gray-100/50 dark:bg-white/3 mx-1 my-0.5"></div>
