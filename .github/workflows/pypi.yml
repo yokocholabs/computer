@@ -67,7 +67,7 @@ jobs:
 
       - name: Build package
         if: steps.check.outputs.skip != 'true'
-        run: python -m build
+        run: python -m build --wheel
 
       - name: Upload dist artifacts
         if: steps.check.outputs.skip != 'true'
