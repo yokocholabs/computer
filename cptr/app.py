@@ -27,6 +27,14 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup():
+    # Use OS certificate store (Windows CertStore, macOS Keychain, etc.)
+    # instead of the bundled certifi CA bundle — fixes #31.
+    import logging as _logging
+    import truststore
+
+    truststore.inject_into_ssl()
+    _logging.getLogger(__name__).info("truststore: using system certificate store")
+
     await init_db()
     from cptr.env import STARTUP_TOKEN
 

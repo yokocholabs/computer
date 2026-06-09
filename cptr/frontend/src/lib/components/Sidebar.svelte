@@ -131,6 +131,31 @@
 		}
 	}
 
+	async function handleNewChat(wsPath: string) {
+		// Navigate to the workspace if not already there
+		const currentWsPath = $page.url.searchParams.get('workspace');
+		if ($page.url.pathname !== '/' || currentWsPath !== wsPath) {
+			await goto(`/?workspace=${encodeURIComponent(wsPath)}`);
+		}
+		// Wait for loadWorkspace() to finish populating currentWorkspace
+		// (it runs async in a $effect after goto resolves)
+		const ws = get(currentWorkspace);
+		if (!ws || ws.path !== wsPath) {
+			await new Promise<void>((resolve) => {
+				const unsub = currentWorkspace.subscribe((w) => {
+					if (w && w.path === wsPath) {
+						unsub();
+						resolve();
+					}
+				});
+			});
+		}
+		openChatTab();
+		if (typeof window !== 'undefined' && window.innerWidth < 768) {
+			sidebarOpen.set(false);
+		}
+	}
+
 	// Socket listener for chat events — invalidate cache when chats update
 	const seenChatIds = new Set<string>();
 
@@ -346,40 +371,42 @@
 				{@const chats = wsChatsCache.get(ws.path)}
 				{@const isLoading = wsChatsLoading.has(ws.path)}
 				<div class="ws-item">
-					<a
-						href="/?workspace={encodeURIComponent(ws.path)}"
-						class="group flex items-center gap-1.5 w-full h-7 px-2 rounded-lg text-xs font-medium transition-colors duration-100 no-underline
-							{ws.path === currentPath
-							? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
-							: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
-						onclick={(e) => handleWorkspaceClick(e, ws.path)}
-					>
-						<!-- Icon: folder by default, chevron on hover (when chat enabled) -->
-						{#if $chatEnabled}
-							<span
-								class="ws-icon-toggle shrink-0"
-								role="button"
-								tabindex="-1"
-								onclick={(e) => {
-									e.stopPropagation();
-									e.preventDefault();
-									toggleWorkspaceExpand(ws.path);
-								}}
-								aria-label={isExpanded ? 'Collapse' : 'Expand'}
-							>
-								<span class="ws-icon-folder"><Icon name="folder" size={14} /></span>
-								<span class="ws-icon-chevron" style="transform: rotate({isExpanded ? '90deg' : '0deg'})">
-									<Icon name="chevron-right" size={11} />
-								</span>
-							</span>
-						{:else}
-							<Icon name="folder" size={14} />
-						{/if}
-						<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap"
-							>{ws.name}</span
+					<div class="group flex items-center gap-1 w-full h-7 px-2 rounded-lg text-xs font-medium transition-colors duration-100
+						{ws.path === currentPath
+						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
+						: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}">
+						<a
+							href="/?workspace={encodeURIComponent(ws.path)}"
+							class="flex items-center gap-1 flex-1 min-w-0 no-underline text-inherit"
+							onclick={(e) => handleWorkspaceClick(e, ws.path)}
 						>
+							<!-- Icon: folder by default, chevron on hover (when chat enabled) -->
+							{#if $chatEnabled}
+								<span
+									class="ws-icon-toggle shrink-0"
+									role="button"
+									tabindex="-1"
+									onclick={(e) => {
+										e.stopPropagation();
+										e.preventDefault();
+										toggleWorkspaceExpand(ws.path);
+									}}
+									aria-label={isExpanded ? 'Collapse' : 'Expand'}
+								>
+									<span class="ws-icon-folder"><Icon name="folder" size={14} /></span>
+									<span class="ws-icon-chevron" style="transform: rotate({isExpanded ? '90deg' : '0deg'})">
+										<Icon name="chevron-right" size={11} />
+									</span>
+								</span>
+							{:else}
+								<Icon name="folder" size={14} />
+							{/if}
+							<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap"
+								>{ws.name}</span
+							>
+						</a>
 						<span
-							class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
+							class="flex items-center justify-center w-4 h-4 shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-gray-600 dark:hover:text-gray-300 transition-all duration-75"
 							role="button"
 							tabindex="-1"
 							onclick={(e) => openWsMenu(e, ws.path)}
@@ -387,7 +414,19 @@
 						>
 							<Icon name="three-dots" size={11} />
 						</span>
-					</a>
+						{#if $chatEnabled}
+							<span
+								class="flex items-center justify-center w-4 h-4 shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-gray-600 dark:hover:text-gray-300 transition-all duration-75"
+								role="button"
+								tabindex="-1"
+								onclick={() => handleNewChat(ws.path)}
+								aria-label="New Chat"
+								use:tooltip={'New Chat'}
+							>
+								<Icon name="pencil" size={11} />
+							</span>
+						{/if}
+					</div>
 
 					<!-- Collapsible chat list -->
 					{#if $chatEnabled && isExpanded}
