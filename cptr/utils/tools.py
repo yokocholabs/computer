@@ -78,6 +78,84 @@ def _truncate_output(text: str, max_chars: int = 80_000) -> str:
     return text[:half] + "\n\n... (truncated) ...\n\n" + text[-half:]
 
 
+# ── Image support ───────────────────────────────────────────
+
+IMAGE_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif",
+}
+
+_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # 5 MB target for API payload
+
+_IMAGE_MIME = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".tiff": "image/tiff",
+    ".tif": "image/tiff",
+}
+
+
+def _read_image_file(full: Path, path: str) -> str:
+    """Read an image file and return a data URI string.
+
+    If the file exceeds _IMAGE_MAX_BYTES, attempts to resize it down
+    using Pillow.  Falls back to a text error if Pillow is unavailable
+    and the file is too large.
+    """
+    import base64
+
+    size = full.stat().st_size
+    ext = full.suffix.lower()
+    media_type = _IMAGE_MIME.get(ext, "image/png")
+    data = full.read_bytes()
+
+    if size > _IMAGE_MAX_BYTES:
+        try:
+            from PIL import Image
+            import io
+
+            img = Image.open(io.BytesIO(data))
+            # Progressively scale down until under limit
+            # Use JPEG for lossy formats, PNG for lossless
+            out_format = "JPEG" if ext in (".jpg", ".jpeg", ".bmp", ".tiff", ".tif") else "PNG"
+            if out_format == "JPEG":
+                media_type = "image/jpeg"
+                # Convert RGBA to RGB for JPEG
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+            else:
+                media_type = "image/png"
+
+            scale = 0.8  # start at 80%
+            for _ in range(10):
+                new_w = int(img.width * scale)
+                new_h = int(img.height * scale)
+                if new_w < 100 or new_h < 100:
+                    break
+                resized = img.resize((new_w, new_h), Image.LANCZOS)
+                buf = io.BytesIO()
+                save_kwargs = {"quality": 85} if out_format == "JPEG" else {}
+                resized.save(buf, format=out_format, **save_kwargs)
+                if buf.tell() <= _IMAGE_MAX_BYTES:
+                    data = buf.getvalue()
+                    size = len(data)
+                    break
+                scale *= 0.7  # more aggressive on each pass
+            else:
+                return f"Error: image too large ({_human_size(full.stat().st_size)}) and could not be resized below 5MB."
+        except ImportError:
+            return (
+                f"Error: image file is too large ({_human_size(size)}). "
+                f"Install Pillow (`pip install Pillow`) to enable automatic resizing."
+            )
+
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:{media_type};base64,{b64}"
+
+
 # ── Tool functions ──────────────────────────────────────────
 
 
@@ -99,6 +177,10 @@ async def read_file(
         return _DOTENV_ERROR
     if not full.is_file():
         return f"Error: file not found: {path}"
+
+    # Image files: return base64 JSON instead of garbled text
+    if full.suffix.lower() in IMAGE_EXTENSIONS:
+        return await asyncio.to_thread(_read_image_file, full, path)
 
     def _read():
         size = full.stat().st_size
