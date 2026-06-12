@@ -77,6 +77,7 @@ export interface UserPreferences {
 	version?: string; // last seen app version for changelog
 	selectedModelId?: string; // last selected chat model, synced across browsers
 	requestParams?: Record<string, unknown>; // arbitrary params merged into API request body
+	showUpdateToast?: boolean; // show version update notifications (default true)
 }
 
 export type Theme = 'dark' | 'light' | 'system';
@@ -139,7 +140,22 @@ export const planMode = writable(false);
 export const requestParams = writable<Record<string, unknown>>({});
 export const appVersion = writable('');
 export const lastSeenVersion = writable('');
+export const latestVersion = writable('');
+export const updateAvailable = derived(
+	[appVersion, latestVersion],
+	([$app, $latest]) => {
+		if (!$app || !$latest || $app === 'dev' || $app === '0.0.0') return false;
+		return (
+			$app.localeCompare($latest, undefined, {
+				numeric: true,
+				sensitivity: 'case',
+				caseFirst: 'upper'
+			}) < 0
+		);
+	}
+);
 export const showChangelog = writable(false);
+export const showUpdateToastPref = writable(true);
 export const showSearch = writable(false);
 /** @deprecated Use toolApprovalMode */
 export const autoApproveTools = {
@@ -288,7 +304,8 @@ function persistPreferences(): void {
 			keybindings: get(keybindings),
 			version: get(lastSeenVersion),
 			selectedModelId: get(selectedModelId) || undefined,
-			requestParams: Object.keys(get(requestParams)).length ? get(requestParams) : undefined
+			requestParams: Object.keys(get(requestParams)).length ? get(requestParams) : undefined,
+			showUpdateToast: get(showUpdateToastPref)
 		};
 		savePreferences(prefs as unknown as Record<string, unknown>).catch(() => {});
 	}, 300);
@@ -331,6 +348,9 @@ function subscribeForPersistence() {
 	selectedModelId.subscribe(() => {
 		if (get(stateLoaded)) persistPreferences();
 	});
+	showUpdateToastPref.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
 	i18next.on('languageChanged', () => {
 		if (get(stateLoaded)) persistPreferences();
 	});
@@ -358,6 +378,7 @@ export async function loadPreferences(): Promise<void> {
 		if (prefs.version) lastSeenVersion.set(prefs.version as string);
 		if (prefs.selectedModelId) selectedModelId.set(prefs.selectedModelId as string);
 		if (prefs.requestParams) requestParams.set(prefs.requestParams as Record<string, unknown>);
+		if (prefs.showUpdateToast !== undefined) showUpdateToastPref.set(prefs.showUpdateToast as boolean);
 	} catch {
 		// First run, no preferences yet
 	}

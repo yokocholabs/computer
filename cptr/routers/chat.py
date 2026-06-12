@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import List, Optional
 
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 from cptr.models import Chat, ChatMessage, Config
 from cptr.utils.config import check_access, now_ms, _get_jwt_secret
 from cptr.utils.crypto import decrypt_key
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -228,7 +231,14 @@ async def _fetch_provider_models(conn: dict) -> list[str]:
                 )
                 if r.status_code == 200:
                     data = r.json()
-                    return [m["id"] for m in data.get("data", [])]
+                    models = [m["id"] for m in data.get("data", [])]
+                    log.info("Auto-discovered %d models from %s", len(models), url)
+                    return models
+                else:
+                    log.warning(
+                        "Model auto-discovery failed for %s: HTTP %d",
+                        url, r.status_code,
+                    )
 
         elif provider == "openai":
             url = (base_url or "https://api.openai.com/v1") + "/models"
@@ -241,10 +251,20 @@ async def _fetch_provider_models(conn: dict) -> list[str]:
                 )
                 if r.status_code == 200:
                     data = r.json()
-                    return [m["id"] for m in data.get("data", [])]
+                    models = [m["id"] for m in data.get("data", [])]
+                    log.info("Auto-discovered %d models from %s", len(models), url)
+                    return models
+                else:
+                    log.warning(
+                        "Model auto-discovery failed for %s: HTTP %d",
+                        url, r.status_code,
+                    )
+
+        else:
+            log.warning("Unknown provider '%s', skipping model auto-discovery", provider)
 
     except Exception:
-        pass
+        log.exception("Model auto-discovery error for connection %s", conn.get("id", "?"))
 
     return []
 
@@ -492,8 +512,10 @@ async def approve_tool(chat_id: str, message_id: str, body: ApproveRequest, requ
         # Execute the tool
         from cptr.utils.tools import execute_tool
 
+        model_id = msg.model or ""
         result = await execute_tool(
-            call["name"], call.get("arguments", {}), chat.meta.get("workspace", "")
+            call["name"], call.get("arguments", {}),
+            {"workspace": chat.meta.get("workspace", ""), "user_id": user_id, "model_id": model_id},
         )
         call["status"] = "completed"
         output.append(
@@ -520,7 +542,6 @@ async def approve_tool(chat_id: str, message_id: str, body: ApproveRequest, requ
         await ChatMessage.update(message_id, output=output, done=False)
 
         # Resolve connection and continue
-        model_id = msg.model or ""
         connection, bare_model = await _resolve_connection(model_id, request.app.state)
         workspace = chat.meta.get("workspace", "") if chat.meta else ""
 

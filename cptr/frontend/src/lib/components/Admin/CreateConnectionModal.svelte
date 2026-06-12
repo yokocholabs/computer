@@ -156,6 +156,7 @@
 		<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
 			>{$t('connections.models')}</label
 		>
+		<p class="text-[10px] text-gray-300 dark:text-gray-700 mb-0.5">{$t('connections.modelsHint')}</p>
 		<input
 			type="text"
 			placeholder="claude-sonnet-4-20250514, claude-opus-4-20250514"

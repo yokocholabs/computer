@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-06-12
+
+### Added
+
+- 🧩 **Skills system.** Define reusable instruction sets (SKILL.md files) in your workspace or globally. Skills are auto-discovered and surfaced in the system prompt; the AI loads them on demand via a new `view_skill` tool. Type `$` in the chat input to mention a skill directly.
+- 🔔 **Update notifications.** Admins now see a non-intrusive toast when a new version is available, with a link to release notes. Dismissals are remembered for 24 hours. Toggle in Settings > General.
+- 📝 **Per-model system prompts.** Configure custom system prompts per model or as a global default from the Models admin page. Supports `{{VARIABLE}}` template placeholders (workspace name, file tree, instructions, skills, OS, date, model).
+- 📄 **Workspace system prompt override.** Place a `.cptr/system.md` file in any workspace to fully override the system prompt for that project.
+
+### Changed
+
+- 🔧 **Context-aware tool execution.** Automation tools (`create_automation`, `list_automations`, etc.) now receive full execution context (user ID, model ID) instead of just the workspace path, fixing automations being created as the wrong user.
+- 🏷️ **Dynamic page titles.** Browser tab titles now reflect the active file or chat tab (e.g. "stores.ts / myproject / cptr") instead of just the workspace name.
+- 🔗 **"Update available" badge in About.** The Settings > About page now shows a link to the latest release when a newer version exists.
+- 🌍 **i18n updates.** Added translation keys for system prompts, model templates, update notifications, and connection editing across all 10 supported locales.
+
 ## [0.2.2] - 2026-06-11
 
 ### Added

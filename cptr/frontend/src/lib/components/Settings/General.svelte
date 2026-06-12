@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 	import Icon from '../Icon.svelte';
-	import { theme, streamingBehavior } from '$lib/stores';
+	import { theme, streamingBehavior, showUpdateToastPref } from '$lib/stores';
 	import type { Theme, StreamingBehavior } from '$lib/stores';
 	import { t, locale, changeLocale, supportedLocales } from '$lib/i18n';
 	import { notificationsEnabled, notificationSound } from '$lib/stores/chat';
 	import { fetchJSON } from '$lib/apis';
+	import { session } from '$lib/session';
 	import ToggleSwitch from '../common/ToggleSwitch.svelte';
 	import { onMount } from 'svelte';
 
@@ -131,6 +132,17 @@
 			</p>
 		</div>
 	</div>
+
+	{#if $session?.role === 'admin'}
+		<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2 mt-5">Updates</h3>
+		<label class="flex items-center justify-between cursor-pointer">
+			<span class="text-xs text-gray-600 dark:text-gray-400">Update notifications</span>
+			<ToggleSwitch value={$showUpdateToastPref} onchange={(v) => showUpdateToastPref.set(v)} />
+		</label>
+		<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-1">
+			Show a toast when a new version of cptr is available.
+		</p>
+	{/if}
 
 	<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2 mt-5">Message queue</h3>
 	<div class="flex gap-1">

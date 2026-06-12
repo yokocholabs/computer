@@ -223,6 +223,9 @@ async def update_connection(conn_id: str, body: UpdateConnectionRequest, request
         conn["enabled"] = body.enabled
     if body.models is not None:
         conn.setdefault("data", {})["models"] = body.models
+    elif "models" in body.model_fields_set:
+        # Explicit null → clear whitelist, enable auto-discovery
+        conn.get("data", {}).pop("models", None)
 
     await _save_connections(connections)
     invalidate_model_cache(request.app.state)

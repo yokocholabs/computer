@@ -1,6 +1,5 @@
 {
 	"app.tagline": "Seu computador, de qualquer lugar.",
-
 	"auth.createAccountHint": "Crie sua conta para começar.",
 	"auth.signInSystemHint": "Faça login com sua conta do sistema.",
 	"auth.setup": "Configuração",
@@ -20,7 +19,6 @@
 	"auth.minChars": "Mínimo de 6 caracteres",
 	"auth.connectionFailed": "Falha na conexão",
 	"auth.accountPending": "Conta criada. Aguardando aprovação do administrador.",
-
 	"sidebar.workspaces": "Áreas de trabalho",
 	"sidebar.addWorkspace": "Adicionar área de trabalho",
 	"sidebar.collapse": "Recolher",
@@ -31,14 +29,13 @@
 	"sidebar.remove": "Remover",
 	"sidebar.workspaceOptions": "Opções da área de trabalho",
 	"sidebar.closeSidebar": "Fechar barra lateral",
-
+	"sidebar.showMore": "Mostrar mais",
 	"bar.newFile": "Novo arquivo",
 	"bar.newTerminal": "Novo terminal",
 	"bar.closeTab": "Fechar aba",
 	"bar.new": "Novo...",
 	"bar.sidebar": "Barra lateral",
 	"bar.toggleSidebar": "Alternar barra lateral",
-
 	"files.filter": "Filtrar...",
 	"files.refresh": "Atualizar",
 	"files.sort": "Ordenar",
@@ -73,10 +70,16 @@
 	"files.showHidden": "Mostrar dotfiles",
 	"files.hideHidden": "Ocultar dotfiles",
 	"files.failedToLoad": "Falha ao carregar diretório",
+	"search.placeholder": "Pesquisar...",
+	"search.search": "Pesquisar",
+	"search.chats": "Conversas",
+	"search.files": "Arquivos",
+	"search.noResults": "Nenhum resultado encontrado",
+	"search.recentChats": "Conversas recentes",
+	"search.noRecentChats": "Sem conversas recentes",
 
 	"quickOpen.searchFiles": "Buscar arquivos...",
 	"quickOpen.noFiles": "Nenhum arquivo encontrado",
-
 	"settings.back": "Voltar",
 	"settings.general": "Geral",
 	"settings.account": "Conta",
@@ -84,18 +87,15 @@
 	"settings.save": "Salvar",
 	"settings.saved": "Salvo",
 	"settings.saving": "Salvando…",
-
 	"general.title": "Geral",
 	"general.theme": "Tema",
 	"general.light": "Claro",
 	"general.dark": "Escuro",
 	"general.system": "Sistema",
 	"general.language": "Idioma",
-
 	"general.tools": "Ferramentas",
 	"general.autoApproveTools": "Aprovar automaticamente todas as chamadas de ferramentas",
 	"general.autoApproveToolsDesc": "Permitir automaticamente chamadas de ferramentas (escrever, executar etc.) sem confirmação",
-
 	"account.title": "Conta",
 	"account.displayName": "Nome de exibição",
 	"account.displayNamePlaceholder": "Digite o nome de exibição",
@@ -113,11 +113,9 @@
 	"account.uploadFailed": "Falha no envio",
 	"account.failedToUpdate": "Falha ao atualizar",
 	"account.failedToRemoveAvatar": "Falha ao remover avatar",
-
 	"about.title": "Sobre",
 	"about.license": "Licença",
 	"about.createdBy": "Criado por Tim Baek, feito na Terra",
-
 	"git.changes": "Alterações",
 	"git.history": "Histórico",
 	"git.fetch": "Buscar",
@@ -160,7 +158,6 @@
 	"git.discard": "Descartar",
 	"git.copyFilePath": "Copiar caminho do arquivo",
 	"git.copyRelativePath": "Copiar caminho relativo",
-
 	"admin.users": "Usuários",
 	"admin.settings": "Configurações",
 	"admin.noUsers": "Sem usuários",
@@ -191,9 +188,7 @@
 	"admin.delete": "Excluir",
 	"admin.usernameRequired": "Nome de usuário obrigatório",
 	"admin.minCharsPassword": "Mínimo de 6 caracteres",
-
 	"admin.connections": "Conexões",
-
 	"connections.loadError": "Falha ao carregar conexões",
 	"connections.fieldsRequired": "URL base e chave de API obrigatórias",
 	"connections.added": "Conexão adicionada",
@@ -208,18 +203,18 @@
 	"connections.baseUrl": "URL base",
 	"connections.prefixId": "ID de prefixo",
 	"connections.models": "Modelos (separados por vírgula, opcional)",
+	"connections.modelsHint": "Deixe em branco para descoberta automática do provedor.",
 	"connections.cancel": "Cancelar",
 	"connections.add": "Adicionar",
+	"connections.edit": "Editar conexão",
+	"connections.updated": "Conexão atualizada",
 	"connections.verify": "Verificar",
-
 	"bar.newChat": "Novo chat",
-
 	"home.start": "Início",
 	"home.openFolder": "Abrir pasta...",
 	"home.recent": "Recentes",
 	"home.folders": "Pastas",
 	"home.chatComingSoon": "Chat (em breve)",
-
 	"directory.cancel": "Cancelar",
 	"directory.open": "Abrir \"{{name}}\"",
 	"directory.hidden": "Ocultos",
@@ -227,24 +222,20 @@
 	"directory.goBack": "Voltar",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Tentar novamente",
-
 	"saveDialog.fileNamePlaceholder": "Nome do arquivo…",
 	"saveDialog.emptyFolder": "Pasta vazia",
 	"saveDialog.cancel": "Cancelar",
 	"saveDialog.save": "Salvar",
 	"saveDialog.hidden": "Ocultos",
 	"saveDialog.retry": "Tentar novamente",
-
 	"port.preview": "Visualizar",
 	"port.via": "via {{name}}",
-
 	"system.title": "Sistema",
 	"system.cpu": "CPU",
 	"system.memory": "Memória",
 	"system.disk": "Disco",
 	"system.cores": "{{count}} núcleos",
 	"system.process": "PROCESSO",
-
 	"admin.web": "Web",
 	"admin.webEnabled": "Ativar acesso à web",
 	"admin.webEnabledHint": "A IA pode pesquisar na web e buscar URLs.",
@@ -265,5 +256,27 @@
 	"admin.webCcBaseUrl": "URL base",
 	"admin.webCcKey": "Chave de API",
 	"admin.webCcModel": "Modelo",
-	"admin.webCcHint": "Qualquer endpoint compatível com OpenAI (ex. Perplexity Sonar, proxy LiteLLM)"
+	"admin.webCcHint": "Qualquer endpoint compatível com OpenAI (ex. Perplexity Sonar, proxy LiteLLM)",
+	"admin.models": "Modelos",
+	"models.defaults": "Padrões",
+	"models.noDefaults": "Sem padrões globais",
+	"models.noParams": "Sem parâmetros",
+	"models.noModels": "Nenhum modelo disponível",
+	"models.addConnection": "Adicione uma conexão primeiro.",
+	"models.failedToLoad": "Falha ao carregar configuração de modelos",
+	"models.failedToToggle": "Falha ao alternar modelo",
+	"models.failedToSave": "Falha ao salvar",
+	"models.savedDefaults": "Padrões globais salvos",
+	"models.savedParams": "Parâmetros salvos para {{name}}",
+	"models.add": "+ Adicionar",
+	"models.save": "Salvar",
+	"models.systemPrompt": "Prompt do sistema",
+	"models.systemPromptHint": "Instruções padrão enviadas ao modelo. Use {{VARIABLES}} para conteúdo dinâmico.",
+	"models.systemPromptInherited": "Herda o padrão global",
+	"models.templateVariables": "Variáveis",
+	"models.resetToDefault": "Redefinir",
+
+	"update.available": "Uma nova versão (v{{version}}) está disponível.",
+	"update.viewRelease": "Ver notas da versão →",
+	"update.updateAvailable": "Atualização disponível: v{{version}}"
 }

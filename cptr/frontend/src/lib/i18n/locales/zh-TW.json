@@ -1,6 +1,5 @@
 {
 	"app.tagline": "隨時隨地，掌控你的電腦。",
-
 	"auth.createAccountHint": "建立帳號以開始使用。",
 	"auth.signInSystemHint": "使用系統帳號登入。",
 	"auth.setup": "初始設定",
@@ -20,7 +19,6 @@
 	"auth.minChars": "至少6個字元",
 	"auth.connectionFailed": "連線失敗",
 	"auth.accountPending": "帳號已建立，等待管理員核准。",
-
 	"sidebar.workspaces": "工作區",
 	"sidebar.addWorkspace": "新增工作區",
 	"sidebar.collapse": "收合",
@@ -31,14 +29,12 @@
 	"sidebar.remove": "移除",
 	"sidebar.workspaceOptions": "工作區選項",
 	"sidebar.closeSidebar": "關閉側邊欄",
-
 	"bar.newFile": "新增檔案",
 	"bar.newTerminal": "新增終端機",
 	"bar.closeTab": "關閉分頁",
 	"bar.new": "新增...",
 	"bar.sidebar": "側邊欄",
 	"bar.toggleSidebar": "切換側邊欄",
-
 	"files.filter": "篩選...",
 	"files.refresh": "重新整理",
 	"files.sort": "排序",
@@ -73,10 +69,8 @@
 	"files.showHidden": "顯示點檔",
 	"files.hideHidden": "隱藏點檔",
 	"files.failedToLoad": "載入目錄失敗",
-
 	"quickOpen.searchFiles": "搜尋檔案...",
 	"quickOpen.noFiles": "找不到檔案",
-
 	"settings.back": "返回",
 	"settings.general": "一般",
 	"settings.account": "帳號",
@@ -84,18 +78,15 @@
 	"settings.save": "儲存",
 	"settings.saved": "已儲存",
 	"settings.saving": "儲存中…",
-
 	"general.title": "一般",
 	"general.theme": "佈景主題",
 	"general.light": "淺色",
 	"general.dark": "深色",
 	"general.system": "跟隨系統",
 	"general.language": "語言",
-
 	"general.tools": "工具",
 	"general.autoApproveTools": "自動核准所有工具呼叫",
 	"general.autoApproveToolsDesc": "自動允許工具呼叫（寫入、執行等），無需確認",
-
 	"account.title": "帳號",
 	"account.displayName": "顯示名稱",
 	"account.displayNamePlaceholder": "輸入顯示名稱",
@@ -113,11 +104,9 @@
 	"account.uploadFailed": "上傳失敗",
 	"account.failedToUpdate": "更新失敗",
 	"account.failedToRemoveAvatar": "移除頭像失敗",
-
 	"about.title": "關於",
 	"about.license": "授權條款",
 	"about.createdBy": "由 Tim Baek 創建，誕生於地球",
-
 	"git.changes": "變更",
 	"git.history": "歷史",
 	"git.fetch": "擷取",
@@ -160,7 +149,6 @@
 	"git.discard": "捨棄",
 	"git.copyFilePath": "複製檔案路徑",
 	"git.copyRelativePath": "複製相對路徑",
-
 	"admin.users": "使用者",
 	"admin.settings": "設定",
 	"admin.noUsers": "尚無使用者",
@@ -191,9 +179,7 @@
 	"admin.delete": "刪除",
 	"admin.usernameRequired": "請輸入使用者名稱",
 	"admin.minCharsPassword": "至少6個字元",
-
 	"admin.connections": "連線",
-
 	"connections.loadError": "無法載入連線",
 	"connections.fieldsRequired": "需要基礎 URL 和 API 金鑰",
 	"connections.added": "已新增連線",
@@ -211,15 +197,12 @@
 	"connections.cancel": "取消",
 	"connections.add": "新增",
 	"connections.verify": "驗證",
-
 	"bar.newChat": "新增聊天",
-
 	"home.start": "開始",
 	"home.openFolder": "開啟資料夾...",
 	"home.recent": "最近",
 	"home.folders": "資料夾",
 	"home.chatComingSoon": "聊天（即將推出）",
-
 	"directory.cancel": "取消",
 	"directory.open": "開啟「{{name}}」",
 	"directory.hidden": "隱藏檔案",
@@ -227,24 +210,20 @@
 	"directory.goBack": "返回",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "重試",
-
 	"saveDialog.fileNamePlaceholder": "檔案名稱…",
 	"saveDialog.emptyFolder": "空資料夾",
 	"saveDialog.cancel": "取消",
 	"saveDialog.save": "儲存",
 	"saveDialog.hidden": "隱藏檔案",
 	"saveDialog.retry": "重試",
-
 	"port.preview": "預覽",
 	"port.via": "來自 {{name}}",
-
 	"system.title": "系統",
 	"system.cpu": "CPU",
 	"system.memory": "記憶體",
 	"system.disk": "磁碟",
 	"system.cores": "{{count}} 核心",
 	"system.process": "處理程序",
-
 	"admin.web": "網頁",
 	"admin.webEnabled": "啟用網頁存取",
 	"admin.webEnabledHint": "AI 可以搜尋網頁並擷取 URL。",
@@ -265,5 +244,16 @@
 	"admin.webCcBaseUrl": "基礎 URL",
 	"admin.webCcKey": "API 金鑰",
 	"admin.webCcModel": "模型",
-	"admin.webCcHint": "使用任何 OpenAI 相容端點（如 Perplexity Sonar、LiteLLM 代理）"
+	"admin.webCcHint": "使用任何 OpenAI 相容端點（如 Perplexity Sonar、LiteLLM 代理）",
+	"admin.models": "Models",
+	"models.defaults": "Defaults",
+	"models.noModels": "No models available",
+	"models.failedToLoad": "Failed to load model config",
+	"models.failedToToggle": "Failed to toggle model",
+	"models.failedToSave": "Failed to save",
+	"models.systemPrompt": "System Prompt",
+	"models.systemPromptHint": "Default instructions sent to the model. Use {{VARIABLES}} for dynamic content.",
+	"models.systemPromptInherited": "Inherits global default",
+	"models.templateVariables": "Variables",
+	"models.resetToDefault": "Reset"
 }

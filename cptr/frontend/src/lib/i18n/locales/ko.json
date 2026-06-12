@@ -1,6 +1,5 @@
 {
 	"app.tagline": "어디서든, 당신의 컴퓨터로.",
-
 	"auth.createAccountHint": "계정을 만들어 시작하세요.",
 	"auth.signInSystemHint": "시스템 계정으로 로그인하세요.",
 	"auth.setup": "설정",
@@ -20,7 +19,6 @@
 	"auth.minChars": "최소 6자",
 	"auth.connectionFailed": "연결 실패",
 	"auth.accountPending": "계정이 생성되었습니다. 관리자 승인을 기다려 주세요.",
-
 	"sidebar.workspaces": "워크스페이스",
 	"sidebar.addWorkspace": "워크스페이스 추가",
 	"sidebar.collapse": "접기",
@@ -31,14 +29,13 @@
 	"sidebar.remove": "제거",
 	"sidebar.workspaceOptions": "워크스페이스 옵션",
 	"sidebar.closeSidebar": "사이드바 닫기",
-
+	"sidebar.showMore": "더 보기",
 	"bar.newFile": "새 파일",
 	"bar.newTerminal": "새 터미널",
 	"bar.closeTab": "탭 닫기",
 	"bar.new": "새로 만들기...",
 	"bar.sidebar": "사이드바",
 	"bar.toggleSidebar": "사이드바 전환",
-
 	"files.filter": "필터...",
 	"files.refresh": "새로고침",
 	"files.sort": "정렬",
@@ -73,10 +70,16 @@
 	"files.showHidden": "닷파일 표시",
 	"files.hideHidden": "닷파일 숨기기",
 	"files.failedToLoad": "디렉터리 로드 실패",
+	"search.placeholder": "검색...",
+	"search.search": "검색",
+	"search.chats": "채팅",
+	"search.files": "파일",
+	"search.noResults": "결과를 찾을 수 없습니다",
+	"search.recentChats": "최근 채팅",
+	"search.noRecentChats": "최근 채팅 없음",
 
 	"quickOpen.searchFiles": "파일 검색...",
 	"quickOpen.noFiles": "파일을 찾을 수 없습니다",
-
 	"settings.back": "뒤로",
 	"settings.general": "일반",
 	"settings.account": "계정",
@@ -84,18 +87,15 @@
 	"settings.save": "저장",
 	"settings.saved": "저장됨",
 	"settings.saving": "저장 중…",
-
 	"general.title": "일반",
 	"general.theme": "테마",
 	"general.light": "라이트",
 	"general.dark": "다크",
 	"general.system": "시스템",
 	"general.language": "언어",
-
 	"general.tools": "도구",
 	"general.autoApproveTools": "모든 도구 호출 자동 승인",
 	"general.autoApproveToolsDesc": "도구 호출(쓰기, 실행 등)을 확인 없이 자동으로 허용합니다",
-
 	"account.title": "계정",
 	"account.displayName": "표시 이름",
 	"account.displayNamePlaceholder": "표시 이름 입력",
@@ -113,11 +113,9 @@
 	"account.uploadFailed": "업로드 실패",
 	"account.failedToUpdate": "업데이트 실패",
 	"account.failedToRemoveAvatar": "아바타 제거 실패",
-
 	"about.title": "정보",
 	"about.license": "라이선스",
 	"about.createdBy": "Tim Baek 제작, 지구에서 만듦",
-
 	"git.changes": "변경사항",
 	"git.history": "기록",
 	"git.fetch": "가져오기",
@@ -160,7 +158,6 @@
 	"git.discard": "폐기",
 	"git.copyFilePath": "파일 경로 복사",
 	"git.copyRelativePath": "상대 경로 복사",
-
 	"admin.users": "사용자",
 	"admin.settings": "설정",
 	"admin.noUsers": "사용자 없음",
@@ -191,9 +188,7 @@
 	"admin.delete": "삭제",
 	"admin.usernameRequired": "사용자 이름을 입력하세요",
 	"admin.minCharsPassword": "최소 6자",
-
 	"admin.connections": "연결",
-
 	"connections.loadError": "연결을 불러오지 못했습니다",
 	"connections.fieldsRequired": "기본 URL과 API 키가 필요합니다",
 	"connections.added": "연결이 추가되었습니다",
@@ -208,18 +203,18 @@
 	"connections.baseUrl": "기본 URL",
 	"connections.prefixId": "접두사 ID",
 	"connections.models": "모델(쉼표로 구분, 선택 사항)",
+	"connections.modelsHint": "비워두면 프로바이더에서 자동 감지합니다.",
 	"connections.cancel": "취소",
 	"connections.add": "추가",
+	"connections.edit": "연결 편집",
+	"connections.updated": "연결이 업데이트되었습니다",
 	"connections.verify": "확인",
-
 	"bar.newChat": "새 채팅",
-
 	"home.start": "시작",
 	"home.openFolder": "폴더 열기...",
 	"home.recent": "최근",
 	"home.folders": "폴더",
 	"home.chatComingSoon": "채팅 (출시 예정)",
-
 	"directory.cancel": "취소",
 	"directory.open": "\"{{name}}\" 열기",
 	"directory.hidden": "숨김 파일",
@@ -227,24 +222,20 @@
 	"directory.goBack": "뒤로",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "재시도",
-
 	"saveDialog.fileNamePlaceholder": "파일 이름…",
 	"saveDialog.emptyFolder": "빈 폴더",
 	"saveDialog.cancel": "취소",
 	"saveDialog.save": "저장",
 	"saveDialog.hidden": "숨김 파일",
 	"saveDialog.retry": "재시도",
-
 	"port.preview": "미리보기",
 	"port.via": "{{name}} 경유",
-
 	"system.title": "시스템",
 	"system.cpu": "CPU",
 	"system.memory": "메모리",
 	"system.disk": "디스크",
 	"system.cores": "{{count}} 코어",
 	"system.process": "프로세스",
-
 	"admin.web": "웹",
 	"admin.webEnabled": "웹 액세스 활성화",
 	"admin.webEnabledHint": "AI가 웹을 검색하고 URL을 가져올 수 있습니다.",
@@ -265,5 +256,27 @@
 	"admin.webCcBaseUrl": "기본 URL",
 	"admin.webCcKey": "API 키",
 	"admin.webCcModel": "모델",
-	"admin.webCcHint": "OpenAI 호환 엔드포인트 사용 (예: Perplexity Sonar, LiteLLM 프록시)"
+	"admin.webCcHint": "OpenAI 호환 엔드포인트 사용 (예: Perplexity Sonar, LiteLLM 프록시)",
+	"admin.models": "모델",
+	"models.defaults": "기본값",
+	"models.noDefaults": "글로벌 기본값 없음",
+	"models.noParams": "파라미터 없음",
+	"models.noModels": "사용 가능한 모델이 없습니다",
+	"models.addConnection": "먼저 연결을 추가하세요.",
+	"models.failedToLoad": "모델 설정 로드 실패",
+	"models.failedToToggle": "모델 전환 실패",
+	"models.failedToSave": "저장 실패",
+	"models.savedDefaults": "글로벌 기본값 저장됨",
+	"models.savedParams": "{{name}} 파라미터 저장됨",
+	"models.add": "+ 추가",
+	"models.save": "저장",
+	"models.systemPrompt": "시스템 프롬프트",
+	"models.systemPromptHint": "모델에 전송되는 기본 지시. {{VARIABLES}}로 동적 콘텐츠 사용.",
+	"models.systemPromptInherited": "글로벌 기본값 상속",
+	"models.templateVariables": "변수",
+	"models.resetToDefault": "초기화",
+
+	"update.available": "새 버전 (v{{version}})이 사용 가능합니다.",
+	"update.viewRelease": "릴리스 노트 보기 →",
+	"update.updateAvailable": "업데이트 가능: v{{version}}"
 }

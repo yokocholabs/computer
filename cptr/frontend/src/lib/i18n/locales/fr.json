@@ -1,6 +1,5 @@
 {
 	"app.tagline": "Votre ordinateur, où que vous soyez.",
-
 	"auth.createAccountHint": "Créez votre compte pour commencer.",
 	"auth.signInSystemHint": "Connectez-vous avec votre compte système.",
 	"auth.setup": "Configuration",
@@ -20,7 +19,6 @@
 	"auth.minChars": "6 caractères minimum",
 	"auth.connectionFailed": "Échec de la connexion",
 	"auth.accountPending": "Compte créé. En attente de l'approbation de l'administrateur.",
-
 	"sidebar.workspaces": "Espaces de travail",
 	"sidebar.addWorkspace": "Ajouter un espace de travail",
 	"sidebar.collapse": "Réduire",
@@ -31,14 +29,13 @@
 	"sidebar.remove": "Supprimer",
 	"sidebar.workspaceOptions": "Options de l'espace de travail",
 	"sidebar.closeSidebar": "Fermer la barre latérale",
-
+	"sidebar.showMore": "Afficher plus",
 	"bar.newFile": "Nouveau fichier",
 	"bar.newTerminal": "Nouveau terminal",
 	"bar.closeTab": "Fermer l'onglet",
 	"bar.new": "Nouveau...",
 	"bar.sidebar": "Barre latérale",
 	"bar.toggleSidebar": "Afficher/masquer la barre latérale",
-
 	"files.filter": "Filtrer...",
 	"files.refresh": "Actualiser",
 	"files.sort": "Trier",
@@ -73,10 +70,16 @@
 	"files.showHidden": "Afficher les dotfiles",
 	"files.hideHidden": "Masquer les dotfiles",
 	"files.failedToLoad": "Échec du chargement du répertoire",
+	"search.placeholder": "Rechercher...",
+	"search.search": "Recherche",
+	"search.chats": "Conversations",
+	"search.files": "Fichiers",
+	"search.noResults": "Aucun résultat trouvé",
+	"search.recentChats": "Conversations récentes",
+	"search.noRecentChats": "Aucune conversation récente",
 
 	"quickOpen.searchFiles": "Rechercher des fichiers...",
 	"quickOpen.noFiles": "Aucun fichier trouvé",
-
 	"settings.back": "Retour",
 	"settings.general": "Général",
 	"settings.account": "Compte",
@@ -84,18 +87,15 @@
 	"settings.save": "Enregistrer",
 	"settings.saved": "Enregistré",
 	"settings.saving": "Enregistrement…",
-
 	"general.title": "Général",
 	"general.theme": "Thème",
 	"general.light": "Clair",
 	"general.dark": "Sombre",
 	"general.system": "Système",
 	"general.language": "Langue",
-
 	"general.tools": "Outils",
 	"general.autoApproveTools": "Approuver automatiquement tous les appels d’outils",
 	"general.autoApproveToolsDesc": "Autoriser automatiquement les appels d’outils (écriture, exécution, etc.) sans confirmation",
-
 	"account.title": "Compte",
 	"account.displayName": "Nom d'affichage",
 	"account.displayNamePlaceholder": "Saisissez un nom d'affichage",
@@ -113,11 +113,9 @@
 	"account.uploadFailed": "Échec de l'importation",
 	"account.failedToUpdate": "Échec de la mise à jour",
 	"account.failedToRemoveAvatar": "Échec de la suppression de l'avatar",
-
 	"about.title": "À propos",
 	"about.license": "Licence",
 	"about.createdBy": "Créé par Tim Baek, fabriqué sur Terre",
-
 	"git.changes": "Modifications",
 	"git.history": "Historique",
 	"git.fetch": "Récupérer",
@@ -160,7 +158,6 @@
 	"git.discard": "Annuler",
 	"git.copyFilePath": "Copier le chemin du fichier",
 	"git.copyRelativePath": "Copier le chemin relatif",
-
 	"admin.users": "Utilisateurs",
 	"admin.settings": "Paramètres",
 	"admin.noUsers": "Aucun utilisateur",
@@ -191,9 +188,7 @@
 	"admin.delete": "Supprimer",
 	"admin.usernameRequired": "Nom d'utilisateur requis",
 	"admin.minCharsPassword": "6 caractères minimum",
-
 	"admin.connections": "Connexions",
-
 	"connections.loadError": "Échec du chargement des connexions",
 	"connections.fieldsRequired": "URL de base et clé API requises",
 	"connections.added": "Connexion ajoutée",
@@ -208,18 +203,18 @@
 	"connections.baseUrl": "URL de base",
 	"connections.prefixId": "ID de préfixe",
 	"connections.models": "Modèles (séparés par des virgules, facultatif)",
+	"connections.modelsHint": "Laisser vide pour la découverte automatique du fournisseur.",
 	"connections.cancel": "Annuler",
 	"connections.add": "Ajouter",
+	"connections.edit": "Modifier la connexion",
+	"connections.updated": "Connexion mise à jour",
 	"connections.verify": "Vérifier",
-
 	"bar.newChat": "Nouveau chat",
-
 	"home.start": "Démarrer",
 	"home.openFolder": "Ouvrir un dossier...",
 	"home.recent": "Récents",
 	"home.folders": "Dossiers",
 	"home.chatComingSoon": "Chat (bientôt disponible)",
-
 	"directory.cancel": "Annuler",
 	"directory.open": "Ouvrir « {{name}} »",
 	"directory.hidden": "Masqués",
@@ -227,24 +222,20 @@
 	"directory.goBack": "Retour",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Réessayer",
-
 	"saveDialog.fileNamePlaceholder": "Nom du fichier…",
 	"saveDialog.emptyFolder": "Dossier vide",
 	"saveDialog.cancel": "Annuler",
 	"saveDialog.save": "Enregistrer",
 	"saveDialog.hidden": "Masqués",
 	"saveDialog.retry": "Réessayer",
-
 	"port.preview": "Aperçu",
 	"port.via": "via {{name}}",
-
 	"system.title": "Système",
 	"system.cpu": "CPU",
 	"system.memory": "Mémoire",
 	"system.disk": "Disque",
 	"system.cores": "{{count}} cœurs",
 	"system.process": "PROCESSUS",
-
 	"admin.web": "Web",
 	"admin.webEnabled": "Activer l’accès web",
 	"admin.webEnabledHint": "L’IA peut rechercher sur le web et récupérer des URL.",
@@ -265,5 +256,27 @@
 	"admin.webCcBaseUrl": "URL de base",
 	"admin.webCcKey": "Clé API",
 	"admin.webCcModel": "Modèle",
-	"admin.webCcHint": "Tout endpoint compatible OpenAI (ex. Perplexity Sonar, proxy LiteLLM)"
+	"admin.webCcHint": "Tout endpoint compatible OpenAI (ex. Perplexity Sonar, proxy LiteLLM)",
+	"admin.models": "Modèles",
+	"models.defaults": "Valeurs par défaut",
+	"models.noDefaults": "Aucune valeur par défaut globale",
+	"models.noParams": "Aucun paramètre",
+	"models.noModels": "Aucun modèle disponible",
+	"models.addConnection": "Ajoutez d’abord une connexion.",
+	"models.failedToLoad": "Échec du chargement de la configuration des modèles",
+	"models.failedToToggle": "Échec du basculement du modèle",
+	"models.failedToSave": "Échec de la sauvegarde",
+	"models.savedDefaults": "Valeurs par défaut globales enregistrées",
+	"models.savedParams": "Paramètres enregistrés pour {{name}}",
+	"models.add": "+ Ajouter",
+	"models.save": "Enregistrer",
+	"models.systemPrompt": "Prompt système",
+	"models.systemPromptHint": "Instructions par défaut envoyées au modèle. Utilisez {{VARIABLES}} pour le contenu dynamique.",
+	"models.systemPromptInherited": "Hérite de la valeur par défaut globale",
+	"models.templateVariables": "Variables",
+	"models.resetToDefault": "Réinitialiser",
+
+	"update.available": "Une nouvelle version (v{{version}}) est disponible.",
+	"update.viewRelease": "Voir les notes de version →",
+	"update.updateAvailable": "Mise à jour disponible : v{{version}}"
 }

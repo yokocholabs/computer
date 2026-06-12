@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n';
-	import { appVersion, showChangelog } from '$lib/stores';
+	import { appVersion, showChangelog, updateAvailable, latestVersion } from '$lib/stores';
 </script>
 
 <h2 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
@@ -22,7 +22,18 @@
 				>v{$appVersion}</button
 			>
 		{/if}
+		{#if $updateAvailable}
+			<span class="text-[11px] text-gray-300 dark:text-gray-600">·</span>
+			<a
+				href="https://github.com/open-webui/computer/releases"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+				>v{$latestVersion} available</a
+			>
+		{/if}
 	</div>
+
 	<p class="text-[13px] text-gray-500 mt-0.5 mb-4">{$t('app.tagline')}</p>
 
 	<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-1">
@@ -44,3 +55,4 @@
 <p class="text-[11px] text-gray-300 dark:text-gray-700 pt-8">
 	{$t('about.createdBy')}
 </p>
+

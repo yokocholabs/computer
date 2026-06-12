@@ -1,6 +1,5 @@
 {
 	"app.tagline": "どこからでも、あなたのコンピュータへ。",
-
 	"auth.createAccountHint": "アカウントを作成して始めましょう。",
 	"auth.signInSystemHint": "システムアカウントでサインインしてください。",
 	"auth.setup": "セットアップ",
@@ -20,7 +19,6 @@
 	"auth.minChars": "6文字以上",
 	"auth.connectionFailed": "接続に失敗しました",
 	"auth.accountPending": "アカウントが作成されました。管理者の承認をお待ちください。",
-
 	"sidebar.workspaces": "ワークスペース",
 	"sidebar.addWorkspace": "ワークスペースを追加",
 	"sidebar.collapse": "折りたたむ",
@@ -31,14 +29,13 @@
 	"sidebar.remove": "削除",
 	"sidebar.workspaceOptions": "ワークスペースオプション",
 	"sidebar.closeSidebar": "サイドバーを閉じる",
-
+	"sidebar.showMore": "もっと見る",
 	"bar.newFile": "新規ファイル",
 	"bar.newTerminal": "新規ターミナル",
 	"bar.closeTab": "タブを閉じる",
 	"bar.new": "新規...",
 	"bar.sidebar": "サイドバー",
 	"bar.toggleSidebar": "サイドバー切り替え",
-
 	"files.filter": "フィルター...",
 	"files.refresh": "更新",
 	"files.sort": "並び替え",
@@ -73,10 +70,16 @@
 	"files.showHidden": "ドットファイルを表示",
 	"files.hideHidden": "ドットファイルを非表示",
 	"files.failedToLoad": "ディレクトリの読み込みに失敗しました",
+	"search.placeholder": "検索...",
+	"search.search": "検索",
+	"search.chats": "チャット",
+	"search.files": "ファイル",
+	"search.noResults": "結果が見つかりません",
+	"search.recentChats": "最近のチャット",
+	"search.noRecentChats": "最近のチャットはありません",
 
 	"quickOpen.searchFiles": "ファイルを検索...",
 	"quickOpen.noFiles": "ファイルが見つかりません",
-
 	"settings.back": "戻る",
 	"settings.general": "一般",
 	"settings.account": "アカウント",
@@ -84,18 +87,15 @@
 	"settings.save": "保存",
 	"settings.saved": "保存しました",
 	"settings.saving": "保存中…",
-
 	"general.title": "一般",
 	"general.theme": "テーマ",
 	"general.light": "ライト",
 	"general.dark": "ダーク",
 	"general.system": "システム",
 	"general.language": "言語",
-
 	"general.tools": "ツール",
 	"general.autoApproveTools": "すべてのツール呼び出しを自動承認",
 	"general.autoApproveToolsDesc": "ツール呼び出し（書き込み、実行など）を確認なしで自動的に許可します",
-
 	"account.title": "アカウント",
 	"account.displayName": "表示名",
 	"account.displayNamePlaceholder": "表示名を入力",
@@ -113,11 +113,9 @@
 	"account.uploadFailed": "アップロードに失敗しました",
 	"account.failedToUpdate": "更新に失敗しました",
 	"account.failedToRemoveAvatar": "アバターの削除に失敗しました",
-
 	"about.title": "概要",
 	"about.license": "ライセンス",
 	"about.createdBy": "Tim Baek が作成、地球にて",
-
 	"git.changes": "変更",
 	"git.history": "履歴",
 	"git.fetch": "フェッチ",
@@ -160,7 +158,6 @@
 	"git.discard": "破棄",
 	"git.copyFilePath": "ファイルパスをコピー",
 	"git.copyRelativePath": "相対パスをコピー",
-
 	"admin.users": "ユーザー",
 	"admin.settings": "設定",
 	"admin.noUsers": "ユーザーがいません",
@@ -191,9 +188,7 @@
 	"admin.delete": "削除",
 	"admin.usernameRequired": "ユーザー名を入力してください",
 	"admin.minCharsPassword": "6文字以上",
-
 	"admin.connections": "接続",
-
 	"connections.loadError": "接続の読み込みに失敗しました",
 	"connections.fieldsRequired": "ベースURLとAPIキーが必要です",
 	"connections.added": "接続を追加しました",
@@ -208,18 +203,18 @@
 	"connections.baseUrl": "ベースURL",
 	"connections.prefixId": "プレフィックスID",
 	"connections.models": "モデル（カンマ区切り、任意）",
+	"connections.modelsHint": "空白のままでプロバイダーから自動検出します。",
 	"connections.cancel": "キャンセル",
 	"connections.add": "追加",
+	"connections.edit": "接続を編集",
+	"connections.updated": "接続が更新されました",
 	"connections.verify": "確認",
-
 	"bar.newChat": "新しいチャット",
-
 	"home.start": "スタート",
 	"home.openFolder": "フォルダを開く...",
 	"home.recent": "最近",
 	"home.folders": "フォルダ",
 	"home.chatComingSoon": "チャット（近日公開）",
-
 	"directory.cancel": "キャンセル",
 	"directory.open": "「{{name}}」を開く",
 	"directory.hidden": "隠しファイル",
@@ -227,24 +222,20 @@
 	"directory.goBack": "戻る",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "再試行",
-
 	"saveDialog.fileNamePlaceholder": "ファイル名…",
 	"saveDialog.emptyFolder": "空のフォルダ",
 	"saveDialog.cancel": "キャンセル",
 	"saveDialog.save": "保存",
 	"saveDialog.hidden": "隠しファイル",
 	"saveDialog.retry": "再試行",
-
 	"port.preview": "プレビュー",
 	"port.via": "{{name}} 経由",
-
 	"system.title": "システム",
 	"system.cpu": "CPU",
 	"system.memory": "メモリ",
 	"system.disk": "ディスク",
 	"system.cores": "{{count}} コア",
 	"system.process": "プロセス",
-
 	"admin.web": "Web",
 	"admin.webEnabled": "Webアクセスを有効にする",
 	"admin.webEnabledHint": "AIがWebを検索し、URLを取得できます。",
@@ -265,5 +256,27 @@
 	"admin.webCcBaseUrl": "ベースURL",
 	"admin.webCcKey": "APIキー",
 	"admin.webCcModel": "モデル",
-	"admin.webCcHint": "OpenAI互換エンドポイント（例: Perplexity Sonar、LiteLLMプロキシ）"
+	"admin.webCcHint": "OpenAI互換エンドポイント（例: Perplexity Sonar、LiteLLMプロキシ）",
+	"admin.models": "モデル",
+	"models.defaults": "デフォルト",
+	"models.noDefaults": "グローバルデフォルトなし",
+	"models.noParams": "パラメータなし",
+	"models.noModels": "利用可能なモデルがありません",
+	"models.addConnection": "まず接続を追加してください。",
+	"models.failedToLoad": "モデル設定の読み込みに失敗しました",
+	"models.failedToToggle": "モデルの切り替えに失敗しました",
+	"models.failedToSave": "保存に失敗しました",
+	"models.savedDefaults": "グローバルデフォルトを保存しました",
+	"models.savedParams": "{{name}} のパラメータを保存しました",
+	"models.add": "+ 追加",
+	"models.save": "保存",
+	"models.systemPrompt": "システムプロンプト",
+	"models.systemPromptHint": "モデルに送信されるデフォルトの指示。{{VARIABLES}} で動的コンテンツを使用。",
+	"models.systemPromptInherited": "グローバルデフォルトを継承",
+	"models.templateVariables": "変数",
+	"models.resetToDefault": "リセット",
+
+	"update.available": "新しいバージョン (v{{version}}) が利用可能です。",
+	"update.viewRelease": "リリースノートを見る →",
+	"update.updateAvailable": "アップデート利用可能: v{{version}}"
 }

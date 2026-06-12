@@ -1,6 +1,5 @@
 {
 	"app.tagline": "Ваш компьютер, откуда угодно.",
-
 	"auth.createAccountHint": "Создайте аккаунт, чтобы начать.",
 	"auth.signInSystemHint": "Войдите с помощью системной учётной записи.",
 	"auth.setup": "Настройка",
@@ -20,7 +19,6 @@
 	"auth.minChars": "Минимум 6 символов",
 	"auth.connectionFailed": "Ошибка подключения",
 	"auth.accountPending": "Аккаунт создан. Ожидайте одобрения администратора.",
-
 	"sidebar.workspaces": "Рабочие области",
 	"sidebar.addWorkspace": "Добавить рабочую область",
 	"sidebar.collapse": "Свернуть",
@@ -31,14 +29,13 @@
 	"sidebar.remove": "Удалить",
 	"sidebar.workspaceOptions": "Параметры рабочей области",
 	"sidebar.closeSidebar": "Закрыть боковую панель",
-
+	"sidebar.showMore": "Показать ещё",
 	"bar.newFile": "Новый файл",
 	"bar.newTerminal": "Новый терминал",
 	"bar.closeTab": "Закрыть вкладку",
 	"bar.new": "Создать...",
 	"bar.sidebar": "Боковая панель",
 	"bar.toggleSidebar": "Переключить боковую панель",
-
 	"files.filter": "Фильтр...",
 	"files.refresh": "Обновить",
 	"files.sort": "Сортировка",
@@ -73,10 +70,16 @@
 	"files.showHidden": "Показать dotfiles",
 	"files.hideHidden": "Скрыть dotfiles",
 	"files.failedToLoad": "Не удалось загрузить каталог",
+	"search.placeholder": "Поиск...",
+	"search.search": "Поиск",
+	"search.chats": "Чаты",
+	"search.files": "Файлы",
+	"search.noResults": "Результаты не найдены",
+	"search.recentChats": "Недавние чаты",
+	"search.noRecentChats": "Нет недавних чатов",
 
 	"quickOpen.searchFiles": "Поиск файлов...",
 	"quickOpen.noFiles": "Файлы не найдены",
-
 	"settings.back": "Назад",
 	"settings.general": "Основные",
 	"settings.account": "Аккаунт",
@@ -84,18 +87,15 @@
 	"settings.save": "Сохранить",
 	"settings.saved": "Сохранено",
 	"settings.saving": "Сохранение…",
-
 	"general.title": "Основные",
 	"general.theme": "Тема",
 	"general.light": "Светлая",
 	"general.dark": "Тёмная",
 	"general.system": "Системная",
 	"general.language": "Язык",
-
 	"general.tools": "Инструменты",
 	"general.autoApproveTools": "Автоматически одобрять все вызовы инструментов",
 	"general.autoApproveToolsDesc": "Автоматически разрешать вызовы инструментов (запись, запуск и т. д.) без подтверждения",
-
 	"account.title": "Аккаунт",
 	"account.displayName": "Отображаемое имя",
 	"account.displayNamePlaceholder": "Введите отображаемое имя",
@@ -113,11 +113,9 @@
 	"account.uploadFailed": "Ошибка загрузки",
 	"account.failedToUpdate": "Ошибка обновления",
 	"account.failedToRemoveAvatar": "Не удалось удалить аватар",
-
 	"about.title": "О программе",
 	"about.license": "Лицензия",
 	"about.createdBy": "Создано Tim Baek, сделано на Земле",
-
 	"git.changes": "Изменения",
 	"git.history": "История",
 	"git.fetch": "Получить",
@@ -160,7 +158,6 @@
 	"git.discard": "Отменить",
 	"git.copyFilePath": "Копировать путь к файлу",
 	"git.copyRelativePath": "Копировать относительный путь",
-
 	"admin.users": "Пользователи",
 	"admin.settings": "Настройки",
 	"admin.noUsers": "Нет пользователей",
@@ -191,9 +188,7 @@
 	"admin.delete": "Удалить",
 	"admin.usernameRequired": "Введите имя пользователя",
 	"admin.minCharsPassword": "Минимум 6 символов",
-
 	"admin.connections": "Подключения",
-
 	"connections.loadError": "Не удалось загрузить подключения",
 	"connections.fieldsRequired": "Требуются базовый URL и API-ключ",
 	"connections.added": "Подключение добавлено",
@@ -208,18 +203,18 @@
 	"connections.baseUrl": "Базовый URL",
 	"connections.prefixId": "ID префикса",
 	"connections.models": "Модели (через запятую, необязательно)",
+	"connections.modelsHint": "Оставьте пустым для автообнаружения от провайдера.",
 	"connections.cancel": "Отмена",
 	"connections.add": "Добавить",
+	"connections.edit": "Редактировать подключение",
+	"connections.updated": "Подключение обновлено",
 	"connections.verify": "Проверить",
-
 	"bar.newChat": "Новый чат",
-
 	"home.start": "Начало",
 	"home.openFolder": "Открыть папку...",
 	"home.recent": "Недавние",
 	"home.folders": "Папки",
 	"home.chatComingSoon": "Чат (скоро)",
-
 	"directory.cancel": "Отмена",
 	"directory.open": "Открыть \"{{name}}\"",
 	"directory.hidden": "Скрытые",
@@ -227,24 +222,20 @@
 	"directory.goBack": "Назад",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Повторить",
-
 	"saveDialog.fileNamePlaceholder": "Имя файла…",
 	"saveDialog.emptyFolder": "Пустая папка",
 	"saveDialog.cancel": "Отмена",
 	"saveDialog.save": "Сохранить",
 	"saveDialog.hidden": "Скрытые",
 	"saveDialog.retry": "Повторить",
-
 	"port.preview": "Предпросмотр",
 	"port.via": "через {{name}}",
-
 	"system.title": "Система",
 	"system.cpu": "ЦП",
 	"system.memory": "Память",
 	"system.disk": "Диск",
 	"system.cores": "{{count}} ядер",
 	"system.process": "ПРОЦЕСС",
-
 	"admin.web": "Веб",
 	"admin.webEnabled": "Включить доступ к вебу",
 	"admin.webEnabledHint": "ИИ может искать в вебе и получать URL-адреса.",
@@ -265,5 +256,27 @@
 	"admin.webCcBaseUrl": "Базовый URL",
 	"admin.webCcKey": "API-ключ",
 	"admin.webCcModel": "Модель",
-	"admin.webCcHint": "Любой OpenAI-совместимый эндпоинт (напр. Perplexity Sonar, прокси LiteLLM)"
+	"admin.webCcHint": "Любой OpenAI-совместимый эндпоинт (напр. Perplexity Sonar, прокси LiteLLM)",
+	"admin.models": "Модели",
+	"models.defaults": "Значения по умолчанию",
+	"models.noDefaults": "Нет глобальных значений по умолчанию",
+	"models.noParams": "Нет параметров",
+	"models.noModels": "Нет доступных моделей",
+	"models.addConnection": "Сначала добавьте подключение.",
+	"models.failedToLoad": "Не удалось загрузить конфигурацию моделей",
+	"models.failedToToggle": "Не удалось переключить модель",
+	"models.failedToSave": "Не удалось сохранить",
+	"models.savedDefaults": "Глобальные значения по умолчанию сохранены",
+	"models.savedParams": "Параметры для {{name}} сохранены",
+	"models.add": "+ Добавить",
+	"models.save": "Сохранить",
+	"models.systemPrompt": "Системный промпт",
+	"models.systemPromptHint": "Инструкции по умолчанию для модели. Используйте {{VARIABLES}} для динамического содержимого.",
+	"models.systemPromptInherited": "Наследует глобальные настройки",
+	"models.templateVariables": "Переменные",
+	"models.resetToDefault": "Сбросить",
+
+	"update.available": "Доступна новая версия (v{{version}}).",
+	"update.viewRelease": "Посмотреть заметки о выпуске →",
+	"update.updateAvailable": "Доступно обновление: v{{version}}"
 }

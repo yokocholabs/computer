@@ -31,6 +31,7 @@
 	"sidebar.remove": "Eliminar",
 	"sidebar.workspaceOptions": "Opciones del espacio de trabajo",
 	"sidebar.closeSidebar": "Cerrar barra lateral",
+	"sidebar.showMore": "Mostrar más",
 
 	"bar.newFile": "Nuevo archivo",
 	"bar.newTerminal": "Nueva terminal",
@@ -73,6 +74,14 @@
 	"files.showHidden": "Mostrar dotfiles",
 	"files.hideHidden": "Ocultar dotfiles",
 	"files.failedToLoad": "Error al cargar el directorio",
+
+	"search.placeholder": "Buscar...",
+	"search.search": "Buscar",
+	"search.chats": "Chats",
+	"search.files": "Archivos",
+	"search.noResults": "No se encontraron resultados",
+	"search.recentChats": "Chats recientes",
+	"search.noRecentChats": "Sin chats recientes",
 
 	"quickOpen.searchFiles": "Buscar archivos...",
 	"quickOpen.noFiles": "No se encontraron archivos",
@@ -208,8 +217,11 @@
 	"connections.baseUrl": "URL base",
 	"connections.prefixId": "ID de prefijo",
 	"connections.models": "Modelos (separados por comas, opcional)",
+	"connections.modelsHint": "Dejar en blanco para auto-descubrir del proveedor.",
 	"connections.cancel": "Cancelar",
 	"connections.add": "Agregar",
+	"connections.edit": "Editar conexión",
+	"connections.updated": "Conexión actualizada",
 	"connections.verify": "Verificar",
 
 	"bar.newChat": "Nuevo chat",
@@ -265,5 +277,28 @@
 	"admin.webCcBaseUrl": "URL base",
 	"admin.webCcKey": "Clave de API",
 	"admin.webCcModel": "Modelo",
-	"admin.webCcHint": "Cualquier endpoint compatible con OpenAI (ej. Perplexity Sonar, proxy LiteLLM)"
+	"admin.webCcHint": "Cualquier endpoint compatible con OpenAI (ej. Perplexity Sonar, proxy LiteLLM)",
+
+	"admin.models": "Modelos",
+	"models.defaults": "Predeterminados",
+	"models.noDefaults": "Sin valores predeterminados globales",
+	"models.noParams": "Sin parámetros",
+	"models.noModels": "Sin modelos disponibles",
+	"models.addConnection": "Agrega una conexión primero.",
+	"models.failedToLoad": "Error al cargar configuración de modelos",
+	"models.failedToToggle": "Error al alternar modelo",
+	"models.failedToSave": "Error al guardar",
+	"models.savedDefaults": "Valores predeterminados globales guardados",
+	"models.savedParams": "Parámetros guardados para {{name}}",
+	"models.add": "+ Agregar",
+	"models.save": "Guardar",
+	"models.systemPrompt": "Prompt del sistema",
+	"models.systemPromptHint": "Instrucciones predeterminadas enviadas al modelo. Usa {{VARIABLES}} para contenido dinámico.",
+	"models.systemPromptInherited": "Hereda el predeterminado global",
+	"models.templateVariables": "Variables",
+	"models.resetToDefault": "Restablecer",
+
+	"update.available": "Hay una nueva versión (v{{version}}) disponible.",
+	"update.viewRelease": "Ver notas de la versión →",
+	"update.updateAvailable": "Actualización disponible: v{{version}}"
 }

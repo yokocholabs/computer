@@ -13,6 +13,7 @@ from pathlib import Path
 
 from cptr.env import CHAT_MAX_ITERATIONS, CHAT_TOOL_MAX_CHARS
 from cptr.utils.context import should_compact
+from cptr.utils.skills import discover_skills, load_skill, build_catalog_xml, format_skill_content
 from cptr.utils.summarize import summarize_messages
 from cptr.models import Chat, ChatMessage, Config
 from cptr.socket.main import emit_to_user
@@ -305,36 +306,131 @@ def _load_instruction_files(workspace: str, max_bytes: int = 32_000) -> str:
     return "\n\n".join(parts)
 
 
-def _load_system_prompt(workspace: str) -> str:
-    """Load system prompt: .cptr/system.md > default. Appends instruction files + file tree."""
-    ws_prompt = Path(workspace) / ".cptr" / "system.md"
-    if ws_prompt.is_file():
-        base = ws_prompt.read_text(errors="replace").strip()
-    else:
-        base = (
-            "You are a helpful coding assistant. "
-            "You have access to tools to read, search, and modify files in the workspace. "
-            "Use them to help the user with their coding tasks.\n\n"
-            "For complex tasks, create an implementation plan first using "
-            "create_artifact, then wait for approval before coding."
-        )
+# ── Template engine ─────────────────────────────────────────
 
-    # Load MEMORY.md / AGENTS.md / CLAUDE.md from workspace root
+import platform
+import re
+from datetime import date
+
+_TEMPLATE_RE = re.compile(r"\{\{(\w+)\}\}")
+
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful coding assistant. "
+    "You have access to tools to read, search, and modify files in the workspace. "
+    "Use them to help the user with their coding tasks.\n\n"
+    "For complex tasks, create an implementation plan first using "
+    "create_artifact, then wait for approval before coding."
+    "\n\n{{INSTRUCTIONS}}"
+    "\n\n{{SKILLS}}"
+    "\n\nWorkspace: {{WORKSPACE_NAME}}"
+    "\nFiles:\n{{FILE_TREE}}"
+)
+
+
+def _render_template(template: str, variables: dict[str, str]) -> str:
+    """Render {{VARIABLE}} placeholders in a template string.
+
+    - Known variables are substituted with their values.
+    - Unrecognized {{...}} tokens are left as-is.
+    - Cleans up excess blank lines left by empty variable substitutions.
+    """
+    def _replace(match: re.Match) -> str:
+        key = match.group(1)
+        if key in variables:
+            return variables[key]
+        return match.group(0)  # leave unrecognized tokens as-is
+
+    result = _TEMPLATE_RE.sub(_replace, template)
+    # Clean up triple+ blank lines left by empty substitutions
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result.strip()
+
+
+def _build_template_variables(workspace: str, model: str = "") -> dict[str, str]:
+    """Build the dict of template variable values for the current context."""
+    ws_path = Path(workspace)
+
+    # Build instructions content
     instructions = _load_instruction_files(workspace)
     if instructions:
-        base += f"\n\n<instructions>\n{instructions}\n</instructions>"
-        base += (
+        instructions_block = (
+            f"<instructions>\n{instructions}\n</instructions>"
             "\n\nThe above <instructions> were loaded from instruction files in the workspace root. "
             "These files persist across sessions. "
             "You can update them with your file tools to save learnings, decisions, or "
             "project conventions for future sessions."
         )
+    else:
+        instructions_block = ""
 
-    tree = _get_file_tree(workspace)
-    if tree:
-        base += f"\n\nWorkspace: {Path(workspace).name}\nFiles:\n{tree}"
+    # Build skills catalog
+    skills = discover_skills(workspace)
+    skills_block = build_catalog_xml(skills)
 
-    return base
+    return {
+        "WORKSPACE_NAME": ws_path.name if ws_path.is_dir() else "",
+        "WORKSPACE_PATH": str(ws_path),
+        "FILE_TREE": _get_file_tree(workspace),
+        "INSTRUCTIONS": instructions_block,
+        "SKILLS": skills_block,
+        "OS": platform.system().replace("Darwin", "macOS"),
+        "DATE": date.today().isoformat(),
+        "MODEL": model,
+    }
+
+
+async def _load_system_prompt(workspace: str, model: str = "") -> str:
+    """Load system prompt with template variable rendering.
+
+    Resolution order (most specific wins):
+      1. .cptr/system.md in the workspace (file override)
+      2. Per-model system_prompt from chat.models config
+      3. Global (*) system_prompt from chat.models config
+      4. DEFAULT_SYSTEM_PROMPT constant (hardcoded fallback)
+
+    All sources support {{VARIABLE}} template substitution.
+    """
+    template = None
+
+    # 1. Workspace file override (.cptr/system.md)
+    ws_prompt = Path(workspace) / ".cptr" / "system.md"
+    if ws_prompt.is_file():
+        template = ws_prompt.read_text(errors="replace").strip()
+
+    # 2 & 3. Config-based prompts (per-model → global)
+    if template is None:
+        try:
+            chat_models_config = await Config.get("chat.models") or {}
+            # Per-model prompt
+            if model:
+                model_prompt = (
+                    chat_models_config
+                    .get(model, {})
+                    .get("params", {})
+                    .get("system_prompt")
+                )
+                if model_prompt:
+                    template = model_prompt
+            # Global prompt
+            if template is None:
+                global_prompt = (
+                    chat_models_config
+                    .get("*", {})
+                    .get("params", {})
+                    .get("system_prompt")
+                )
+                if global_prompt:
+                    template = global_prompt
+        except Exception:
+            logger.debug("[system_prompt] Failed to load from config", exc_info=True)
+
+    # 4. Hardcoded fallback
+    if template is None:
+        template = DEFAULT_SYSTEM_PROMPT
+
+    # Render template variables
+    variables = _build_template_variables(workspace, model)
+    return _render_template(template, variables)
 
 
 # ── Title generation ────────────────────────────────────────
@@ -696,7 +792,7 @@ async def run_chat_task(
         api_key = decrypt_key(connection.get("api_key", ""), _get_jwt_secret())
         base_url = connection.get("base_url") or _default_base_url(provider)
 
-        system = _load_system_prompt(workspace)
+        system = await _load_system_prompt(workspace, model)
         messages, loaded_summary = await _load_message_history(chat_id, message_id)
         if loaded_summary:
             system += f"\n\n[CONVERSATION SUMMARY]\n{loaded_summary}"
@@ -704,9 +800,33 @@ async def run_chat_task(
             messages.append({"role": "user", "content": regeneration_prompt})
         tools = get_tool_list()
 
-        # Load chat params for approval mode
+        # Remove view_skill tool if no skills are available
+        skills = discover_skills(workspace)
+        if not skills:
+            tools = [t for t in tools if t["name"] != "view_skill"]
+
+        # Parse $skill-name mentions from the user message to auto-activate skills
         chat_obj = await Chat.get_by_id(chat_id)
         chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
+        attached_skill_ids: list[str] = []
+        if skills and messages:
+            # Find the last user message
+            last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
+            if last_user:
+                import re as _re
+                mentioned = _re.findall(r'\$([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)', last_user["content"])
+                skill_names = {s.name for s in skills}
+                attached_skill_ids = [m for m in mentioned if m in skill_names]
+        if attached_skill_ids:
+            from cptr.utils.tools import _activated_skills
+            skill_blocks = []
+            for sid in attached_skill_ids:
+                skill = load_skill(workspace, sid)
+                if skill:
+                    skill_blocks.append(format_skill_content(skill))
+                    _activated_skills.add(sid)  # mark as activated for dedup
+            if skill_blocks:
+                system += "\n\n" + "\n\n".join(skill_blocks)
 
         # Plan mode: strip write tools, inject prompt as user message (not system, to preserve cache)
         plan_mode = chat_params.get("plan_mode", False)
@@ -762,8 +882,17 @@ async def run_chat_task(
                 loaded_summary = summary
 
                 # Append summary to system prompt (works for all providers)
-                system = _load_system_prompt(workspace)
+                system = await _load_system_prompt(workspace, model)
                 system += f"\n\n[CONVERSATION SUMMARY]\n{summary}"
+                # Re-inject attached skills after compaction (protect from pruning)
+                if attached_skill_ids:
+                    skill_blocks = []
+                    for sid in attached_skill_ids:
+                        skill = load_skill(workspace, sid)
+                        if skill:
+                            skill_blocks.append(format_skill_content(skill))
+                    if skill_blocks:
+                        system += "\n\n" + "\n\n".join(skill_blocks)
                 messages = keep_zone
                 last_usage = None  # reset after compaction
                 new_messages_since = 0
@@ -818,7 +947,7 @@ async def run_chat_task(
                         if name == "create_artifact":
                             result = await create_artifact(**event["arguments"], workspace=workspace)
                         else:
-                            result = await execute_tool(name, event["arguments"], workspace)
+                            result = await execute_tool(name, event["arguments"], {"workspace": workspace, "user_id": user_id, "model_id": model})
                         item["status"] = "completed"
                         output_items.append(item)
                         result_item = {

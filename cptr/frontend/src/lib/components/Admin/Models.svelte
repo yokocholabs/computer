@@ -17,6 +17,7 @@
 		provider: string;
 		is_active: boolean;
 		rows: ParamRow[];
+		systemPrompt: string;
 		dirty: boolean;
 	};
 
@@ -26,8 +27,30 @@
 	let selectedId = $state<string | null>(null);
 
 	let globalRows = $state<ParamRow[]>([]);
+	let globalSystemPrompt = $state('');
 	let globalDirty = $state(false);
 	let globalExpanded = $state(false);
+	let showVariables = $state(false);
+
+	const TEMPLATE_VARIABLES = [
+		{ name: 'WORKSPACE_NAME', desc: 'Workspace folder name' },
+		{ name: 'WORKSPACE_PATH', desc: 'Full workspace path' },
+		{ name: 'FILE_TREE', desc: 'File listing (top-level + 1 depth)' },
+		{ name: 'INSTRUCTIONS', desc: 'MEMORY.md / AGENTS.md / CLAUDE.md content' },
+		{ name: 'OS', desc: 'Operating system (macOS, Linux, Windows)' },
+		{ name: 'DATE', desc: 'Current date (ISO format)' },
+		{ name: 'MODEL', desc: 'Model ID being used' }
+	];
+
+	const DEFAULT_PROMPT_PLACEHOLDER = `You are a helpful coding assistant. You have access to tools to read, search, and modify files in the workspace. Use them to help the user with their coding tasks.
+
+For complex tasks, create an implementation plan first using create_artifact, then wait for approval before coding.
+
+{{INSTRUCTIONS}}
+
+Workspace: {{WORKSPACE_NAME}}
+Files:
+{{FILE_TREE}}`;
 
 	let hasDirty = $derived(globalDirty || models.some((m) => m.dirty));
 
@@ -58,13 +81,15 @@
 			const data = await getModelConfig();
 			const config = data.config || {};
 			globalRows = parseRows(config['*']);
-			globalExpanded = globalRows.length > 0;
+			globalSystemPrompt = config['*']?.params?.system_prompt || '';
+			globalExpanded = globalRows.length > 0 || !!globalSystemPrompt;
 			models = data.models.map((m) => {
 				const mc = config[m.id];
 				return {
 					...m,
 					is_active: mc?.is_active !== false,
 					rows: parseRows(mc),
+					systemPrompt: (mc?.params as any)?.system_prompt || '',
 					dirty: false
 				};
 			});
@@ -89,24 +114,30 @@
 		}
 	}
 
+	function buildParams(rows: ParamRow[], systemPrompt: string): Record<string, unknown> {
+		const params: Record<string, unknown> = {};
+		const rp = rowsToRequestParams(rows);
+		if (Object.keys(rp).length) params.request_params = rp;
+		if (systemPrompt.trim()) params.system_prompt = systemPrompt.trim();
+		return params;
+	}
+
 	async function saveAll() {
 		saving = true;
 		try {
 			const promises: Promise<unknown>[] = [];
 			if (globalDirty) {
-				const rp = rowsToRequestParams(globalRows);
 				promises.push(
 					updateModelConfig('*', {
-						params: Object.keys(rp).length ? { request_params: rp } : {}
+						params: buildParams(globalRows, globalSystemPrompt)
 					})
 				);
 			}
 			for (const model of models) {
 				if (model.dirty) {
-					const rp = rowsToRequestParams(model.rows);
 					promises.push(
 						updateModelConfig(model.id, {
-							params: Object.keys(rp).length ? { request_params: rp } : {}
+							params: buildParams(model.rows, model.systemPrompt)
 						})
 					);
 				}
@@ -123,17 +154,86 @@
 	}
 </script>
 
+{#snippet systemPromptField(value: string, onInput: (v: string) => void, placeholder: string)}
+	<div class="mb-2">
+		<span class="text-[10px] text-gray-400 dark:text-gray-600 uppercase tracking-wide"
+			>{$t('models.systemPrompt')}</span
+		>
+		<textarea
+			class="w-full mt-1 bg-gray-50 dark:bg-white/4 border border-gray-200 dark:border-white/8 rounded-lg px-2.5 py-2 text-[11px] font-mono text-gray-600 dark:text-gray-400 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none resize-y leading-relaxed"
+			rows="6"
+			{placeholder}
+			value={value}
+			oninput={(e) => onInput((e.target as HTMLTextAreaElement).value)}
+			spellcheck="false"
+		></textarea>
+		<div class="flex items-center gap-2 mt-1">
+			<button
+				class="text-[10px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-75"
+				onclick={() => (showVariables = !showVariables)}
+			>
+				{$t('models.templateVariables')} {showVariables ? '▾' : '▸'}
+			</button>
+			{#if value.trim()}
+				<button
+					class="text-[10px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-75"
+					onclick={() => onInput('')}
+				>
+					{$t('models.resetToDefault')}
+				</button>
+			{/if}
+		</div>
+		{#if showVariables}
+			<div
+				class="mt-1 rounded-lg bg-gray-50 dark:bg-white/3 border border-gray-100 dark:border-white/5 px-2.5 py-2"
+			>
+				{#each TEMPLATE_VARIABLES as v}
+					<div class="flex items-baseline gap-2 h-5">
+						<code
+							class="text-[10px] font-mono text-gray-500 dark:text-gray-500 shrink-0 select-all"
+							>{`{{${v.name}}}`}</code
+						>
+						<span class="text-[10px] text-gray-400 dark:text-gray-600 truncate"
+							>{v.desc}</span
+						>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
 {#snippet paramRows(rows: ParamRow[], onInput: () => void, onRemove: (i: number) => void, onAdd: () => void)}
 	<div class="mb-2">
-		<span class="text-[10px] text-gray-400 dark:text-gray-600 uppercase tracking-wide">request params</span>
+		<span class="text-[10px] text-gray-400 dark:text-gray-600 uppercase tracking-wide"
+			>request params</span
+		>
 		{#each rows as row, i}
 			<div class="group/row flex items-center gap-1.5 h-6">
-				<input type="text" placeholder="key" bind:value={row.key} oninput={onInput} autocomplete="off" spellcheck="false"
-					class="w-24 shrink-0 bg-transparent text-[11px] font-mono text-gray-500 dark:text-gray-500 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none" />
-				<input type="text" placeholder="value" bind:value={row.value} oninput={onInput} autocomplete="off" spellcheck="false"
-					class="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-gray-500 dark:text-gray-500 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none" />
-				<button type="button" onclick={() => onRemove(i)}
-					class="shrink-0 text-gray-300 dark:text-gray-700 opacity-0 group-hover/row:opacity-100 hover:text-gray-500 dark:hover:text-gray-400 transition-colors duration-75" aria-label="Remove">
+				<input
+					type="text"
+					placeholder="key"
+					bind:value={row.key}
+					oninput={onInput}
+					autocomplete="off"
+					spellcheck="false"
+					class="w-24 shrink-0 bg-transparent text-[11px] font-mono text-gray-500 dark:text-gray-500 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none"
+				/>
+				<input
+					type="text"
+					placeholder="value"
+					bind:value={row.value}
+					oninput={onInput}
+					autocomplete="off"
+					spellcheck="false"
+					class="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-gray-500 dark:text-gray-500 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none"
+				/>
+				<button
+					type="button"
+					onclick={() => onRemove(i)}
+					class="shrink-0 text-gray-300 dark:text-gray-700 opacity-0 group-hover/row:opacity-100 hover:text-gray-500 dark:hover:text-gray-400 transition-colors duration-75"
+					aria-label="Remove"
+				>
 					<Icon name="xmark" size={8} />
 				</button>
 			</div>
@@ -149,30 +249,56 @@
 {/snippet}
 
 <div class="flex flex-col h-full">
-	<h2 class="text-sm font-medium text-gray-900 dark:text-white mb-4 shrink-0">{$t('admin.models')}</h2>
-
 	{#if loading}
 		<div class="flex justify-center py-8"><Spinner size={16} /></div>
 	{:else}
 		<div class="flex-1 min-h-0 overflow-y-auto">
+			<h2 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+				{$t('admin.models')}
+			</h2>
 			<!-- Global defaults -->
 			<button
 				class="group flex items-center gap-2 w-full h-7 text-left"
 				onclick={() => (globalExpanded = !globalExpanded)}
 			>
-				<span class="flex-1 text-[13px] text-gray-500 dark:text-gray-400">{$t('models.defaults')}</span>
-				{#if globalRows.filter((r) => r.key.trim()).length > 0}
-					<span class="text-[10px] text-gray-400 dark:text-gray-600">{globalRows.filter((r) => r.key.trim()).length}</span>
+				<span class="flex-1 text-[13px] text-gray-500 dark:text-gray-400"
+					>{$t('models.defaults')}</span
+				>
+				{#if globalRows.filter((r) => r.key.trim()).length > 0 || globalSystemPrompt.trim()}
+					<span class="text-[10px] text-gray-400 dark:text-gray-600">
+						{#if globalSystemPrompt.trim()}prompt{/if}
+						{#if globalRows.filter((r) => r.key.trim()).length > 0}
+							{globalRows.filter((r) => r.key.trim()).length} params
+						{/if}
+					</span>
 				{/if}
-				<Icon name={globalExpanded ? 'chevron-down' : 'chevron-right'} size={10} class="shrink-0 text-gray-300 dark:text-gray-700" />
+				<Icon
+					name={globalExpanded ? 'chevron-down' : 'chevron-right'}
+					size={10}
+					class="shrink-0 text-gray-300 dark:text-gray-700"
+				/>
 			</button>
 
 			{#if globalExpanded}
+				{@render systemPromptField(
+					globalSystemPrompt,
+					(v) => {
+						globalSystemPrompt = v;
+						globalDirty = true;
+					},
+					DEFAULT_PROMPT_PLACEHOLDER
+				)}
 				{@render paramRows(
 					globalRows,
 					() => (globalDirty = true),
-					(i) => { globalRows = globalRows.filter((_, idx) => idx !== i); globalDirty = true; },
-					() => { globalRows = [...globalRows, { key: '', value: '' }]; globalDirty = true; }
+					(i) => {
+						globalRows = globalRows.filter((_, idx) => idx !== i);
+						globalDirty = true;
+					},
+					() => {
+						globalRows = [...globalRows, { key: '', value: '' }];
+						globalDirty = true;
+					}
 				)}
 			{/if}
 
@@ -182,34 +308,65 @@
 					class="group flex items-center gap-2 w-full h-7 text-left"
 					onclick={() => (selectedId = selectedId === model.id ? null : model.id)}
 				>
-					<span class="flex-1 text-[13px] truncate {model.is_active ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'}">
+					<span
+						class="flex-1 text-[13px] truncate {model.is_active
+							? 'text-gray-700 dark:text-gray-300'
+							: 'text-gray-400 dark:text-gray-600'}"
+					>
 						{model.name}
 					</span>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<span
 						class="relative w-6 h-3.5 rounded-full shrink-0 cursor-pointer transition-colors duration-150
 							{model.is_active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}"
-						role="switch" tabindex="-1" aria-checked={model.is_active}
+						role="switch"
+						tabindex="-1"
+						aria-checked={model.is_active}
 						onclick={(e) => toggleModel(e, model)}
-						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleModel(e, model); } }}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								toggleModel(e, model);
+							}
+						}}
 					>
-						<span class="absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all duration-150
-							{model.is_active ? 'left-3 bg-white dark:bg-gray-900' : 'left-0.5 bg-white dark:bg-gray-500'}"></span>
+						<span
+							class="absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all duration-150
+							{model.is_active
+								? 'left-3 bg-white dark:bg-gray-900'
+								: 'left-0.5 bg-white dark:bg-gray-500'}"
+						></span>
 					</span>
 				</button>
 
 				{#if selectedId === model.id}
+					{@render systemPromptField(
+						model.systemPrompt,
+						(v) => {
+							model.systemPrompt = v;
+							model.dirty = true;
+						},
+						$t('models.systemPromptInherited')
+					)}
 					{@render paramRows(
 						model.rows,
 						() => (model.dirty = true),
-						(i) => { model.rows = model.rows.filter((_, idx) => idx !== i); model.dirty = true; },
-						() => { model.rows = [...model.rows, { key: '', value: '' }]; model.dirty = true; }
+						(i) => {
+							model.rows = model.rows.filter((_, idx) => idx !== i);
+							model.dirty = true;
+						},
+						() => {
+							model.rows = [...model.rows, { key: '', value: '' }];
+							model.dirty = true;
+						}
 					)}
 				{/if}
 			{/each}
 
 			{#if models.length === 0}
-				<p class="text-[13px] text-gray-400 dark:text-gray-600 py-4">{$t('models.noModels')}</p>
+				<p class="text-[13px] text-gray-400 dark:text-gray-600 py-4">
+					{$t('models.noModels')}
+				</p>
 			{/if}
 		</div>
 
@@ -223,5 +380,3 @@
 		</div>
 	{/if}
 </div>
-
-

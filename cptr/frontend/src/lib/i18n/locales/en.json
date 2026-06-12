@@ -217,8 +217,11 @@
 	"connections.baseUrl": "Base URL",
 	"connections.prefixId": "Prefix ID",
 	"connections.models": "Models (comma-separated, optional)",
+	"connections.modelsHint": "Leave blank to auto-discover from provider.",
 	"connections.cancel": "Cancel",
 	"connections.add": "Add",
+	"connections.edit": "Edit Connection",
+	"connections.updated": "Connection updated",
 	"connections.verify": "Verify",
 
 	"bar.newChat": "New Chat",
@@ -288,5 +291,15 @@
 	"models.savedDefaults": "Saved global defaults",
 	"models.savedParams": "Saved params for {{name}}",
 	"models.add": "+ Add",
-	"models.save": "Save"
+	"models.save": "Save",
+
+	"models.systemPrompt": "System Prompt",
+	"models.systemPromptHint": "Default instructions sent to the model. Use {{VARIABLES}} for dynamic content.",
+	"models.systemPromptInherited": "Inherits global default",
+	"models.templateVariables": "Variables",
+	"models.resetToDefault": "Reset",
+
+	"update.available": "A new version (v{{version}}) is available.",
+	"update.viewRelease": "View release notes →",
+	"update.updateAvailable": "Update available: v{{version}}"
 }

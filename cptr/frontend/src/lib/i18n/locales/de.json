@@ -1,6 +1,5 @@
 {
 	"app.tagline": "Dein Computer, von überall.",
-
 	"auth.createAccountHint": "Erstelle ein Konto, um loszulegen.",
 	"auth.signInSystemHint": "Melde dich mit deinem Systemkonto an.",
 	"auth.setup": "Einrichtung",
@@ -20,7 +19,6 @@
 	"auth.minChars": "Mindestens 6 Zeichen",
 	"auth.connectionFailed": "Verbindung fehlgeschlagen",
 	"auth.accountPending": "Konto erstellt. Warte auf die Freigabe durch den Administrator.",
-
 	"sidebar.workspaces": "Arbeitsbereiche",
 	"sidebar.addWorkspace": "Arbeitsbereich hinzufügen",
 	"sidebar.collapse": "Einklappen",
@@ -31,14 +29,13 @@
 	"sidebar.remove": "Entfernen",
 	"sidebar.workspaceOptions": "Arbeitsbereich-Optionen",
 	"sidebar.closeSidebar": "Seitenleiste schließen",
-
+	"sidebar.showMore": "Mehr anzeigen",
 	"bar.newFile": "Neue Datei",
 	"bar.newTerminal": "Neues Terminal",
 	"bar.closeTab": "Tab schließen",
 	"bar.new": "Neu...",
 	"bar.sidebar": "Seitenleiste",
 	"bar.toggleSidebar": "Seitenleiste umschalten",
-
 	"files.filter": "Filtern...",
 	"files.refresh": "Aktualisieren",
 	"files.sort": "Sortieren",
@@ -73,10 +70,16 @@
 	"files.showHidden": "Dotfiles anzeigen",
 	"files.hideHidden": "Dotfiles ausblenden",
 	"files.failedToLoad": "Verzeichnis konnte nicht geladen werden",
+	"search.placeholder": "Suchen...",
+	"search.search": "Suche",
+	"search.chats": "Chats",
+	"search.files": "Dateien",
+	"search.noResults": "Keine Ergebnisse gefunden",
+	"search.recentChats": "Letzte Chats",
+	"search.noRecentChats": "Keine letzten Chats",
 
 	"quickOpen.searchFiles": "Dateien suchen...",
 	"quickOpen.noFiles": "Keine Dateien gefunden",
-
 	"settings.back": "Zurück",
 	"settings.general": "Allgemein",
 	"settings.account": "Konto",
@@ -84,18 +87,15 @@
 	"settings.save": "Speichern",
 	"settings.saved": "Gespeichert",
 	"settings.saving": "Speichern…",
-
 	"general.title": "Allgemein",
 	"general.theme": "Design",
 	"general.light": "Hell",
 	"general.dark": "Dunkel",
 	"general.system": "System",
 	"general.language": "Sprache",
-
 	"general.tools": "Tools",
 	"general.autoApproveTools": "Alle Tool-Aufrufe automatisch genehmigen",
 	"general.autoApproveToolsDesc": "Tool-Aufrufe (Schreiben, Ausführen usw.) automatisch ohne Bestätigung erlauben",
-
 	"account.title": "Konto",
 	"account.displayName": "Anzeigename",
 	"account.displayNamePlaceholder": "Anzeigename eingeben",
@@ -113,11 +113,9 @@
 	"account.uploadFailed": "Hochladen fehlgeschlagen",
 	"account.failedToUpdate": "Aktualisierung fehlgeschlagen",
 	"account.failedToRemoveAvatar": "Avatar konnte nicht entfernt werden",
-
 	"about.title": "Über",
 	"about.license": "Lizenz",
 	"about.createdBy": "Erstellt von Tim Baek, hergestellt auf der Erde",
-
 	"git.changes": "Änderungen",
 	"git.history": "Verlauf",
 	"git.fetch": "Abrufen",
@@ -160,7 +158,6 @@
 	"git.discard": "Verwerfen",
 	"git.copyFilePath": "Dateipfad kopieren",
 	"git.copyRelativePath": "Relativen Pfad kopieren",
-
 	"admin.users": "Benutzer",
 	"admin.settings": "Einstellungen",
 	"admin.noUsers": "Keine Benutzer",
@@ -191,9 +188,7 @@
 	"admin.delete": "Löschen",
 	"admin.usernameRequired": "Benutzername erforderlich",
 	"admin.minCharsPassword": "Mindestens 6 Zeichen",
-
 	"admin.connections": "Verbindungen",
-
 	"connections.loadError": "Verbindungen konnten nicht geladen werden",
 	"connections.fieldsRequired": "Basis-URL und API-Schlüssel erforderlich",
 	"connections.added": "Verbindung hinzugefügt",
@@ -208,18 +203,18 @@
 	"connections.baseUrl": "Basis-URL",
 	"connections.prefixId": "Präfix-ID",
 	"connections.models": "Modelle (durch Kommas getrennt, optional)",
+	"connections.modelsHint": "Leer lassen, um automatisch vom Anbieter zu erkennen.",
 	"connections.cancel": "Abbrechen",
 	"connections.add": "Hinzufügen",
+	"connections.edit": "Verbindung bearbeiten",
+	"connections.updated": "Verbindung aktualisiert",
 	"connections.verify": "Prüfen",
-
 	"bar.newChat": "Neuer Chat",
-
 	"home.start": "Start",
 	"home.openFolder": "Ordner öffnen...",
 	"home.recent": "Zuletzt verwendet",
 	"home.folders": "Ordner",
 	"home.chatComingSoon": "Chat (demnächst verfügbar)",
-
 	"directory.cancel": "Abbrechen",
 	"directory.open": "\"{{name}}\" öffnen",
 	"directory.hidden": "Versteckte",
@@ -227,24 +222,20 @@
 	"directory.goBack": "Zurück",
 	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Erneut versuchen",
-
 	"saveDialog.fileNamePlaceholder": "Dateiname…",
 	"saveDialog.emptyFolder": "Leerer Ordner",
 	"saveDialog.cancel": "Abbrechen",
 	"saveDialog.save": "Speichern",
 	"saveDialog.hidden": "Versteckte",
 	"saveDialog.retry": "Erneut versuchen",
-
 	"port.preview": "Vorschau",
 	"port.via": "über {{name}}",
-
 	"system.title": "System",
 	"system.cpu": "CPU",
 	"system.memory": "Speicher",
 	"system.disk": "Festplatte",
 	"system.cores": "{{count}} Kerne",
 	"system.process": "PROZESS",
-
 	"admin.web": "Web",
 	"admin.webEnabled": "Webzugriff aktivieren",
 	"admin.webEnabledHint": "KI kann das Web durchsuchen und URLs abrufen.",
@@ -265,5 +256,27 @@
 	"admin.webCcBaseUrl": "Basis-URL",
 	"admin.webCcKey": "API-Schlüssel",
 	"admin.webCcModel": "Modell",
-	"admin.webCcHint": "Beliebiger OpenAI-kompatibler Endpunkt (z. B. Perplexity Sonar, LiteLLM-Proxy)"
+	"admin.webCcHint": "Beliebiger OpenAI-kompatibler Endpunkt (z. B. Perplexity Sonar, LiteLLM-Proxy)",
+	"admin.models": "Modelle",
+	"models.defaults": "Standardwerte",
+	"models.noDefaults": "Keine globalen Standardwerte",
+	"models.noParams": "Keine Parameter",
+	"models.noModels": "Keine Modelle verfügbar",
+	"models.addConnection": "Zuerst eine Verbindung hinzufügen.",
+	"models.failedToLoad": "Modellkonfiguration konnte nicht geladen werden",
+	"models.failedToToggle": "Modell konnte nicht umgeschaltet werden",
+	"models.failedToSave": "Speichern fehlgeschlagen",
+	"models.savedDefaults": "Globale Standardwerte gespeichert",
+	"models.savedParams": "Parameter für {{name}} gespeichert",
+	"models.add": "+ Hinzufügen",
+	"models.save": "Speichern",
+	"models.systemPrompt": "System-Prompt",
+	"models.systemPromptHint": "Standardanweisungen für das Modell. Verwenden Sie {{VARIABLES}} für dynamische Inhalte.",
+	"models.systemPromptInherited": "Erbt den globalen Standard",
+	"models.templateVariables": "Variablen",
+	"models.resetToDefault": "Zurücksetzen",
+
+	"update.available": "Eine neue Version (v{{version}}) ist verfügbar.",
+	"update.viewRelease": "Versionshinweise ansehen →",
+	"update.updateAvailable": "Update verfügbar: v{{version}}"
 }

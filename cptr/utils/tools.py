@@ -1,8 +1,12 @@
 """Tool definitions: plain functions with schema introspection.
 
 Tools are real async functions. Schemas are auto-generated from
-type hints + docstrings via inspect. The LLM never sees the
-`workspace` parameter; it's injected by the task runner.
+type hints + docstrings via inspect. Keyword-only parameters are
+never exposed to the LLM — they carry injected execution context:
+
+  - Legacy tools use ``*, workspace: str`` (injected by execute_tool).
+  - Context-aware tools use ``*, __context__: dict`` containing
+    workspace, user_id, and model_id (injected by execute_tool).
 """
 
 from __future__ import annotations
@@ -694,9 +698,8 @@ async def create_automation(
     name: str,
     prompt: str,
     rrule: str,
-    model_id: str = "",
     *,
-    workspace: str,
+    __context__: dict,
 ) -> str:
     """Create a scheduled automation that runs a prompt on a recurring or one-time schedule.
     The rrule parameter must be a valid iCalendar RRULE string. Common examples:
@@ -708,8 +711,11 @@ async def create_automation(
     :param name: A short descriptive name for the automation.
     :param prompt: The instructions/prompt to execute on each run.
     :param rrule: An iCalendar RRULE string defining the schedule.
-    :param model_id: Model to use (optional, defaults to the current chat model).
     """
+    workspace = __context__["workspace"]
+    user_id = __context__["user_id"]
+    model_id = __context__.get("model_id", "")
+
     try:
         import time
         from cptr.models.automations import Automation as AutomationModel
@@ -721,22 +727,14 @@ async def create_automation(
         except ValueError as e:
             return json.dumps({"error": f"Invalid schedule: {e}"})
 
-        # If no model_id provided, try to detect from admin config
         if not model_id:
-            try:
-                from cptr.models.config import AdminConfig
-                cfg = await AdminConfig.get()
-                model_id = (cfg.meta or {}).get("default_model", "") if cfg else ""
-            except Exception:
-                pass
-        if not model_id:
-            return json.dumps({"error": "Could not detect model. Please provide model_id."})
+            return json.dumps({"error": "Could not detect model from current chat context."})
 
         now_ns = int(time.time() * 1_000_000_000)
         nxt = next_run_ns(rrule)
 
         automation = await AutomationModel.create(
-            user_id="default",
+            user_id=user_id,
             name=name,
             prompt=prompt,
             model_id=model_id,
@@ -762,18 +760,21 @@ async def list_automations(
     status: str = "",
     count: int = 10,
     *,
-    workspace: str,
+    __context__: dict,
 ) -> str:
     """List scheduled automations for the current workspace.
     :param status: Filter by status: "active", "paused", or empty for all.
     :param count: Maximum number of automations to return (default: 10).
     """
+    workspace = __context__["workspace"]
+    user_id = __context__["user_id"]
+
     try:
         from cptr.models.automations import Automation as AutomationModel
         from cptr.utils.automations import next_n_runs_ns
 
         items, total = await AutomationModel.get_by_workspace(
-            user_id="default",
+            user_id=user_id,
             workspace=workspace or None,
             status=status or None,
             limit=count,
@@ -802,7 +803,7 @@ async def update_automation(
     rrule: str = "",
     model_id: str = "",
     *,
-    workspace: str,
+    __context__: dict,
 ) -> str:
     """Update an existing automation. Only provided fields are changed.
     :param automation_id: The ID of the automation to update.
@@ -857,7 +858,7 @@ async def update_automation(
 async def toggle_automation(
     automation_id: str,
     *,
-    workspace: str,
+    __context__: dict,
 ) -> str:
     """Pause or resume a scheduled automation. If active, it will be paused. If paused, it will be resumed.
     :param automation_id: The ID of the automation to toggle.
@@ -888,7 +889,7 @@ async def toggle_automation(
 async def delete_automation(
     automation_id: str,
     *,
-    workspace: str,
+    __context__: dict,
 ) -> str:
     """Delete a scheduled automation and all its run history.
     :param automation_id: The ID of the automation to delete.
@@ -910,6 +911,34 @@ async def delete_automation(
         return json.dumps({"error": str(e)})
 
 
+# ── Skill tools ─────────────────────────────────────────────
+
+# Track activated skills per session (cleared on import)
+_activated_skills: set[str] = set()
+
+
+async def view_skill(
+    skill_name: str,
+    *,
+    workspace: str,
+) -> str:
+    """Load the full instructions and resource listing for an available skill.
+    :param skill_name: The name of the skill to load (from the <available_skills> catalog).
+    """
+    from cptr.utils.skills import load_skill, format_skill_content
+
+    # Deduplication: if already activated, return short notice
+    if skill_name in _activated_skills:
+        return f"Skill '{skill_name}' is already loaded in this session. Refer to the existing <skill_content> above."
+
+    skill = load_skill(workspace, skill_name)
+    if not skill:
+        return f"Error: skill '{skill_name}' not found. Check <available_skills> for valid names."
+
+    _activated_skills.add(skill_name)
+    return format_skill_content(skill)
+
+
 # ── Registry ────────────────────────────────────────────────
 
 TOOLS: dict[str, dict] = {
@@ -921,6 +950,7 @@ TOOLS: dict[str, dict] = {
     "web_search": {"fn": web_search, "auto": True},
     "read_url": {"fn": read_url, "auto": True},
     "list_automations": {"fn": list_automations, "auto": True},
+    "view_skill": {"fn": view_skill, "auto": True},
     # Write / mutate (require approval unless auto_approve_all)
     "create_file": {"fn": create_file, "auto": False},
     "edit_file": {"fn": edit_file, "auto": False},
@@ -965,7 +995,8 @@ def _fn_to_schema(name: str, fn) -> dict:
     properties: dict[str, dict] = {}
     required: list[str] = []
     for pname, param in sig.parameters.items():
-        if pname == "workspace":
+        # Skip injected context params (keyword-only, never exposed to LLM)
+        if param.kind == inspect.Parameter.KEYWORD_ONLY:
             continue
         ptype = _TYPE_MAP.get(hints.get(pname), "string")  # type: ignore[arg-type]
         prop: dict = {"type": ptype}
@@ -973,10 +1004,7 @@ def _fn_to_schema(name: str, fn) -> dict:
             prop["description"] = param_descs[pname]
         properties[pname] = prop
         # Positional with no default → required
-        if (
-            param.default is inspect.Parameter.empty
-            and param.kind != inspect.Parameter.KEYWORD_ONLY
-        ):
+        if param.default is inspect.Parameter.empty:
             required.append(pname)
     return {
         "name": name,
@@ -994,13 +1022,18 @@ def get_tool_list() -> list[dict]:
     return [_fn_to_schema(name, t["fn"]) for name, t in TOOLS.items()]
 
 
-async def execute_tool(name: str, args: dict, workspace: str) -> str:
-    """Execute a tool by name. Returns output string."""
+async def execute_tool(name: str, args: dict, __context__: dict) -> str:
+    """Execute a tool by name, injecting execution context."""
     info = TOOLS.get(name)
     if not info:
         return f"Error: unknown tool: {name}"
     fn = info["fn"]
     try:
-        return await fn(**args, workspace=workspace)
+        sig = inspect.signature(fn)
+        if "__context__" in sig.parameters:
+            return await fn(**args, __context__=__context__)
+        else:
+            # Legacy tools: inject workspace directly
+            return await fn(**args, workspace=__context__["workspace"])
     except Exception as e:
         return f"Error executing {name}: {e}"
