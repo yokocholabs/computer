@@ -33,19 +33,19 @@
 
 	const isAdmin = $derived($session?.role === 'admin');
 
-	const personalTabs: { id: Tab; label: string; icon: string }[] = [
-		{ id: 'general', label: 'General', icon: 'settings' },
-		{ id: 'keyboard', label: 'Keyboard', icon: 'terminal' },
-		{ id: 'account', label: 'Account', icon: 'user' },
-		{ id: 'about', label: 'About', icon: 'info' }
-	];
+	const personalTabs: { id: Tab; label: string; icon: string }[] = $derived([
+		{ id: 'general', label: $t('settings.general'), icon: 'settings' },
+		{ id: 'keyboard', label: $t('settings.keyboard'), icon: 'terminal' },
+		{ id: 'account', label: $t('settings.account'), icon: 'user' },
+		{ id: 'about', label: $t('settings.about'), icon: 'info' }
+	]);
 
-	const adminTabs: { id: Tab; label: string; icon: string }[] = [
-		{ id: 'users', label: 'Users', icon: 'user' },
-		{ id: 'connections', label: 'Connections', icon: 'plug' },
-		{ id: 'models', label: 'Models', icon: 'cube' },
-		{ id: 'admin_settings', label: 'Configuration', icon: 'shield' }
-	];
+	const adminTabs: { id: Tab; label: string; icon: string }[] = $derived([
+		{ id: 'users', label: $t('admin.users'), icon: 'user' },
+		{ id: 'connections', label: $t('admin.connections'), icon: 'plug' },
+		{ id: 'models', label: $t('admin.models'), icon: 'cube' },
+		{ id: 'admin_settings', label: $t('settings.configuration'), icon: 'shield' }
+	]);
 </script>
 
 <Modal
@@ -80,7 +80,7 @@
 
 			<!-- Admin section -->
 			{#if isAdmin}
-				<span class="hidden md:block text-[10px] text-gray-400 dark:text-gray-600 px-2 mt-2 mb-0.5">Admin</span>
+				<span class="hidden md:block text-[10px] text-gray-400 dark:text-gray-600 px-2 mt-2 mb-0.5">{$t('sidebar.admin')}</span>
 
 				{#each adminTabs as tab}
 					<button
