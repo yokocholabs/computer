@@ -165,7 +165,7 @@
 		...($voiceMemosEnabled
 			? [
 					{
-						label: 'Voice Memo',
+						label: $t('bar.voiceMemo'),
 						icon: 'microphone',
 						shortcut: formatChord($keybindings.voiceMemo),
 						onclick: () => {
@@ -183,12 +183,12 @@
 
 		if (isWideScreen && tab.type === 'file' && tab.filePath && !$splitActive) {
 			items.push({
-				label: 'Split Right',
+				label: $t('bar.splitRight'),
 				icon: 'split-horizontal',
 				onclick: () => openInSplit(tab.filePath!, 'horizontal')
 			});
 			items.push({
-				label: 'Split Down',
+				label: $t('bar.splitDown'),
 				icon: 'split-vertical',
 				onclick: () => openInSplit(tab.filePath!, 'vertical')
 			});
@@ -210,7 +210,7 @@
 		const direction = $activeWorkspace?.splitDirection ?? 'horizontal';
 		return [
 			{
-				label: 'Split Right',
+				label: $t('bar.splitRight'),
 				icon: 'split-horizontal',
 				active: direction === 'horizontal',
 				onclick: () => {
@@ -219,7 +219,7 @@
 				}
 			},
 			{
-				label: 'Split Down',
+				label: $t('bar.splitDown'),
 				icon: 'split-vertical',
 				active: direction === 'vertical',
 				onclick: () => {
@@ -309,7 +309,7 @@
 						<Icon name={tabIconName(tab)} size={14} />
 					{/if}
 					<span class="max-w-30 overflow-hidden text-ellipsis">
-						{tab.type === 'files' ? ($activeWorkspace?.name ?? 'Files') : tab.label}
+						{tab.type === 'files' ? ($activeWorkspace?.name ?? $t('bar.files')) : tab.label}
 					</span>
 					{#if tab.unsaved}<span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>{/if}
 					{#if !tab.permanent}

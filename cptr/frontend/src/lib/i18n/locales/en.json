@@ -579,6 +579,41 @@
 	"a11y.closePane": "Close pane",
 	"a11y.refreshChanges": "Refresh changes",
 
-	"keyboard.clickToRebind": "Click to rebind"
+	"keyboard.clickToRebind": "Click to rebind",
+
+	"bar.splitRight": "Split Right",
+	"bar.splitDown": "Split Down",
+	"bar.voiceMemo": "Voice Memo",
+	"bar.files": "Files",
+
+	"messaging.noBots": "No messaging bots configured.",
+	"messaging.failedToLoad": "Failed to load bots",
+	"messaging.failedToToggle": "Failed to toggle bot",
+	"messaging.failedToDelete": "Failed to delete bot",
+	"messaging.editBot": "Edit Bot",
+	"messaging.addBot": "Add Bot",
+	"messaging.name": "Name",
+	"messaging.platform": "Platform",
+	"messaging.token": "Token",
+	"messaging.tokenKeep": "Leave empty to keep current",
+	"messaging.tokenPaste": "Paste token",
+	"messaging.verify": "Verify",
+	"messaging.allowedSenders": "Allowed senders",
+	"messaging.allowedSendersHint": "Comma-separated user IDs. Leave empty to allow all.",
+	"messaging.save": "Save →",
+	"messaging.add": "Add →",
+	"messaging.failedToSave": "Failed to save",
+
+	"messaging.hint.telegram": "Create a bot via @BotFather",
+	"messaging.hint.discord": "Create a bot in the Developer Portal",
+	"messaging.hint.slack": "Bot Token | App Token (pipe-separated)",
+	"messaging.hint.whatsapp": "Access Token | Phone Number ID (pipe-separated)",
+	"messaging.hint.signal": "signal-cli URL | Phone Number (pipe-separated)",
+
+	"admin.gateway.keys": "Keys",
+	"admin.gateway.copy": "Copy",
+	"admin.gateway.baseUrl": "Base URL:",
+	"admin.gateway.apiKey": "API Key:",
+	"admin.gateway.headers": "Headers:"
 }
 

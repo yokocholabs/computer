@@ -52,7 +52,7 @@
 		{ id: 'models', label: $t('admin.models'), icon: 'cube' },
 		{ id: 'messaging', label: $t('admin.messaging'), icon: 'chat-bubble' },
 		{ id: 'gateway', label: $t('admin.gateway.tab'), icon: 'gateway' },
-		{ id: 'audio', label: 'Audio', icon: 'microphone' },
+		{ id: 'audio', label: $t('admin.audio.title'), icon: 'microphone' },
 		{ id: 'web', label: $t('admin.web'), icon: 'globe' }
 	]);
 </script>
