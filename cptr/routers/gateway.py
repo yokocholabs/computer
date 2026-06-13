@@ -40,6 +40,8 @@ router = APIRouter(prefix="/v1", tags=["gateway"])
 # Headers that clients can send with the chat ID.
 CHAT_ID_HEADER = "X-Chat-Id"
 OWUI_CHAT_ID_HEADER = "X-OpenWebUI-Chat-Id"
+OWUI_MESSAGE_ID_HEADER = "X-OpenWebUI-Message-Id"
+OWUI_TASK_HEADER = "X-OpenWebUI-Task"
 
 
 # ── API key management ───────────────────────────────────────
@@ -67,7 +69,7 @@ def _format_tool_call(item: dict) -> str | None:
     return f"\n\n`{item.get('name', 'tool')}`\n\n"
 
 
-async def _validate_bearer(request: Request) -> str:
+async def _authenticate(request: Request) -> str:
     """Validate Bearer token from Authorization header.  Returns user_id."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -145,67 +147,58 @@ class ChatCompletionRequest(BaseModel):
     temperature: float | None = None
     max_tokens: int | None = None
     top_p: float | None = None
+    # OWUI metadata for message tree mapping
+    id: str | None = None  # OWUI assistant message ID
+    parent_id: str | None = None  # OWUI user message's parentId
+    user_message: dict | None = None  # OWUI user message object
+
+    model_config = {"extra": "allow"}  # Accept any additional fields
 
 
 @router.post("/chat/completions")
 async def create_chat_completion(request: Request, body: ChatCompletionRequest):
     """Run the cptr agentic loop and stream results as OpenAI SSE."""
-    user_id = await _validate_bearer(request)
+    user_id = await _authenticate(request)
 
     # 1. Resolve model → workspace path
     workspace = await _resolve_workspace(user_id, body.model)
 
     # 2. Resolve the underlying LLM connection for this workspace
-    connection, bare_model, model_id = await _resolve_model_connection(workspace)
+    connection, bare_model, model_id = await _resolve_model(workspace)
+
+    # Intercept OWUI utility tasks (follow-ups, title gen, tags gen).
+    # These should go directly to the LLM, not through the agentic loop.
+    utility_result = await _intercept_task(
+        request, body, connection, bare_model, model_id
+    )
+    if utility_result is not None:
+        return utility_result
 
     # 3. Session mapping: find or create a cptr chat
     client_chat_id = request.headers.get(CHAT_ID_HEADER) or request.headers.get(OWUI_CHAT_ID_HEADER)
-    chat_id = await _find_or_create_chat(
+    chat_id = await _ensure_chat(
         user_id, workspace, client_chat_id, body.messages, model_id
     )
 
-    # 4. Create user + assistant messages
-    user_content = ""
-    if body.messages:
-        last_user = next(
-            (m for m in reversed(body.messages) if m.get("role") == "user"),
-            None,
-        )
-        user_content = (last_user.get("content", "") if last_user else "") or ""
-
-    # Get parent (latest message in the chat)
-    chat = await Chat.get_by_id(chat_id)
-    parent_id = chat.current_message_id if chat else None
-
-    user_msg = await ChatMessage.create(
+    # 4. Resolve message tree — map OWUI message IDs to cptr message IDs
+    #    Supports: normal messages, regeneration (sibling), edit (fork)
+    user_msg, assistant_msg = await _resolve_messages(
+        request=request,
         chat_id=chat_id,
-        role="user",
-        content=user_content,
-        parent_id=parent_id,
-        created_at=now_ms(),
+        model_id=model_id,
+        messages=body.messages,
     )
 
-    assistant_msg = await ChatMessage.create(
-        chat_id=chat_id,
-        role="assistant",
-        content="",
-        parent_id=user_msg.id,
-        model=model_id,
-        done=False,
-        created_at=now_ms(),
-    )
     await Chat.update_current_message(chat_id, assistant_msg.id, now_ms())
 
     # Export JSON so cptr sidebar sees it immediately
     from cptr.utils.chat_export import export_chat_to_file
-
     await export_chat_to_file(chat_id)
 
     # 5. Create output queue and start the agentic loop
     output_queue: asyncio.Queue = asyncio.Queue()
 
     from cptr.utils.chat_task import start_task
-
     start_task(
         message_id=assistant_msg.id,
         chat_id=chat_id,
@@ -222,7 +215,7 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
 
     if body.stream:
         return StreamingResponse(
-            _sse_generator(output_queue, completion_id, created, body.model),
+            _stream(output_queue, completion_id, created, body.model),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -232,19 +225,17 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
         )
     else:
         # Non-streaming: collect all text, return as single response
-        full_text = await _collect_response(output_queue)
+        full_text = await _collect(output_queue)
         return {
             "id": completion_id,
             "object": "chat.completion",
             "created": created,
             "model": body.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": full_text},
-                    "finish_reason": "stop",
-                }
-            ],
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": full_text},
+                "finish_reason": "stop",
+            }],
             "usage": {
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
@@ -253,10 +244,119 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
         }
 
 
+# ── Message tree resolution ──────────────────────────────────
+
+
+async def _resolve_messages(
+    request: Request,
+    chat_id: str,
+    model_id: str,
+    messages: list[dict],
+) -> tuple:
+    """Create user + assistant messages with proper tree structure.
+
+    Uses OWUI headers (set via custom header templates) to map message IDs
+    and create proper branches for regeneration and edits.
+
+    Headers used:
+      X-OpenWebUI-Message-Id        → OWUI assistant message ID
+      X-OpenWebUI-User-Message-Id   → OWUI user message ID
+      X-OpenWebUI-User-Message-Parent-Id → OWUI user message's parentId
+
+    Returns (user_msg, assistant_msg).
+    """
+    chat = await Chat.get_by_id(chat_id)
+    meta = (chat.meta or {}) if chat else {}
+    msg_map: dict = dict(meta.get("owui_msg_map", {}))
+
+    # Extract OWUI message IDs from headers
+    # Distinguish "header not set" (no OWUI config) from "header set to empty" (root-level msg)
+    owui_asst_id = (request.headers.get("X-OpenWebUI-Message-Id") or "").strip() or None
+    owui_user_id = (request.headers.get("X-OpenWebUI-User-Message-Id") or "").strip() or None
+    _raw_parent = request.headers.get("X-OpenWebUI-User-Message-Parent-Id")
+    has_parent_header = _raw_parent is not None
+    owui_user_parent_id = (_raw_parent or "").strip() or None
+
+    # Extract user content
+    user_content = ""
+    if messages:
+        last_user = next(
+            (m for m in reversed(messages) if m.get("role") == "user"),
+            None,
+        )
+        user_content = (last_user.get("content", "") if last_user else "") or ""
+
+    # Determine parent for the user message
+    cptr_parent_id = chat.current_message_id if chat else None
+
+    if owui_user_id and owui_user_id in msg_map:
+        # User message already exists in cptr (regeneration case)
+        existing_user_msg = await ChatMessage.get_by_id(msg_map[owui_user_id])
+        if existing_user_msg:
+            # Skip creating user msg — just create a sibling assistant
+            assistant_msg = await ChatMessage.create(
+                chat_id=chat_id,
+                role="assistant",
+                content="",
+                parent_id=existing_user_msg.id,
+                model=model_id,
+                done=False,
+                created_at=now_ms(),
+            )
+            # Update map
+            if owui_asst_id:
+                msg_map[owui_asst_id] = assistant_msg.id
+                meta["owui_msg_map"] = msg_map
+                await Chat.update_meta(chat_id, meta, now_ms())
+
+            return existing_user_msg, assistant_msg
+
+    # Resolve parent for edited/new user messages
+    if owui_user_parent_id and owui_user_parent_id in msg_map:
+        # Edit/fork case: parent is a known OWUI message → resolve to cptr ID
+        cptr_parent_id = msg_map[owui_user_parent_id]
+    elif has_parent_header and not owui_user_parent_id:
+        # Header present but empty → editing root-level message (first msg has no parent)
+        # Create as root sibling, not child of current_message_id
+        cptr_parent_id = None
+
+    # Create user message
+    user_msg = await ChatMessage.create(
+        chat_id=chat_id,
+        role="user",
+        content=user_content,
+        parent_id=cptr_parent_id,
+        created_at=now_ms(),
+    )
+
+    # Create assistant message
+    assistant_msg = await ChatMessage.create(
+        chat_id=chat_id,
+        role="assistant",
+        content="",
+        parent_id=user_msg.id,
+        model=model_id,
+        done=False,
+        created_at=now_ms(),
+    )
+
+    # Update the message ID map
+    if owui_user_id:
+        msg_map[owui_user_id] = user_msg.id
+    if owui_asst_id:
+        msg_map[owui_asst_id] = assistant_msg.id
+
+    if msg_map:
+        meta["owui_msg_map"] = msg_map
+        await Chat.update_meta(chat_id, meta, now_ms())
+
+    return user_msg, assistant_msg
+
+
 # ── SSE generator ────────────────────────────────────────────
 
 
-async def _sse_generator(
+async def _stream(
     queue: asyncio.Queue,
     completion_id: str,
     created: int,
@@ -327,7 +427,7 @@ async def _sse_generator(
         # Other output types are persisted in cptr's DB and visible in its sidebar.
 
 
-async def _collect_response(queue: asyncio.Queue) -> str:
+async def _collect(queue: asyncio.Queue) -> str:
     """Collect all text from the queue for non-streaming mode."""
     parts = []
     while True:
@@ -350,7 +450,103 @@ async def _collect_response(queue: asyncio.Queue) -> str:
     return "".join(parts)
 
 
-# ── Workspace resolution ─────────────────────────────────────
+# ── Utility task interception ────────────────────────────────
+
+# Patterns that identify OWUI background task prompts.
+# These should be proxied directly to the LLM, not through the agentic loop.
+_UTILITY_PATTERNS = [
+    "follow_ups",  # follow-up generation
+    "follow-up questions",
+    "Generate a concise",  # title generation
+    "generate a brief 2-3 word",
+    "Generate 1-3 broad tags",  # tags generation
+    "tags_generation",
+]
+
+
+async def _intercept_task(
+    request: Request,
+    body: ChatCompletionRequest,
+    connection: dict,
+    bare_model: str,
+    model_id: str,
+) -> dict | None:
+    """Detect OWUI utility tasks and proxy them directly to the LLM.
+
+    Detection priority:
+      1. X-OpenWebUI-Task header (set via custom header template {{TASK}})
+      2. Message content pattern matching (fallback)
+
+    Returns a response dict if this is a utility task, or None if it should
+    go through the normal agentic loop.
+    """
+    # 1. Header-based detection (reliable, requires OWUI config)
+    task_header = request.headers.get(OWUI_TASK_HEADER, "").strip()
+    if task_header:
+        logger.info("[gateway] Detected utility task via header: %s", task_header)
+        return await _proxy_to_llm(body, connection, bare_model)
+
+    # 2. Message content pattern matching (fallback)
+    if not body.messages:
+        return None
+
+    last_msg = body.messages[-1]
+    content = last_msg.get("content", "") if isinstance(last_msg, dict) else ""
+    if not isinstance(content, str):
+        return None
+
+    is_utility = any(pattern in content for pattern in _UTILITY_PATTERNS)
+    if not is_utility:
+        return None
+
+    logger.info("[gateway] Detected utility task via content matching")
+    return await _proxy_to_llm(body, connection, bare_model)
+
+
+async def _proxy_to_llm(
+    body: ChatCompletionRequest,
+    connection: dict,
+    bare_model: str,
+) -> dict:
+    """Proxy a utility task directly to the underlying LLM."""
+    from cptr.utils.ai import chat_completion
+    from cptr.utils.config import _get_jwt_secret
+    from cptr.utils.crypto import decrypt_key
+
+    provider = connection["provider"]
+    api_key = decrypt_key(connection.get("api_key", ""), _get_jwt_secret())
+    base_url = connection.get("base_url") or None
+
+    try:
+        result = await chat_completion(
+            provider=provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=bare_model,
+            messages=body.messages,
+            max_tokens=200,
+        )
+    except Exception as e:
+        logger.warning("[gateway] Utility task LLM call failed: %s", e)
+        result = ""
+
+    completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+    return {
+        "id": completion_id,
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": body.model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": result or ""},
+            "finish_reason": "stop",
+        }],
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
+    }
 
 
 async def _resolve_workspace(user_id: str, model_id: str) -> str:
@@ -386,7 +582,7 @@ async def _resolve_workspace(user_id: str, model_id: str) -> str:
 # ── Model connection resolution ──────────────────────────────
 
 
-async def _resolve_model_connection(workspace: str) -> tuple[dict, str, str]:
+async def _resolve_model(workspace: str) -> tuple[dict, str, str]:
     """Find a model connection to use for the agentic loop.
 
     Priority:
@@ -443,7 +639,7 @@ async def _resolve_model_connection(workspace: str) -> tuple[dict, str, str]:
 # ── Session mapping ──────────────────────────────────────────
 
 
-async def _find_or_create_chat(
+async def _ensure_chat(
     user_id: str,
     workspace: str,
     client_chat_id: str | None,

@@ -30,7 +30,11 @@
 	/** Newly created key, shown once, then hidden */
 	let revealedKey = $state('');
 	const openWebUIHeaders = `{
-  "X-OpenWebUI-Chat-Id": "{{CHAT_ID}}"
+  "X-OpenWebUI-Chat-Id": "{{CHAT_ID}}",
+  "X-OpenWebUI-Message-Id": "{{MESSAGE_ID}}",
+  "X-OpenWebUI-User-Message-Id": "{{USER_MESSAGE_ID}}",
+  "X-OpenWebUI-User-Message-Parent-Id": "{{USER_MESSAGE_PARENT_ID}}",
+  "X-OpenWebUI-Task": "{{TASK}}"
 }`;
 
 	async function loadSettings() {
