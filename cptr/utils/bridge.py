@@ -16,7 +16,7 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,16 @@ TYPING_INTERVAL = 5.0
 
 
 @dataclass
+class Attachment:
+    """A file attached to a message."""
+
+    type: str  # "image", "audio", "document"
+    filename: str  # Original filename or generated one
+    data: bytes  # Raw file content
+    mime_type: str  # e.g. "image/jpeg", "audio/ogg"
+
+
+@dataclass
 class MessageEvent:
     """Normalized inbound message from any platform."""
 
@@ -40,6 +50,7 @@ class MessageEvent:
     sender_id: str  # Platform's user ID
     sender_name: str  # Display name
     text: str  # Message content
+    attachments: list[Attachment] = field(default_factory=list)
 
 
 class BaseAdapter(ABC):
@@ -79,6 +90,18 @@ class BaseAdapter(ABC):
     async def send_typing(self, chat_id: str) -> None:
         """Show a typing indicator in the chat."""
         ...
+
+    async def send_photo(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a photo. Default: falls back to send() with caption only."""
+        if caption:
+            return await self.send(chat_id, caption)
+        return None
+
+    async def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a file. Default: falls back to send() with caption only."""
+        if caption:
+            return await self.send(chat_id, caption)
+        return None
 
 
 # ── Message chunking ─────────────────────────────────────────
@@ -353,9 +376,94 @@ class BotManager:
                     pass
             return
 
+        if cmd == "/stop":
+            chat_id = await find_chat_for_thread(bot["id"], event.chat_id)
+            cancelled = False
+            if chat_id:
+                from cptr.utils.chat_task import _tasks, _task_chat, cancel_task
+                for mid, cid in list(_task_chat.items()):
+                    if cid == chat_id and mid in _tasks and not _tasks[mid].done():
+                        await cancel_task(mid)
+                        cancelled = True
+                        break
+            if adapter:
+                try:
+                    msg = "⏹️ Stopped." if cancelled else "Nothing running."
+                    await adapter.send(event.chat_id, msg)
+                except Exception:
+                    pass
+            return
+
+        if cmd == "/retry":
+            from cptr.models import ChatMessage
+            chat_id = await find_chat_for_thread(bot["id"], event.chat_id)
+            if not chat_id:
+                if adapter:
+                    try:
+                        await adapter.send(event.chat_id, "No active conversation. Send a message first.")
+                    except Exception:
+                        pass
+                return
+            # Check if a task is already running
+            from cptr.utils.chat_task import get_active_chat_ids
+            if chat_id in get_active_chat_ids():
+                if adapter:
+                    try:
+                        await adapter.send(event.chat_id, "⏳ A task is already running. Use /stop first.")
+                    except Exception:
+                        pass
+                return
+            # Find the last user message
+            msgs = await ChatMessage.get_all_by_chat(chat_id)
+            last_user = None
+            for m in reversed(msgs):
+                if m.role == "user":
+                    last_user = m
+                    break
+            if not last_user:
+                if adapter:
+                    try:
+                        await adapter.send(event.chat_id, "Nothing to retry.")
+                    except Exception:
+                        pass
+                return
+            # Re-dispatch with the same text as a new branch
+            event.text = last_user.content
+            await self._dispatch_task(chat_id, event, bot, adapter)
+            return
+
+        if cmd == "/model":
+            parts = clean.split(None, 1)
+            new_model = parts[1].strip() if len(parts) > 1 else ""
+            if not new_model:
+                if adapter:
+                    try:
+                        await adapter.send(event.chat_id, f"Current model: `{bot['model_id']}`")
+                    except Exception:
+                        pass
+                return
+            # Update bot config
+            from cptr.models import Config
+            bots_raw = await Config.get("bots") or []
+            for b in bots_raw:
+                if b.get("id") == bot["id"]:
+                    b["model_id"] = new_model
+                    break
+            await Config.upsert({"bots": bots_raw})
+            bot["model_id"] = new_model
+            if adapter:
+                try:
+                    await adapter.send(event.chat_id, f"✅ Model switched to: `{new_model}`")
+                except Exception:
+                    pass
+            return
+
         if cmd == "/help":
             help_text = (
                 "/new — Start a new conversation\n"
+                "/stop — Stop the running agent\n"
+                "/retry — Retry the last message\n"
+                "/model [id] — Show or switch model\n"
                 "/workspace <name> — Switch workspace (starts new chat)\n"
                 "/workspaces — List available workspaces\n"
                 "/help — Show this message"
@@ -434,7 +542,7 @@ class BotManager:
                     pass
             return
 
-        if not clean:
+        if not clean and not event.attachments:
             return
 
         # 3. Thread mapping — find or create a cptr chat
@@ -474,13 +582,129 @@ class BotManager:
 
         return chat.id
 
+    async def _process_attachments(
+        self,
+        attachments: list[Attachment],
+        adapter: BaseAdapter | None,
+        platform_chat_id: str,
+    ) -> tuple[list[dict], str]:
+        """Process inbound attachments: save to storage, transcribe voice.
+
+        Returns (file_entries_for_meta, text_to_prepend).
+        file_entries match the web UI format so _load_message_history handles
+        them automatically (base64 for images, file:// refs for documents).
+        """
+        from cptr.models import Config
+        from cptr.utils.config import _get_jwt_secret
+        from cptr.utils.crypto import decrypt_key
+        from cptr.utils.storage import get_storage
+
+        file_entries: list[dict] = []
+        text_parts: list[str] = []
+
+        for att in attachments:
+            if att.type == "audio":
+                # Voice message → transcribe via Whisper
+                transcript = await self._transcribe_voice(att, adapter, platform_chat_id)
+                if transcript:
+                    text_parts.append(transcript)
+                continue
+
+            # Images and documents → save to blob storage
+            file_id = str(uuid.uuid4())
+            try:
+                await get_storage().put(file_id, att.data)
+            except Exception:
+                logger.exception("[bridge] Failed to save attachment %s", att.filename)
+                continue
+
+            entry: dict = {
+                "id": file_id,
+                "name": att.filename,
+                "content_type": att.mime_type,
+            }
+            if att.type == "image":
+                entry["type"] = "image"
+            else:
+                entry["type"] = "file"
+
+            file_entries.append(entry)
+            logger.info("[bridge] Saved attachment %s (%s, %d bytes)", att.filename, att.type, len(att.data))
+
+        return file_entries, "\n".join(text_parts)
+
+    async def _transcribe_voice(
+        self,
+        att: Attachment,
+        adapter: BaseAdapter | None,
+        platform_chat_id: str,
+    ) -> str:
+        """Transcribe a voice attachment using the configured STT API.
+
+        Returns the transcript text, or empty string on failure/not configured.
+        """
+        from cptr.models import Config
+        from cptr.utils.config import _get_jwt_secret
+        from cptr.utils.crypto import decrypt_key
+
+        api_key_encrypted = await Config.get("audio.stt_api_key")
+        if not api_key_encrypted:
+            # STT not configured — warn the user
+            if adapter:
+                try:
+                    await adapter.send(
+                        platform_chat_id,
+                        "⚠️ Voice messages require speech-to-text to be configured in Settings → Audio.",
+                    )
+                except Exception:
+                    pass
+            return ""
+
+        api_key = decrypt_key(api_key_encrypted, _get_jwt_secret())
+        base_url = (await Config.get("audio.stt_base_url")) or "https://api.openai.com/v1"
+        model = (await Config.get("audio.stt_model")) or "whisper-1"
+
+        try:
+            from cptr.routers.audio import _transcribe_chunk
+
+            transcript = await _transcribe_chunk(
+                data=att.data,
+                filename=att.filename,
+                content_type=att.mime_type,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+            )
+            if transcript:
+                logger.info("[bridge] Transcribed voice message: %d chars", len(transcript))
+            return transcript
+        except Exception:
+            logger.exception("[bridge] Voice transcription failed")
+            if adapter:
+                try:
+                    await adapter.send(platform_chat_id, "⚠️ Failed to transcribe voice message.")
+                except Exception:
+                    pass
+            return ""
+
     async def _dispatch_task(
         self, chat_id: str, event: MessageEvent, bot: dict, adapter: BaseAdapter | None,
     ) -> None:
-        from cptr.models import Chat, ChatMessage
+        from cptr.models import Chat, ChatMessage, Config
         from cptr.routers.chat import _resolve_connection
         from cptr.utils.chat_task import start_task, _task_chat
         from cptr.utils.config import now_ms
+
+        # ── Process attachments ──
+        user_meta: dict | None = None
+        if event.attachments:
+            file_entries, text_prepend = await self._process_attachments(
+                event.attachments, adapter, event.chat_id,
+            )
+            if file_entries:
+                user_meta = {"files": file_entries}
+            if text_prepend:
+                event.text = f"{text_prepend}\n{event.text}".strip() if event.text else text_prepend
 
         # Get current chat state for parent_id threading
         chat = await Chat.get_by_id(chat_id)
@@ -492,7 +716,7 @@ class BotManager:
             await ChatMessage.create(
                 chat_id=chat_id, role="user", content=event.text,
                 parent_id=parent_id,
-                meta={"queued": True}, created_at=now_ms(),
+                meta={"queued": True, **(user_meta or {})}, created_at=now_ms(),
             )
             logger.info("[bridge] Queued message for busy chat %s", chat_id[:8])
             return
@@ -500,7 +724,7 @@ class BotManager:
         # Create user message — parent_id chains to previous assistant reply
         user_msg = await ChatMessage.create(
             chat_id=chat_id, role="user", content=event.text,
-            parent_id=parent_id, created_at=now_ms(),
+            parent_id=parent_id, meta=user_meta, created_at=now_ms(),
         )
 
         # Resolve model connection

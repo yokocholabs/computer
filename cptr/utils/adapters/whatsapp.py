@@ -20,7 +20,7 @@ from typing import Optional
 
 import httpx
 
-from cptr.utils.bridge import BaseAdapter, MessageEvent, chunk_message
+from cptr.utils.bridge import Attachment, BaseAdapter, MessageEvent, chunk_message
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +96,64 @@ class WhatsAppAdapter(BaseAdapter):
             for change in entry.get("changes", []):
                 value = change.get("value", {})
                 for message in value.get("messages", []):
-                    if message.get("type") != "text":
+                    msg_type = message.get("type", "")
+
+                    text = ""
+                    attachments: list[Attachment] = []
+
+                    if msg_type == "text":
+                        text = message.get("text", {}).get("body", "").strip()
+                    elif msg_type == "image":
+                        image = message.get("image", {})
+                        text = image.get("caption", "").strip()
+                        media_data = await self._download_media(image.get("id", ""))
+                        if media_data:
+                            attachments.append(Attachment(
+                                type="image",
+                                filename="photo.jpg",
+                                data=media_data,
+                                mime_type=image.get("mime_type", "image/jpeg"),
+                            ))
+                    elif msg_type == "audio":
+                        audio = message.get("audio", {})
+                        media_data = await self._download_media(audio.get("id", ""))
+                        if media_data:
+                            attachments.append(Attachment(
+                                type="audio",
+                                filename="voice.ogg",
+                                data=media_data,
+                                mime_type=audio.get("mime_type", "audio/ogg"),
+                            ))
+                    elif msg_type == "document":
+                        doc = message.get("document", {})
+                        text = doc.get("caption", "").strip()
+                        media_data = await self._download_media(doc.get("id", ""))
+                        if media_data:
+                            fname = doc.get("filename", "document")
+                            attachments.append(Attachment(
+                                type="document",
+                                filename=fname,
+                                data=media_data,
+                                mime_type=doc.get("mime_type", "application/octet-stream"),
+                            ))
+                    elif msg_type == "video":
+                        video = message.get("video", {})
+                        text = video.get("caption", "").strip()
+                        media_data = await self._download_media(video.get("id", ""))
+                        if media_data:
+                            attachments.append(Attachment(
+                                type="document",
+                                filename="video.mp4",
+                                data=media_data,
+                                mime_type=video.get("mime_type", "video/mp4"),
+                            ))
+                    else:
+                        continue
+
+                    if not text and not attachments:
                         continue
 
                     sender = message.get("from", "")
-                    text = message.get("text", {}).get("body", "").strip()
-                    if not text:
-                        continue
 
                     # Resolve sender name from contacts
                     contacts = value.get("contacts", [])
@@ -119,6 +170,7 @@ class WhatsAppAdapter(BaseAdapter):
                         sender_id=sender,
                         sender_name=sender_name,
                         text=text,
+                        attachments=attachments,
                     )
                     await self._message_queue.put(event)
 
@@ -162,8 +214,6 @@ class WhatsAppAdapter(BaseAdapter):
 
     async def edit(self, chat_id: str, message_id: str, text: str) -> None:
         """WhatsApp doesn't support message editing. Send a new message instead."""
-        # WhatsApp has no edit API — for streaming we just send new messages
-        # The stream loop will handle this gracefully
         pass
 
     async def send_typing(self, chat_id: str) -> None:
@@ -171,17 +221,100 @@ class WhatsAppAdapter(BaseAdapter):
         if not self._http:
             return
         try:
-            # Mark as read (closest to typing indicator)
             await self._http.post(
                 f"{API_BASE}/{self._phone_number_id}/messages",
                 json={
                     "messaging_product": "whatsapp",
                     "status": "read",
-                    "message_id": "placeholder",  # Not ideal but API requires it
+                    "message_id": "placeholder",
                 },
             )
         except Exception:
             pass
+
+    # ── Media ──────────────────────────────────────────────
+
+    async def _download_media(self, media_id: str) -> bytes | None:
+        """Download media from WhatsApp Cloud API.
+
+        Two-step: GET /{media_id} for URL, then GET the URL for the bytes.
+        """
+        if not self._http or not media_id:
+            return None
+        try:
+            # Step 1: Get the media URL
+            resp = await self._http.get(f"{API_BASE}/{media_id}")
+            data = resp.json()
+            url = data.get("url")
+            if not url:
+                return None
+            # Step 2: Download the actual file (requires auth header)
+            resp2 = await self._http.get(url)
+            if resp2.status_code == 200:
+                return resp2.content
+            logger.warning("[whatsapp] Media download failed: HTTP %d", resp2.status_code)
+        except Exception:
+            logger.exception("[whatsapp] Failed to download media %s", media_id)
+        return None
+
+    async def send_photo(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a photo via WhatsApp media upload."""
+        media_id = await self._upload_media(data, filename, "image/jpeg")
+        if not media_id:
+            return await self.send(chat_id, caption) if caption else None
+        return await self._send_media_message(chat_id, "image", media_id, caption)
+
+    async def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a document via WhatsApp media upload."""
+        media_id = await self._upload_media(data, filename, "application/octet-stream")
+        if not media_id:
+            return await self.send(chat_id, caption) if caption else None
+        return await self._send_media_message(chat_id, "document", media_id, caption, filename)
+
+    async def _upload_media(self, data: bytes, filename: str, mime_type: str) -> str | None:
+        """Upload media to WhatsApp Cloud API, return media_id."""
+        if not self._http:
+            return None
+        try:
+            resp = await self._http.post(
+                f"{API_BASE}/{self._phone_number_id}/media",
+                files={"file": (filename, data, mime_type)},
+                data={"messaging_product": "whatsapp", "type": mime_type},
+            )
+            result = resp.json()
+            return result.get("id")
+        except Exception:
+            logger.exception("[whatsapp] Failed to upload media")
+        return None
+
+    async def _send_media_message(
+        self, chat_id: str, media_type: str, media_id: str, caption: str = "", filename: str = "",
+    ) -> str | None:
+        """Send a media message using an uploaded media_id."""
+        if not self._http:
+            return None
+        media_obj: dict = {"id": media_id}
+        if caption:
+            media_obj["caption"] = caption[:1024]
+        if filename and media_type == "document":
+            media_obj["filename"] = filename
+        try:
+            resp = await self._http.post(
+                f"{API_BASE}/{self._phone_number_id}/messages",
+                json={
+                    "messaging_product": "whatsapp",
+                    "to": chat_id,
+                    "type": media_type,
+                    media_type: media_obj,
+                },
+            )
+            data = resp.json()
+            messages = data.get("messages", [])
+            return messages[0].get("id") if messages else None
+        except Exception:
+            logger.exception("[whatsapp] Failed to send %s message", media_type)
+        return None
+
 
 
 async def verify_token(token: str) -> dict:

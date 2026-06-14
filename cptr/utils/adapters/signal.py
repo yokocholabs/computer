@@ -19,7 +19,7 @@ from urllib.parse import quote
 
 import httpx
 
-from cptr.utils.bridge import BaseAdapter, MessageEvent, chunk_message
+from cptr.utils.bridge import Attachment, BaseAdapter, MessageEvent, chunk_message
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,16 @@ MAX_MESSAGE_LEN = 4096
 POLL_INTERVAL = 2.0  # seconds between receive polls
 RECONNECT_BASE_DELAY = 2.0
 RECONNECT_MAX_DELAY = 60.0
+
+
+def _ext_for_mime(mime: str) -> str:
+    """Map common MIME types to file extensions."""
+    mapping = {
+        "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
+        "image/webp": ".webp", "audio/ogg": ".ogg", "audio/mpeg": ".mp3",
+        "audio/aac": ".aac", "video/mp4": ".mp4", "application/pdf": ".pdf",
+    }
+    return mapping.get(mime, "")
 
 
 def _parse_token(token: str) -> tuple[str, str]:
@@ -171,7 +181,29 @@ class SignalAdapter(BaseAdapter):
             return
 
         text = (data_message.get("message") or "").strip()
-        if not text:
+
+        # Process attachments from signal-cli
+        attachments: list[Attachment] = []
+        for att in data_message.get("attachments", []):
+            att_id = att.get("id")
+            if not att_id:
+                continue
+            file_data = await self._download_attachment(att_id)
+            if not file_data:
+                continue
+            content_type = att.get("contentType", "application/octet-stream")
+            fname = att.get("filename") or f"attachment{_ext_for_mime(content_type)}"
+            if content_type.startswith("image/"):
+                att_type = "image"
+            elif content_type.startswith("audio/"):
+                att_type = "audio"
+            else:
+                att_type = "document"
+            attachments.append(Attachment(
+                type=att_type, filename=fname, data=file_data, mime_type=content_type,
+            ))
+
+        if not text and not attachments:
             return
 
         source = envelope.get("source", "")
@@ -187,10 +219,59 @@ class SignalAdapter(BaseAdapter):
             sender_id=source,
             sender_name=source_name,
             text=text,
+            attachments=attachments,
         )
 
         if self.on_message:
             await self.on_message(event)
+
+    async def _download_attachment(self, attachment_id: str) -> bytes | None:
+        """Download an attachment from signal-cli REST API."""
+        if not self._http:
+            return None
+        try:
+            resp = await self._http.get(
+                f"{self._base_url}/v1/attachments/{attachment_id}",
+            )
+            if resp.status_code == 200:
+                return resp.content
+            logger.warning("[signal] Attachment download failed: HTTP %d", resp.status_code)
+        except Exception:
+            logger.exception("[signal] Failed to download attachment %s", attachment_id)
+        return None
+
+    async def send_photo(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a photo as a base64 attachment."""
+        return await self._send_with_attachment(chat_id, data, filename, caption)
+
+    async def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a document as a base64 attachment."""
+        return await self._send_with_attachment(chat_id, data, filename, caption)
+
+    async def _send_with_attachment(
+        self, chat_id: str, data: bytes, filename: str, caption: str = "",
+    ) -> str | None:
+        """Send a message with a base64-encoded attachment via signal-cli."""
+        if not self._http:
+            return None
+        import base64
+        try:
+            resp = await self._http.post(
+                f"{self._base_url}/v2/send",
+                json={
+                    "message": caption or "",
+                    "number": self._phone,
+                    "recipients": [chat_id],
+                    "base64_attachments": [
+                        base64.b64encode(data).decode("ascii")
+                    ],
+                },
+            )
+            result = resp.json()
+            return str(result.get("timestamp", ""))
+        except Exception:
+            logger.exception("[signal] Failed to send attachment")
+        return None
 
 
 async def verify_token(token: str) -> dict:

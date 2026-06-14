@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-06-14
+
+### Changed
+
+- 💬 **Telegram rich message formatting.** Telegram messages now use `sendRichMessage` / `sendRichMessageDraft` (Bot API `InputRichMessage`) for properly rendered Markdown with bold, italic, code blocks, and links. Falls back gracefully to plain text when the API is unavailable.
+- 📝 **Increased Telegram streaming buffer.** The streaming buffer limit for Telegram was raised from 4 096 to 32 768 characters, allowing longer messages to stream without premature chunking.
+- 🔒 **Proxy middleware authentication.** The reverse-proxy middleware now verifies the `cptr_session` cookie before forwarding requests, preventing unauthenticated access to proxied local services.
+- 📖 **README refresh.** Updated the README with revised feature descriptions and setup instructions.
+
 ## [0.4.2] - 2026-06-14
 
 ### Fixed

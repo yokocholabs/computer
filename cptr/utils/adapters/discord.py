@@ -17,7 +17,7 @@ from typing import Optional
 
 import httpx
 
-from cptr.utils.bridge import BaseAdapter, MessageEvent, chunk_message
+from cptr.utils.bridge import Attachment, BaseAdapter, MessageEvent, chunk_message
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +232,29 @@ class DiscordAdapter(BaseAdapter):
             return
 
         content = data.get("content", "").strip()
-        if not content:
+
+        # Process Discord attachments
+        attachments: list[Attachment] = []
+        for att in data.get("attachments", []):
+            url = att.get("url")
+            if not url:
+                continue
+            file_data = await self._download_url(url)
+            if not file_data:
+                continue
+            fname = att.get("filename", "file")
+            ctype = att.get("content_type", "application/octet-stream")
+            if ctype.startswith("image/"):
+                att_type = "image"
+            elif ctype.startswith("audio/"):
+                att_type = "audio"
+            else:
+                att_type = "document"
+            attachments.append(Attachment(
+                type=att_type, filename=fname, data=file_data, mime_type=ctype,
+            ))
+
+        if not content and not attachments:
             return
 
         event = MessageEvent(
@@ -241,10 +263,52 @@ class DiscordAdapter(BaseAdapter):
             sender_id=author.get("id", ""),
             sender_name=author.get("global_name") or author.get("username", "User"),
             text=content,
+            attachments=attachments,
         )
 
         if self.on_message:
             await self.on_message(event)
+
+    async def _download_url(self, url: str) -> bytes | None:
+        """Download a file from a URL (Discord CDN)."""
+        if not self._http:
+            return None
+        try:
+            resp = await self._http.get(url)
+            if resp.status_code == 200:
+                return resp.content
+            logger.warning("[discord] File download failed: HTTP %d", resp.status_code)
+        except Exception:
+            logger.exception("[discord] Failed to download %s", url)
+        return None
+
+    async def send_photo(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a photo as a file attachment."""
+        return await self._send_file(chat_id, data, filename, caption)
+
+    async def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a document as a file attachment."""
+        return await self._send_file(chat_id, data, filename, caption)
+
+    async def _send_file(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a file via Discord multipart upload."""
+        if not self._http:
+            return None
+        try:
+            files = {"files[0]": (filename, data, "application/octet-stream")}
+            form_data = {}
+            if caption:
+                form_data["content"] = caption[:MAX_MESSAGE_LEN]
+            resp = await self._http.post(
+                f"{API_BASE}/channels/{chat_id}/messages",
+                files=files,
+                data=form_data,
+            )
+            if resp.status_code == 200:
+                return resp.json().get("id")
+        except Exception:
+            logger.exception("[discord] Failed to send file")
+        return None
 
 
 async def verify_token(token: str) -> dict:

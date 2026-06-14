@@ -20,7 +20,7 @@ from typing import Optional
 
 import httpx
 
-from cptr.utils.bridge import BaseAdapter, MessageEvent, chunk_message
+from cptr.utils.bridge import Attachment, BaseAdapter, MessageEvent, chunk_message
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +238,65 @@ class TelegramAdapter(BaseAdapter):
             return
 
         text = message.get("text") or message.get("caption") or ""
-        if not text.strip():
+
+        # Collect attachments from media types
+        attachments: list = []
+
+        # Photos — Telegram sends multiple sizes, pick the largest
+        if message.get("photo"):
+            photo = message["photo"][-1]  # largest size
+            file_data = await self._download_file(photo["file_id"])
+            if file_data:
+                attachments.append(Attachment(
+                    type="image",
+                    filename="photo.jpg",
+                    data=file_data,
+                    mime_type="image/jpeg",
+                ))
+
+        # Documents (PDF, spreadsheets, etc.)
+        if message.get("document"):
+            doc = message["document"]
+            file_data = await self._download_file(doc["file_id"])
+            if file_data:
+                fname = doc.get("file_name", "document")
+                mime = doc.get("mime_type", "application/octet-stream")
+                att_type = "image" if mime.startswith("image/") else "document"
+                attachments.append(Attachment(
+                    type=att_type,
+                    filename=fname,
+                    data=file_data,
+                    mime_type=mime,
+                ))
+
+        # Voice messages (OGG/Opus)
+        if message.get("voice"):
+            voice = message["voice"]
+            file_data = await self._download_file(voice["file_id"])
+            if file_data:
+                attachments.append(Attachment(
+                    type="audio",
+                    filename="voice.ogg",
+                    data=file_data,
+                    mime_type=voice.get("mime_type", "audio/ogg"),
+                ))
+
+        # Audio files (music, audio messages sent as files)
+        if message.get("audio"):
+            audio = message["audio"]
+            file_data = await self._download_file(audio["file_id"])
+            if file_data:
+                from cptr.utils.bridge import Attachment
+                fname = audio.get("file_name", "audio.mp3")
+                attachments.append(Attachment(
+                    type="audio",
+                    filename=fname,
+                    data=file_data,
+                    mime_type=audio.get("mime_type", "audio/mpeg"),
+                ))
+
+        # Skip if no text AND no attachments
+        if not text.strip() and not attachments:
             return
 
         chat = message.get("chat", {})
@@ -253,10 +311,64 @@ class TelegramAdapter(BaseAdapter):
                 + (" " + sender.get("last_name", "") if sender.get("last_name") else "")
             ).strip() or "User",
             text=text,
+            attachments=attachments,
         )
 
         if self.on_message:
             await self.on_message(event)
+
+    async def _download_file(self, file_id: str) -> bytes | None:
+        """Download a file from Telegram servers via getFile API."""
+        try:
+            file_info = await self._api("getFile", file_id=file_id)
+            file_path = file_info.get("file_path")
+            if not file_path:
+                return None
+            url = f"https://api.telegram.org/file/bot{self._token}/{file_path}"
+            resp = await self._client.get(url)
+            if resp.status_code == 200:
+                return resp.content
+            logger.warning("[telegram] File download failed: HTTP %d", resp.status_code)
+            return None
+        except Exception:
+            logger.exception("[telegram] Failed to download file %s", file_id)
+            return None
+
+    async def send_photo(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a photo via multipart upload."""
+        if not self._client:
+            return None
+        url = f"{self._base}/sendPhoto"
+        files = {"photo": (filename, data, "image/jpeg")}
+        form_data = {"chat_id": chat_id}
+        if caption:
+            form_data["caption"] = caption[:1024]
+        try:
+            resp = await self._client.post(url, files=files, data=form_data)
+            body = resp.json()
+            if body.get("ok"):
+                return str(body.get("result", {}).get("message_id", ""))
+        except Exception:
+            logger.exception("[telegram] Failed to send photo")
+        return None
+
+    async def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a document via multipart upload."""
+        if not self._client:
+            return None
+        url = f"{self._base}/sendDocument"
+        files = {"document": (filename, data, "application/octet-stream")}
+        form_data = {"chat_id": chat_id}
+        if caption:
+            form_data["caption"] = caption[:1024]
+        try:
+            resp = await self._client.post(url, files=files, data=form_data)
+            body = resp.json()
+            if body.get("ok"):
+                return str(body.get("result", {}).get("message_id", ""))
+        except Exception:
+            logger.exception("[telegram] Failed to send document")
+        return None
 
     # ── API helpers ────────────────────────────────────────
 

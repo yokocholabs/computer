@@ -16,7 +16,7 @@ from typing import Optional
 
 import httpx
 
-from cptr.utils.bridge import BaseAdapter, MessageEvent, chunk_message
+from cptr.utils.bridge import Attachment, BaseAdapter, MessageEvent, chunk_message
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +192,29 @@ class SlackAdapter(BaseAdapter):
             return
 
         text = (event.get("text") or "").strip()
-        if not text:
+
+        # Process file attachments
+        attachments: list[Attachment] = []
+        for f in event.get("files", []):
+            url = f.get("url_private")
+            if not url:
+                continue
+            file_data = await self._download_file(url)
+            if not file_data:
+                continue
+            fname = f.get("name") or f.get("title") or "file"
+            mime = f.get("mimetype", "application/octet-stream")
+            if mime.startswith("image/"):
+                att_type = "image"
+            elif mime.startswith("audio/"):
+                att_type = "audio"
+            else:
+                att_type = "document"
+            attachments.append(Attachment(
+                type=att_type, filename=fname, data=file_data, mime_type=mime,
+            ))
+
+        if not text and not attachments:
             return
 
         # Resolve display name
@@ -205,6 +227,7 @@ class SlackAdapter(BaseAdapter):
             sender_id=user_id,
             sender_name=sender_name,
             text=text,
+            attachments=attachments,
         )
 
         if self.on_message:
@@ -222,6 +245,62 @@ class SlackAdapter(BaseAdapter):
         except Exception:
             pass
         return "User"
+
+    async def _download_file(self, url: str) -> bytes | None:
+        """Download a file from Slack (requires bot token auth)."""
+        if not self._http:
+            return None
+        try:
+            resp = await self._http.get(url)
+            if resp.status_code == 200:
+                return resp.content
+            logger.warning("[slack] File download failed: HTTP %d", resp.status_code)
+        except Exception:
+            logger.exception("[slack] Failed to download %s", url)
+        return None
+
+    async def send_photo(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a photo via Slack file upload."""
+        return await self._upload_file(chat_id, data, filename, caption)
+
+    async def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Send a document via Slack file upload."""
+        return await self._upload_file(chat_id, data, filename, caption)
+
+    async def _upload_file(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str | None:
+        """Upload a file to Slack via files.uploadV2."""
+        if not self._http:
+            return None
+        try:
+            # Step 1: Get upload URL
+            resp = await self._http.get(
+                f"{API_BASE}/files.getUploadURLExternal",
+                params={"filename": filename, "length": len(data)},
+            )
+            url_data = resp.json()
+            if not url_data.get("ok"):
+                logger.warning("[slack] files.getUploadURLExternal failed: %s", url_data.get("error"))
+                return None
+
+            # Step 2: Upload to the provided URL
+            upload_url = url_data["upload_url"]
+            file_id = url_data["file_id"]
+            await self._http.post(upload_url, content=data)
+
+            # Step 3: Complete the upload
+            await self._http.post(
+                f"{API_BASE}/files.completeUploadExternal",
+                json={
+                    "files": [{"id": file_id, "title": filename}],
+                    "channel_id": chat_id,
+                    "initial_comment": caption or "",
+                },
+            )
+            return file_id
+        except Exception:
+            logger.exception("[slack] Failed to upload file")
+        return None
+
 
 
 async def verify_token(token: str) -> dict:
