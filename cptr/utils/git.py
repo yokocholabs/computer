@@ -78,7 +78,10 @@ async def status(root: str) -> dict[str, Any]:
             behind = abs(int(parts[3].lstrip("-")))
         elif line.startswith("1 ") or line.startswith("2 "):
             # Changed entry
-            parts = line.split(" ", 8)
+            #  type-1: 1 XY sub mH mI mW hH hI path           (9 fields)
+            #  type-2: 1 XY sub mH mI mW hH hI Xscore path\torigPath (10 fields)
+            nsplits = 9 if line.startswith("2 ") else 8
+            parts = line.split(" ", nsplits)
             xy = parts[1]
             path = parts[-1]
             # "2" entries (rename/copy) have original path after tab
@@ -261,7 +264,8 @@ async def discard(root: str, files: list[str]) -> None:
             if path in requested:
                 to_delete.append(path)
         elif line.startswith("1 ") or line.startswith("2 "):
-            parts = line.split(" ", 8)
+            nsplits = 9 if line.startswith("2 ") else 8
+            parts = line.split(" ", nsplits)
             xy = parts[1]
             path = parts[-1]
             if line.startswith("2 "):
