@@ -5,7 +5,7 @@ import { writable, get } from 'svelte/store';
 import { toast } from 'svelte-sonner';
 import { fetchJSON } from '$lib/apis';
 import { socketStore } from '$lib/stores/socket.svelte';
-import { activeTab, openChatTab } from '$lib/stores';
+import { activeTab } from '$lib/stores';
 
 export const chatEnabled = writable<boolean>(false);
 
@@ -103,15 +103,9 @@ export function bindGlobalChatListener() {
 							title,
 							content: body,
 							onClick: async () => {
-								// Navigate to workspace page first if not already there
-								const wsPath = data.workspace;
-								if (wsPath && window.location.pathname !== '/') {
-									const { goto } = await import('$app/navigation');
-									await goto(`/?workspace=${encodeURIComponent(wsPath)}`);
-									setTimeout(() => openChatTab(chatId), 300);
-								} else {
-									openChatTab(chatId);
-								}
+								const { goto } = await import('$app/navigation');
+								const wsParam = data.workspace ? `workspace=${encodeURIComponent(data.workspace)}&` : '';
+								await goto(`/?${wsParam}chatId=${encodeURIComponent(chatId)}`);
 								toast.dismiss(toastId);
 							},
 							onclose: () => {
