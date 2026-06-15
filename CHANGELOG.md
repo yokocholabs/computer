@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.10] - 2026-06-15
+
+### Changed
+
+- 📁 **File browser drag-and-drop completely reworked.** You can now freely drag and drop files and folders anywhere — into folders, onto breadcrumbs, or between nested directories. Multi-select drag, auto-expand on hover, and full expanded-area highlighting are all supported.
+
+### Fixed
+
+- 📋 **Dropdown menus no longer get cut off by the keyboard on mobile.** Menus that open upward (like the model picker) now anchor from the bottom of the screen instead of the top, so they stay fully visible even when the on-screen keyboard is open.
+- 🔄 **Renamed files no longer break git operations.** Renaming or moving a file could cause errors when staging, discarding, or viewing changes — the file list would show garbled entries like "R100 old-name.txt" instead of the actual file. This is now handled correctly.
+
 ## [0.4.9] - 2026-06-15
 
 ### Fixed
