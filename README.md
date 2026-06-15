@@ -23,11 +23,25 @@ cptr run
 
 Or with [uv](https://docs.astral.sh/uv/): `uvx cptr@latest run`
 
-Opens in your browser. From other devices:
+Opens in your browser at `http://localhost:8000`.
+
+### Access from your phone
+
+Same Wi-Fi? Bind to all interfaces:
 
 ```bash
 cptr run --host 0.0.0.0
 ```
+
+Open `http://<your-computer-ip>:8000` on your phone.
+
+Not on the same network? Use a tunnel:
+
+- **[Tailscale](https://tailscale.com)** creates a private mesh network between your devices. Recommended.
+- **[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)** gives you a permanent URL through Cloudflare's edge.
+- **[ngrok](https://ngrok.com)** gives you a public URL in one command.
+
+Or skip networking entirely and connect a [messaging bot](#messaging-bots) instead.
 
 ## What you get
 
@@ -37,6 +51,7 @@ cptr run --host 0.0.0.0
 | ⌨️ **Terminal** | Full shell in the browser. Run your tools, your scripts, or your favourite coding agent. |
 | 🔀 **Git** | Stage, commit, diff, branch, push. Visual changes view. No command line required. |
 | ✏️ **Editor** | Syntax-highlighted editing with tabs. Open multiple files side by side. |
+| 🗂️ **Tabs** | Open terminals, files, chats, and tools in separate tabs. Rearrange or split your layout. |
 | 📂 **Workspaces** | Multiple projects, one instance. Switch without losing your place. |
 | 🔍 **Search** | Find files by name, search across file contents and chat history. ⌘K to find anything. |
 | 📱 **Mobile-first** | Not a desktop UI made smaller. Built for the screen in your pocket. |
