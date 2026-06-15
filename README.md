@@ -1,5 +1,15 @@
 # cptr
 
+![GitHub stars](https://img.shields.io/github/stars/open-webui/computer?style=social)
+![GitHub forks](https://img.shields.io/github/forks/open-webui/computer?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/open-webui/computer?style=social)
+![GitHub repo size](https://img.shields.io/github/repo-size/open-webui/computer)
+![GitHub language count](https://img.shields.io/github/languages/count/open-webui/computer)
+![GitHub top language](https://img.shields.io/github/languages/top/open-webui/computer)
+![GitHub last commit](https://img.shields.io/github/last-commit/open-webui/computer?color=red)
+[![Discord](https://img.shields.io/badge/Discord-Open_WebUI-blue?logo=discord&logoColor=white)](https://discord.gg/5rJgQTnV4s)
+[![](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/tjbck)
+
 ![Cptr Demo](./demo.png)
 
 The computer used to be a room. Then a desk. Then a bag. Now it's a URL.
@@ -35,11 +45,13 @@ cptr run --host 0.0.0.0
 
 Open `http://<your-computer-ip>:8000` on your phone.
 
-Not on the same network? Use a tunnel:
+Not on the same network? Use a tunnel to reach your machine remotely:
 
 - **[Tailscale](https://tailscale.com)** creates a private mesh network between your devices. Recommended.
 - **[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)** gives you a permanent URL through Cloudflare's edge.
 - **[ngrok](https://ngrok.com)** gives you a public URL in one command.
+
+Most tunnels forward to `localhost`, so the default `cptr run` works. If your tunnel connects to a specific interface, bind accordingly with `--host`.
 
 Or skip networking entirely and connect a [messaging bot](#messaging-bots) instead.
 

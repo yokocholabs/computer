@@ -75,29 +75,32 @@
 			},
 			30 * 60 * 1000
 		);
-		// iOS: Termius-style keyboard handling. visualViewport.height
-		// gives us the area above the keyboard. Set max-height on the
-		// main content column so the terminal shrinks to fit.
-		// The layout container's overflow:hidden clips the gap.
+		// iOS Safari keeps 100vh/100dvh at the layout viewport height when
+		// the keyboard opens. visualViewport tells us how much of the bottom
+		// of that layout viewport is covered, so reserve that space inside the
+		// main column instead of moving or clipping the whole shell.
 		const vv = window.visualViewport;
-		if (vv) {
-			const syncHeight = () => {
-				const col = document.getElementById('main-col');
-				if (!col) return;
-				const kbHeight = window.innerHeight - vv.height;
-				console.log('[viewport]', { innerHeight: window.innerHeight, vvHeight: vv.height, kbHeight });
-				col.style.maxHeight = kbHeight > 100 ? `${vv.height}px` : '';
-			};
-			// iOS may fire 'scroll' instead of 'resize' when keyboard opens
-			vv.addEventListener('resize', syncHeight);
-			vv.addEventListener('scroll', syncHeight);
-			return () => {
-				clearInterval(healthCheck);
-				vv.removeEventListener('resize', syncHeight);
-				vv.removeEventListener('scroll', syncHeight);
-			};
-		}
-		return () => clearInterval(healthCheck);
+		const syncKeyboardInset = () => {
+			const visualBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+			const keyboardInset = Math.max(0, window.innerHeight - visualBottom);
+			document.documentElement.style.setProperty(
+				'--keyboard-inset-bottom',
+				keyboardInset > 100 ? `${keyboardInset}px` : '0px'
+			);
+		};
+
+		syncKeyboardInset();
+		window.addEventListener('resize', syncKeyboardInset);
+		// iOS may fire 'scroll' instead of 'resize' when keyboard opens.
+		vv?.addEventListener('resize', syncKeyboardInset);
+		vv?.addEventListener('scroll', syncKeyboardInset);
+		return () => {
+			clearInterval(healthCheck);
+			document.documentElement.style.removeProperty('--keyboard-inset-bottom');
+			window.removeEventListener('resize', syncKeyboardInset);
+			vv?.removeEventListener('resize', syncKeyboardInset);
+			vv?.removeEventListener('scroll', syncKeyboardInset);
+		};
 	});
 
 	let startupToken = $state('');
@@ -325,7 +328,11 @@
 	>
 		<Sidebar />
 
-		<div id="main-col" class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
+		<div
+			id="main-col"
+			class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden"
+			style="padding-bottom: var(--keyboard-inset-bottom, 0px);"
+		>
 			{#if !$currentWorkspace && $page.url.pathname === '/'}
 				<Bar />
 			{/if}
