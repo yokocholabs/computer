@@ -335,10 +335,8 @@
 										class="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
 										onclick={() => {
 											const ws = detail?.workspace;
-											if (ws) {
-												goto(`/?workspace=${encodeURIComponent(ws)}`);
-											}
-											setTimeout(() => openChatTab(run.chat_id!), 300);
+											const wsParam = ws ? `workspace=${encodeURIComponent(ws)}&` : '';
+											goto(`/?${wsParam}chatId=${encodeURIComponent(run.chat_id!)}`);
 										}}
 									>
 										{$t('automations.viewChat')}
