@@ -342,11 +342,26 @@ async def stream_anthropic(
 # ── OpenAI Chat Completions ──────────────────────────────────
 
 
+def _reasoning_items_to_content(items: list[dict]) -> str:
+    """Convert Responses API reasoning items to a reasoning_content string.
+
+    Reasoning items use the shape: {"type": "reasoning", "content": [{"type": "text", "text": "..."}]}.
+    We extract the text blocks and join them.
+    """
+    texts: list[str] = []
+    for item in items:
+        for block in item.get("content", []):
+            if block.get("type") == "text" and block.get("text"):
+                texts.append(block["text"])
+    return "\n".join(texts)
+
+
 def _to_openai_messages(messages: list[dict], instructions: str) -> list[dict]:
     """Canonical messages → OpenAI Chat Completions format.
 
-    Strips non-standard fields (reasoning_items, fc_id in tool_calls)
-    that are used internally but would cause 400 errors from OpenAI.
+    Converts reasoning_items (Responses API format) to reasoning_content
+    (Chat Completions format) for providers like Kimi that require it.
+    Strips other non-standard fields (fc_id in tool_calls).
     """
     result = []
     if instructions:
@@ -372,13 +387,21 @@ def _to_openai_messages(messages: list[dict], instructions: str) -> list[dict]:
                     })
             new_m = dict(m)
             new_m["content"] = formatted_content
-            # Strip non-standard fields
-            new_m.pop("reasoning_items", None)
+            # Convert reasoning_items → reasoning_content for round-tripping
+            ri = new_m.pop("reasoning_items", None)
+            if ri and new_m.get("role") == "assistant":
+                rc = _reasoning_items_to_content(ri)
+                if rc:
+                    new_m["reasoning_content"] = rc
             result.append(new_m)
         else:
             out = dict(m)
-            # Strip non-standard fields that are only for Responses API
-            out.pop("reasoning_items", None)
+            # Convert reasoning_items → reasoning_content for round-tripping
+            ri = out.pop("reasoning_items", None)
+            if ri and out.get("role") == "assistant":
+                rc = _reasoning_items_to_content(ri)
+                if rc:
+                    out["reasoning_content"] = rc
             # Clean tool_calls: remove fc_id which is Responses-API-only
             if "tool_calls" in out:
                 out["tool_calls"] = [
@@ -434,6 +457,7 @@ async def stream_openai_completions(
                         logger.error("[stream] openai completions error body: %s", error_body.decode(errors="replace"))
                     resp.raise_for_status()
                     tool_calls: dict[int, dict] = {}
+                    reasoning_buffer = ""  # Accumulate reasoning_content deltas (Kimi, DeepSeek)
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: ") or line == "data: [DONE]":
                             continue
@@ -444,6 +468,10 @@ async def stream_openai_completions(
                         if delta.get("content"):
                             emitted = True
                             yield {"type": "text_delta", "content": delta["content"]}
+
+                        # Capture reasoning_content from providers like Kimi / DeepSeek
+                        if delta.get("reasoning_content"):
+                            reasoning_buffer += delta["reasoning_content"]
 
                         for tc in delta.get("tool_calls", []):
                             idx = tc["index"]
@@ -456,6 +484,16 @@ async def stream_openai_completions(
                             tool_calls[idx]["arguments_json"] += tc["function"].get("arguments", "")
 
                         if choices and choices[0].get("finish_reason") == "tool_calls":
+                            # Emit accumulated reasoning before tool calls
+                            if reasoning_buffer:
+                                yield {
+                                    "type": "reasoning",
+                                    "item": {
+                                        "type": "reasoning",
+                                        "content": [{"type": "text", "text": reasoning_buffer}],
+                                    },
+                                }
+                                reasoning_buffer = ""
                             for tc in tool_calls.values():
                                 emitted = True
                                 yield {
@@ -474,6 +512,15 @@ async def stream_openai_completions(
                                 "output_tokens": raw.get("completion_tokens", 0),
                             }
 
+                    # Emit any remaining reasoning (text-only response, no tool calls)
+                    if reasoning_buffer:
+                        yield {
+                            "type": "reasoning",
+                            "item": {
+                                "type": "reasoning",
+                                "content": [{"type": "text", "text": reasoning_buffer}],
+                            },
+                        }
                     emitted = True
                     yield {"type": "done"}
             return
