@@ -27,9 +27,69 @@ export const ttsPlaybackEnabled = writable<boolean>(
 	typeof localStorage !== 'undefined' ? localStorage.getItem('ttsPlaybackEnabled') === 'true' : false
 );
 
+const SILENT_WAV =
+	'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQQAAAAAAA==';
+
+let ttsAudioElement: HTMLAudioElement | null = null;
+let ttsAudioContext: AudioContext | null = null;
+let ttsAudioUnlocked = false;
+
 ttsPlaybackEnabled.subscribe((v) => {
 	if (typeof localStorage !== 'undefined') localStorage.setItem('ttsPlaybackEnabled', String(v));
 });
+
+export function getTtsAudioElement(): HTMLAudioElement | null {
+	if (typeof Audio === 'undefined') return null;
+	if (!ttsAudioElement) {
+		ttsAudioElement = new Audio();
+		ttsAudioElement.preload = 'auto';
+		(ttsAudioElement as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+	}
+	return ttsAudioElement;
+}
+
+export async function unlockTtsAudioPlayback() {
+	if (typeof window === 'undefined') return;
+
+	const unlocks: Promise<unknown>[] = [];
+	const AudioContextCtor =
+		window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+	try {
+		if (AudioContextCtor) {
+			ttsAudioContext ??= new AudioContextCtor();
+			const buffer = ttsAudioContext.createBuffer(1, 1, 22050);
+			const source = ttsAudioContext.createBufferSource();
+			source.buffer = buffer;
+			source.connect(ttsAudioContext.destination);
+			source.start(0);
+			if (ttsAudioContext.state !== 'running') unlocks.push(ttsAudioContext.resume());
+		}
+	} catch {}
+
+	const audio = getTtsAudioElement();
+	if (audio && !ttsAudioUnlocked) {
+		try {
+			audio.src = SILENT_WAV;
+			audio.volume = 0;
+			const started = audio.play();
+			unlocks.push(
+				Promise.resolve(started)
+					.then(() => {
+						ttsAudioUnlocked = true;
+					})
+					.finally(() => {
+						audio.pause();
+						audio.currentTime = 0;
+						audio.removeAttribute('src');
+						audio.load();
+						audio.volume = 1;
+					})
+			);
+		} catch {}
+	}
+
+	await Promise.allSettled(unlocks);
+}
 
 export async function refreshAudioState() {
 	try {

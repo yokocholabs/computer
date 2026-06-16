@@ -37,8 +37,10 @@
 		ttsEnabled,
 		ttsConfigured,
 		ttsFormat,
+		getTtsAudioElement,
 		ttsPlaybackEnabled,
 		ttsVoice,
+		unlockTtsAudioPlayback,
 		voiceModeEnabled
 	} from '$lib/stores/audio';
 
@@ -1078,6 +1080,7 @@
 			return;
 		}
 		stopTtsPlayback();
+		void unlockTtsAudioPlayback();
 		speakingMessageId = messageId;
 		ttsPlaybackEnabled.set(true);
 		ttsErrorShown = false;
@@ -1177,7 +1180,8 @@
 				if (generation !== ttsGeneration) break;
 				if (ttsObjectUrl) URL.revokeObjectURL(ttsObjectUrl);
 				ttsObjectUrl = URL.createObjectURL(blob);
-				ttsAudio = new Audio(ttsObjectUrl);
+				ttsAudio = getTtsAudioElement() ?? new Audio();
+				ttsAudio.src = ttsObjectUrl;
 				await new Promise<void>((resolve, reject) => {
 					const audio = ttsAudio!;
 					audio.onended = () => resolve();
