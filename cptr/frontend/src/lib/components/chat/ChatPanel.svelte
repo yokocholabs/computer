@@ -37,8 +37,10 @@
 		ttsEnabled,
 		ttsConfigured,
 		ttsFormat,
+		setTtsAudioPlaybackSource,
 		ttsPlaybackEnabled,
 		ttsVoice,
+		unlockTtsAudioPlayback,
 		voiceModeEnabled
 	} from '$lib/stores/audio';
 
@@ -80,6 +82,8 @@
 	let ttsInsideCodeFence = false;
 	let ttsPlaying = false;
 	let ttsGeneration = 0;
+	let ttsPrepareCursor = 0;
+	let ttsPreparing = 0;
 	let ttsAudio: HTMLAudioElement | null = null;
 	let ttsObjectUrl: string | null = null;
 	let ttsErrorShown = false;
@@ -92,6 +96,7 @@
 	const ttsAudioCache = new Map<string, Blob>();
 	const ttsPreparedAudio = new Map<string, PreparedTtsAudio>();
 	const TTS_AUDIO_CACHE_LIMIT_BYTES = 20 * 1024 * 1024;
+	const TTS_MAX_PREFETCH = 2;
 
 	// ── Windowed rendering ──────────────────────────────────────
 	// Only render the last N turns to keep the DOM light for long chats.
@@ -956,6 +961,8 @@
 		ttsStopRequested = true;
 		ttsGeneration += 1;
 		ttsQueue = [];
+		ttsPrepareCursor = 0;
+		ttsPreparing = 0;
 		resetTtsBuffer();
 		for (const pending of ttsPreparedAudio.values()) pending.controller.abort();
 		ttsPreparedAudio.clear();
@@ -996,18 +1003,21 @@
 			.trim();
 	}
 
-	function findSpeechBoundary(text: string): number {
-		if (text.length < 60) return -1;
-		for (let i = 40; i < text.length; i++) {
+	function findSpeechBoundary(text: string, firstChunk = false): number {
+		const min = firstChunk ? 35 : 60;
+		const scanFrom = firstChunk ? 30 : 40;
+		const hardMax = firstChunk ? 95 : 220;
+		if (text.length < min) return -1;
+		for (let i = scanFrom; i < text.length; i++) {
 			const ch = text[i];
 			const next = text[i + 1] || '';
 			if ((ch === '.' || ch === '!' || ch === '?' || ch === '\n') && (!next || /\s/.test(next))) {
 				return i + 1;
 			}
 		}
-		if (text.length > 220) {
-			const idx = text.lastIndexOf(' ', 220);
-			return idx > 80 ? idx : 220;
+		if (text.length > hardMax) {
+			const idx = text.lastIndexOf(' ', hardMax);
+			return idx > min ? idx : hardMax;
 		}
 		return -1;
 	}
@@ -1023,7 +1033,7 @@
 		if (!speakable.trim()) return;
 
 		ttsBuffer += speakable;
-		let boundary = findSpeechBoundary(ttsBuffer);
+		let boundary = findSpeechBoundary(ttsBuffer, ttsQueue.length === 0 && !ttsPlaying);
 		while (boundary > 0) {
 			const chunk = cleanSpeechText(ttsBuffer.slice(0, boundary));
 			ttsBuffer = ttsBuffer.slice(boundary);
@@ -1041,7 +1051,7 @@
 
 	function enqueueSpeech(text: string) {
 		ttsQueue = [...ttsQueue, text];
-		void prepareTtsAudio(text, ttsGeneration);
+		scheduleTtsPrepare(ttsGeneration);
 		if (!ttsPlaying) void playTtsQueue(ttsGeneration);
 	}
 
@@ -1078,6 +1088,7 @@
 			return;
 		}
 		stopTtsPlayback();
+		void unlockTtsAudioPlayback();
 		speakingMessageId = messageId;
 		ttsPlaybackEnabled.set(true);
 		ttsErrorShown = false;
@@ -1131,6 +1142,24 @@
 		voiceModeEnabled.set(false);
 	}
 
+	function scheduleTtsPrepare(generation: number) {
+		while (
+			generation === ttsGeneration &&
+			ttsPreparing < TTS_MAX_PREFETCH &&
+			ttsPrepareCursor < ttsQueue.length
+		) {
+			const text = ttsQueue[ttsPrepareCursor++];
+			ttsPreparing += 1;
+			void prepareTtsAudio(text, generation)
+				.catch(() => {})
+				.finally(() => {
+					if (generation !== ttsGeneration) return;
+					ttsPreparing = Math.max(0, ttsPreparing - 1);
+					scheduleTtsPrepare(generation);
+				});
+		}
+	}
+
 	function prepareTtsAudio(text: string, generation: number): Promise<Blob> {
 		const cacheKey = ttsCacheKey(text);
 		const cached = getCachedTtsAudio(cacheKey);
@@ -1151,6 +1180,7 @@
 			.then(async (response) => {
 				if (!response.ok) throw new Error(await readTtsError(response));
 				const blob = await response.blob();
+				if (blob.size <= 0) throw new Error('empty audio response');
 				cacheTtsAudio(cacheKey, blob);
 				return blob;
 			})
@@ -1169,15 +1199,20 @@
 		try {
 			while (generation === ttsGeneration && ttsQueue.length > 0) {
 				if (!shouldUseTts()) break;
-				const text = ttsQueue.shift();
-				if (!text) continue;
+				const text = ttsQueue[0];
+				if (!text) {
+					ttsQueue = ttsQueue.slice(1);
+					if (ttsPrepareCursor > 0) ttsPrepareCursor -= 1;
+					continue;
+				}
+				scheduleTtsPrepare(generation);
 
 				const blob = await prepareTtsAudio(text, generation);
 
 				if (generation !== ttsGeneration) break;
 				if (ttsObjectUrl) URL.revokeObjectURL(ttsObjectUrl);
 				ttsObjectUrl = URL.createObjectURL(blob);
-				ttsAudio = new Audio(ttsObjectUrl);
+				ttsAudio = setTtsAudioPlaybackSource(ttsObjectUrl) ?? new Audio(ttsObjectUrl);
 				await new Promise<void>((resolve, reject) => {
 					const audio = ttsAudio!;
 					audio.onended = () => resolve();
@@ -1193,6 +1228,11 @@
 					ttsObjectUrl = null;
 				}
 				ttsAudio = null;
+				if (generation !== ttsGeneration) break;
+				if (ttsQueue[0] === text) {
+					ttsQueue = ttsQueue.slice(1);
+					if (ttsPrepareCursor > 0) ttsPrepareCursor -= 1;
+				}
 			}
 		} catch (err: any) {
 			if (!ttsStopRequested && err?.name !== 'AbortError' && !ttsErrorShown) {

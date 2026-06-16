@@ -27,6 +27,7 @@
 		sttConfigured,
 		ttsConfigured,
 		ttsEnabled,
+		unlockTtsAudioPlayback,
 		voiceModeEnabled,
 		voiceModeSttMode
 	} from '$lib/stores/audio';
@@ -808,6 +809,7 @@
 		const next = !$voiceModeEnabled;
 		voiceModeEnabled.set(next);
 		if (next) {
+			void unlockTtsAudioPlayback();
 			voiceWaitingForResponse = false;
 			voiceSawStreaming = false;
 			startVoiceRecognition();
