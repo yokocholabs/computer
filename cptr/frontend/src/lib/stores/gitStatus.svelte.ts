@@ -30,28 +30,29 @@ let _status = $state<GitStatus | null>(null);
 let _loading = $state(false);
 let _currentRoot = '';
 let _fetchPromise: Promise<void> | null = null;
+let _fetchSeq = 0;
 
-async function _doFetch(root: string) {
+async function _doFetch(root: string, seq: number) {
 	if (!root) {
 		_status = null;
 		return;
 	}
 	_loading = true;
 	try {
-		const data = (await fetchJSON(
-			`/api/git/status?root=${encodeURIComponent(root)}`
-		)) as GitStatus;
+		const data = (await fetchJSON(`/api/git/status?root=${encodeURIComponent(root)}`)) as GitStatus;
 		// Only apply if root hasn't changed while we were fetching
-		if (root === _currentRoot) {
+		if (root === _currentRoot && seq === _fetchSeq) {
 			_status = data;
 		}
 	} catch {
-		if (root === _currentRoot) {
+		if (root === _currentRoot && seq === _fetchSeq) {
 			_status = null;
 		}
 	} finally {
-		_loading = false;
-		_fetchPromise = null;
+		if (seq === _fetchSeq) {
+			_loading = false;
+			_fetchPromise = null;
+		}
 	}
 }
 
@@ -71,7 +72,8 @@ export const gitStatusStore = {
 		if (root === _currentRoot) return;
 		_currentRoot = root;
 		_status = null;
-		this.refresh();
+		_fetchPromise = null;
+		this.refresh({ force: true });
 	},
 
 	/** Clear all state (no workspace). */
@@ -80,16 +82,18 @@ export const gitStatusStore = {
 		_status = null;
 		_loading = false;
 		_fetchPromise = null;
+		_fetchSeq++;
 	},
 
 	/**
 	 * Refresh git status from the server.
 	 * Concurrent calls are coalesced into a single fetch.
 	 */
-	refresh() {
+	refresh({ force = false }: { force?: boolean } = {}) {
 		if (!_currentRoot) return;
-		if (!_fetchPromise) {
-			_fetchPromise = _doFetch(_currentRoot);
+		if (!_fetchPromise || force) {
+			const seq = ++_fetchSeq;
+			_fetchPromise = _doFetch(_currentRoot, seq);
 		}
 		return _fetchPromise;
 	}

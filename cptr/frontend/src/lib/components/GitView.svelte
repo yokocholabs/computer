@@ -8,7 +8,6 @@
 	import Icon from './Icon.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
-
 	type DiffLine = { type: 'added' | 'removed' | 'context'; content: string };
 	type DiffHunk = { header: string; lines: DiffLine[] };
 	type DiffFile = { path: string; hunks: DiffHunk[] };
@@ -114,7 +113,7 @@
 	}
 
 	async function refreshReview(initial = false) {
-		await gitStatusStore.refresh();
+		await gitStatusStore.refresh({ force: true });
 	}
 
 	function fileKey(file: GitFile): string {

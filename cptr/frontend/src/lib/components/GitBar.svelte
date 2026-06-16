@@ -9,6 +9,7 @@
 		unstageFiles,
 		discardChanges,
 		gitCommit,
+		gitFetch,
 		gitPull,
 		gitPush,
 		gitUncommit,
@@ -55,15 +56,17 @@
 	const allStaged = $derived(totalChanges > 0 && unstagedFiles.length === 0);
 	const someStaged = $derived(stagedFiles.length > 0 && unstagedFiles.length > 0);
 
-	let gitStatus = $derived(gitStatusStore.status as {
-		is_repo: boolean;
-		branch: string;
-		upstream: string;
-		remote_url: string;
-		ahead: number;
-		behind: number;
-		files: GitFile[];
-	} | null);
+	let gitStatus = $derived(
+		gitStatusStore.status as {
+			is_repo: boolean;
+			branch: string;
+			upstream: string;
+			remote_url: string;
+			ahead: number;
+			behind: number;
+			files: GitFile[];
+		} | null
+	);
 
 	// Branch has never been pushed to remote
 	const needsPublish = $derived(!gitStatus?.upstream);
@@ -85,7 +88,11 @@
 		if (remoteWebUrl.includes('github.com')) return 'GitHub';
 		if (remoteWebUrl.includes('gitlab.com') || remoteWebUrl.includes('gitlab')) return 'GitLab';
 		if (remoteWebUrl.includes('bitbucket')) return 'Bitbucket';
-		try { return new URL(remoteWebUrl).hostname; } catch { return 'Remote'; }
+		try {
+			return new URL(remoteWebUrl).hostname;
+		} catch {
+			return 'Remote';
+		}
 	});
 
 	// Clear stale selection when file is no longer in the changed list
@@ -114,8 +121,8 @@
 		}
 	});
 
-	async function refresh() {
-		await gitStatusStore.refresh();
+	async function refresh({ force = false }: { force?: boolean } = {}) {
+		await gitStatusStore.refresh({ force });
 	}
 
 	async function selectFile(path: string, staged: boolean, untracked: boolean = false) {
@@ -236,7 +243,22 @@
 		const d = await gitPull(workspacePath);
 		flash(d.ok ? $t('git.pulled') : d.message);
 		loading = false;
-		await refresh();
+		await refresh({ force: true });
+	}
+
+	async function doFetch() {
+		loading = true;
+		try {
+			const d = (await gitFetch(workspacePath)) as { ok?: boolean; message?: string };
+			flash(d.ok ? d.message || $t('git.fetch') : d.message || 'Fetch failed');
+		} catch (e) {
+			flash(e instanceof Error ? e.message : 'Fetch failed');
+		} finally {
+			loading = false;
+			await refresh({ force: true });
+			if (showBranches) await loadBranches();
+			if (view === 'history') await loadHistory();
+		}
 	}
 
 	async function doPush() {
@@ -247,7 +269,7 @@
 		});
 		flash(d.ok ? $t('git.pushed') : d.message);
 		loading = false;
-		await refresh();
+		await refresh({ force: true });
 	}
 
 	async function switchBranch(branch: string) {
@@ -353,7 +375,7 @@
 	}
 
 	const syncAction = $derived.by(() => {
-		if (!gitStatus) return { label: $t('git.fetch'), icon: 'refresh', action: doPull };
+		if (!gitStatus) return { label: $t('git.fetch'), icon: 'refresh', action: doFetch };
 		if (gitStatus.behind > 0)
 			return {
 				label: $t('git.pullCount', { count: gitStatus.behind }),
@@ -366,9 +388,8 @@
 				icon: 'upload',
 				action: doPush
 			};
-		if (!gitStatus.upstream)
-			return { label: $t('git.publish'), icon: 'upload', action: doPush };
-		return { label: $t('git.fetch'), icon: 'refresh', action: doPull };
+		if (!gitStatus.upstream) return { label: $t('git.publish'), icon: 'upload', action: doPush };
+		return { label: $t('git.fetch'), icon: 'refresh', action: doFetch };
 	});
 
 	function onResizeStart(e: PointerEvent) {
@@ -443,8 +464,6 @@
 		return () => window.removeEventListener('keydown', onKeydown);
 	});
 </script>
-
-
 
 {#if gitStatus?.is_repo}
 	<div
@@ -785,8 +804,14 @@
 							<div class="flex-1 overflow-y-auto">
 								{#each commits as c, i}
 									{#if i === unpushedCount && unpushedCount > 0}
-										<div class="flex items-center gap-2 px-2.5 py-1 border-b border-gray-100 dark:border-white/4 bg-gray-50/50 dark:bg-white/2">
-											<Icon name="upload" size={10} class="text-gray-400 dark:text-gray-600 shrink-0" />
+										<div
+											class="flex items-center gap-2 px-2.5 py-1 border-b border-gray-100 dark:border-white/4 bg-gray-50/50 dark:bg-white/2"
+										>
+											<Icon
+												name="upload"
+												size={10}
+												class="text-gray-400 dark:text-gray-600 shrink-0"
+											/>
 											<span class="text-[10px] text-gray-400 dark:text-gray-600">
 												{unpushedCount} unpushed {unpushedCount === 1 ? 'commit' : 'commits'}
 											</span>
@@ -800,7 +825,10 @@
 										onclick={() => selectCommit(c)}
 									>
 										{#if i < unpushedCount}
-											<span class="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" title="Unpushed"></span>
+											<span
+												class="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0"
+												title="Unpushed"
+											></span>
 										{/if}
 										<div class="flex flex-col min-w-0 flex-1">
 											<span class="text-xs text-gray-800 dark:text-gray-200 truncate w-full"

@@ -20,6 +20,7 @@ from cptr.utils.git import (
     delete_branch,
     diff,
     discard,
+    fetch,
     is_repo,
     log,
     pull,
@@ -239,6 +240,15 @@ async def git_pull(body: RootRequest):
     """Pull from remote."""
     try:
         return await pull(body.root)
+    except GitError as e:
+        _handle_git_error(e)
+
+
+@router.post("/fetch")
+async def git_fetch(body: RootRequest):
+    """Fetch from remote without merging."""
+    try:
+        return await fetch(body.root)
     except GitError as e:
         _handle_git_error(e)
 

@@ -55,6 +55,10 @@ async def is_repo(root: str) -> bool:
 
 async def status(root: str) -> dict[str, Any]:
     """Get repo status using porcelain v2 format."""
+    # Refresh Git's cached file metadata first so status catches edits whose
+    # filesystem stat information was stale.
+    await _run("update-index", "-q", "--refresh", cwd=root, check=False)
+
     _, out, _ = await _run(
         "status", "--porcelain=v2", "--branch", "--untracked-files=all", cwd=root
     )
@@ -471,6 +475,12 @@ async def delete_branch(root: str, name: str) -> None:
 async def pull(root: str) -> dict[str, Any]:
     """Pull from remote."""
     code, out, err = await _run("pull", cwd=root, check=False)
+    return {"ok": code == 0, "message": (out + err).strip()}
+
+
+async def fetch(root: str) -> dict[str, Any]:
+    """Fetch remote refs without merging."""
+    code, out, err = await _run("fetch", "--prune", cwd=root, check=False)
     return {"ok": code == 0, "message": (out + err).strip()}
 
 

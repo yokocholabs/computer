@@ -59,13 +59,18 @@ export const gitCommit = (root: string, message: string) =>
 
 export const gitPull = (root: string) => fetchJSON('/api/git/pull', jsonBody({ root }));
 
+export const gitFetch = (root: string) => fetchJSON('/api/git/fetch', jsonBody({ root }));
+
 export const gitPush = (
 	root: string,
-	{ force = false, set_upstream = false, branch }: { force?: boolean; set_upstream?: boolean; branch?: string } = {}
+	{
+		force = false,
+		set_upstream = false,
+		branch
+	}: { force?: boolean; set_upstream?: boolean; branch?: string } = {}
 ) => fetchJSON('/api/git/push', jsonBody({ root, force, set_upstream, branch }));
 
-export const gitUncommit = (root: string) =>
-	fetchJSON('/api/git/uncommit', jsonBody({ root }));
+export const gitUncommit = (root: string) => fetchJSON('/api/git/uncommit', jsonBody({ root }));
 
 export const createGitBranch = (root: string, name: string) =>
 	fetchJSON('/api/git/branch', jsonBody({ root, name }));
