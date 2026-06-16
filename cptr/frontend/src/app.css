@@ -82,11 +82,13 @@
 	border-radius: 9999px;
 }
 
-.scrollbar-hidden {
+.scrollbar-hidden,
+.scrollbar-none {
 	scrollbar-width: none;
 	-ms-overflow-style: none;
 }
-.scrollbar-hidden::-webkit-scrollbar {
+.scrollbar-hidden::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
 	display: none;
 }
 

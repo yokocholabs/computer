@@ -646,7 +646,7 @@
 		<!-- Universal toolbar (hidden for untitled files with no content yet) -->
 		<div class="toolbar">
 			<div class="toolbar-left">
-				<span class="file-name">{fileData.name}</span>
+				<span class="file-name scrollbar-none">{fileData.name}</span>
 				<span class="file-size">{formatSize(fileData.size)}</span>
 			</div>
 			<div class="toolbar-right">
@@ -880,6 +880,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 8px;
 		height: 30px;
 		padding: 0 10px;
 		border-bottom: 1px solid var(--color-gray-200);
@@ -893,19 +894,33 @@
 	.toolbar-left {
 		display: flex;
 		align-items: center;
+		flex: 1 1 auto;
 		gap: 8px;
+		min-width: 0;
+		overflow: hidden;
 	}
 
 	.toolbar-right {
 		display: flex;
 		align-items: center;
+		flex: 0 0 auto;
 		gap: 2px;
 	}
 
 	.file-name {
+		display: block;
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow-x: auto;
+		overflow-y: hidden;
+		white-space: nowrap;
 		font-size: 12px;
 		font-weight: 500;
 		color: var(--color-gray-700);
+	}
+
+	.file-name::-webkit-scrollbar {
+		display: none;
 	}
 
 	:global(.dark) .file-name {
@@ -913,6 +928,8 @@
 	}
 
 	.file-size {
+		flex: 0 0 auto;
+		white-space: nowrap;
 		font-size: 11px;
 		color: var(--color-gray-400);
 	}
@@ -921,6 +938,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex: 0 0 auto;
 		width: 20px;
 		height: 20px;
 		border-radius: 4px;
