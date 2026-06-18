@@ -26,7 +26,8 @@ function connect() {
 		reconnection: true,
 		reconnectionDelay: 1000,
 		withCredentials: true,
-		transports: ['websocket', 'polling']
+		transports: ['websocket', 'polling'],
+		tryAllTransports: true
 	});
 
 	socket.on('connect', () => {
