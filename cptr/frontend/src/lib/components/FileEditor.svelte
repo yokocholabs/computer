@@ -58,6 +58,7 @@
 		autocompletion,
 		closeBrackets,
 		closeBracketsKeymap,
+		completeAnyWord,
 		completionKeymap
 	} from '@codemirror/autocomplete';
 	import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
@@ -907,6 +908,7 @@
 			bracketMatching(),
 			closeBrackets(),
 			autocompletion(),
+			EditorState.languageData.of(() => [{ autocomplete: completeAnyWord }]),
 			rectangularSelection(),
 			highlightActiveLine(),
 			highlightSelectionMatches(),
