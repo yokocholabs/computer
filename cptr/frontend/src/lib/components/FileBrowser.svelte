@@ -184,7 +184,8 @@
 
 	function gitStatusDecoration(status: string): {
 		char: string;
-		textColor: string;
+		nameColor: string;
+		badgeColor: string;
 		markerColor: string;
 		label: string;
 	} {
@@ -192,63 +193,72 @@
 			case 'added':
 				return {
 					char: 'A',
-					textColor: 'text-emerald-600/80 dark:text-emerald-300/80',
+					nameColor: 'text-emerald-700/85 dark:text-emerald-300/85',
+					badgeColor: 'text-emerald-600/85 dark:text-emerald-300/85',
 					markerColor: 'bg-emerald-500/70',
 					label: 'Added'
 				};
 			case 'untracked':
 				return {
 					char: 'U',
-					textColor: 'text-emerald-600/80 dark:text-emerald-300/80',
-					markerColor: 'bg-emerald-500/70',
+					nameColor: 'text-[#476f36] dark:text-[#91bd91]',
+					badgeColor: 'text-[#4f7b35] dark:text-[#7fbf8b]',
+					markerColor: 'bg-[#7fbf8b]/70',
 					label: 'Untracked'
 				};
 			case 'modified':
 				return {
 					char: 'M',
-					textColor: 'text-amber-600/75 dark:text-amber-300/75',
-					markerColor: 'bg-amber-500/65',
+					nameColor: 'text-[#735c2a] dark:text-[#c7ad78]',
+					badgeColor: 'text-[#815f23] dark:text-[#d2ba82]',
+					markerColor: 'bg-[#d2ba82]/70',
 					label: 'Modified'
 				};
 			case 'deleted':
 				return {
 					char: 'D',
-					textColor: 'text-rose-500/80 dark:text-rose-300/80',
+					nameColor: 'text-rose-600/85 dark:text-rose-300/85',
+					badgeColor: 'text-rose-500/85 dark:text-rose-300/85',
 					markerColor: 'bg-rose-500/70',
 					label: 'Deleted'
 				};
 			case 'renamed':
 				return {
 					char: 'R',
-					textColor: 'text-sky-500/80 dark:text-sky-300/80',
+					nameColor: 'text-sky-600/85 dark:text-sky-300/85',
+					badgeColor: 'text-sky-500/85 dark:text-sky-300/85',
 					markerColor: 'bg-sky-500/70',
 					label: 'Renamed'
 				};
 			case 'copied':
 				return {
 					char: 'C',
-					textColor: 'text-sky-500/75 dark:text-sky-300/75',
+					nameColor: 'text-sky-600/80 dark:text-sky-300/80',
+					badgeColor: 'text-sky-500/80 dark:text-sky-300/80',
 					markerColor: 'bg-sky-500/65',
 					label: 'Copied'
 				};
 			case 'type-changed':
 				return {
 					char: 'T',
-					textColor: 'text-violet-500/75 dark:text-violet-300/75',
+					nameColor: 'text-violet-600/80 dark:text-violet-300/80',
+					badgeColor: 'text-violet-500/80 dark:text-violet-300/80',
 					markerColor: 'bg-violet-500/65',
 					label: 'Type changed'
 				};
 			case 'conflict':
 				return {
 					char: '!',
-					textColor: 'text-orange-500/85 dark:text-orange-300/85',
+					nameColor: 'text-orange-600/90 dark:text-orange-300/90',
+					badgeColor: 'text-orange-500/90 dark:text-orange-300/90',
 					markerColor: 'bg-orange-500/75',
 					label: 'Conflict'
 				};
 			default:
 				return {
 					char: '?',
-					textColor: 'text-gray-500/80 dark:text-gray-400/80',
+					nameColor: 'text-gray-700 dark:text-gray-300',
+					badgeColor: 'text-gray-500/80 dark:text-gray-400/80',
 					markerColor: 'bg-gray-400/70',
 					label: 'Changed'
 				};
@@ -606,7 +616,8 @@
 		}
 
 		// Don't allow dropping onto self or a child of a dragged dir
-		if (draggedItem && (targetDir === draggedItem || targetDir.startsWith(draggedItem + '/'))) return;
+		if (draggedItem && (targetDir === draggedItem || targetDir.startsWith(draggedItem + '/')))
+			return;
 		e.preventDefault();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
 
@@ -626,7 +637,10 @@
 	}
 
 	function onDragLeaveDir() {
-		if (dragExpandTimer) { clearTimeout(dragExpandTimer); dragExpandTimer = null; }
+		if (dragExpandTimer) {
+			clearTimeout(dragExpandTimer);
+			dragExpandTimer = null;
+		}
 		dragOverDir = null;
 	}
 
@@ -652,7 +666,10 @@
 
 	async function onDropOnDir(e: DragEvent, entry: TreeEntry) {
 		e.preventDefault();
-		if (dragExpandTimer) { clearTimeout(dragExpandTimer); dragExpandTimer = null; }
+		if (dragExpandTimer) {
+			clearTimeout(dragExpandTimer);
+			dragExpandTimer = null;
+		}
 		dragOverDir = null;
 
 		// Resolve actual target directory (entry itself if dir, or parent expanded dir)
@@ -664,7 +681,11 @@
 			const rawPaths = e.dataTransfer?.getData('application/x-filebrowser-paths');
 			let paths: string[] = [];
 			if (rawPaths) {
-				try { paths = JSON.parse(rawPaths); } catch { paths = [draggedItem]; }
+				try {
+					paths = JSON.parse(rawPaths);
+				} catch {
+					paths = [draggedItem];
+				}
 			} else {
 				paths = [draggedItem];
 			}
@@ -681,7 +702,10 @@
 	}
 
 	function onDragEnd() {
-		if (dragExpandTimer) { clearTimeout(dragExpandTimer); dragExpandTimer = null; }
+		if (dragExpandTimer) {
+			clearTimeout(dragExpandTimer);
+			dragExpandTimer = null;
+		}
 		draggedItem = null;
 		dragOverDir = null;
 		dragOverBreadcrumb = null;
@@ -706,7 +730,11 @@
 		const rawPaths = e.dataTransfer?.getData('application/x-filebrowser-paths');
 		let paths: string[] = [];
 		if (rawPaths) {
-			try { paths = JSON.parse(rawPaths); } catch { paths = [draggedItem]; }
+			try {
+				paths = JSON.parse(rawPaths);
+			} catch {
+				paths = [draggedItem];
+			}
 		} else {
 			paths = [draggedItem];
 		}
@@ -742,7 +770,11 @@
 			const rawPaths = e.dataTransfer?.getData('application/x-filebrowser-paths');
 			let paths: string[] = [];
 			if (rawPaths) {
-				try { paths = JSON.parse(rawPaths); } catch { paths = [draggedItem]; }
+				try {
+					paths = JSON.parse(rawPaths);
+				} catch {
+					paths = [draggedItem];
+				}
 			} else {
 				paths = [draggedItem];
 			}
@@ -1071,11 +1103,15 @@
 					</div>
 				{:else}
 					{@const isSelected = selectedPaths.has(entry.path)}
-					{@const isDragTarget = dragOverDir !== null && (entry.path === dragOverDir || entry.path.startsWith(dragOverDir + '/'))}
+					{@const isDragTarget =
+						dragOverDir !== null &&
+						(entry.path === dragOverDir || entry.path.startsWith(dragOverDir + '/'))}
 					{@const fileGitStatus = gitStatusForFile(entry)}
 					{@const dirGitStatus = gitStatusForDirectory(entry)}
 					{@const entryGitStatus = fileGitStatus ?? dirGitStatus}
-					{@const entryGitDecoration = entryGitStatus ? gitStatusDecoration(entryGitStatus.status) : null}
+					{@const entryGitDecoration = entryGitStatus
+						? gitStatusDecoration(entryGitStatus.status)
+						: null}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<button
 						class="group flex items-center gap-1 w-full h-7 rounded-lg text-left transition-colors duration-75
@@ -1131,16 +1167,14 @@
 						{#if entry.type === 'directory'}
 							<span
 								class="flex-1 text-xs truncate {entryGitDecoration
-									? entryGitDecoration.textColor
-									: 'text-gray-800 dark:text-gray-200'}"
-								>{entry.name}</span
+									? entryGitDecoration.nameColor
+									: 'text-gray-800 dark:text-gray-200'}">{entry.name}</span
 							>
 						{:else}
 							<span
 								class="flex-1 text-xs truncate {entryGitDecoration
-									? entryGitDecoration.textColor
-									: 'text-gray-800 dark:text-gray-200'}"
-								>{entry.name}</span
+									? entryGitDecoration.nameColor
+									: 'text-gray-800 dark:text-gray-200'}">{entry.name}</span
 							>
 						{/if}
 						{#if dirGitStatus && entryGitDecoration}
@@ -1151,9 +1185,8 @@
 						{/if}
 						{#if fileGitStatus && entryGitDecoration}
 							<span
-								class="text-[10px] font-mono font-bold shrink-0 {entryGitDecoration.textColor}"
-								use:tooltip={gitStatusTooltip(fileGitStatus, entry)}
-								>{entryGitDecoration.char}</span
+								class="text-[10px] font-mono font-bold shrink-0 {entryGitDecoration.badgeColor}"
+								use:tooltip={gitStatusTooltip(fileGitStatus, entry)}>{entryGitDecoration.char}</span
 							>
 						{/if}
 						{#if entry.type !== 'directory' && entry.size !== null}
@@ -1277,12 +1310,20 @@
 						{
 							label: $t('files.openFolder'),
 							icon: 'folder',
-							onclick: () => { setFileBrowserCwd(contextMenu!.entry.path); closeMenu(); }
+							onclick: () => {
+								setFileBrowserCwd(contextMenu!.entry.path);
+								closeMenu();
+							}
 						},
 						{
-							label: expandedDirs.has(contextMenu.entry.path) ? $t('files.collapse') : $t('files.expand'),
+							label: expandedDirs.has(contextMenu.entry.path)
+								? $t('files.collapse')
+								: $t('files.expand'),
 							icon: expandedDirs.has(contextMenu.entry.path) ? 'chevron-down' : 'chevron-right',
-							onclick: () => { toggleDir(contextMenu!.entry.path); closeMenu(); }
+							onclick: () => {
+								toggleDir(contextMenu!.entry.path);
+								closeMenu();
+							}
 						},
 						{ label: '', divider: true, onclick: () => {} }
 					]
