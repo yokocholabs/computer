@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-06-19
+
+### Changed
+
+- 🧠 **Smarter system prompt.** The AI now knows more about the machine it's running on, including the hostname, architecture, shell, and whether it's inside a container. This helps it give more relevant answers when you ask about your system or run commands.
+- 📝 **More template variables for custom prompts.** If you customize your system prompt from the Models admin page, there are new placeholders you can use: runtime environment, hostname, platform, architecture, shell, home directory, and cptr version.
+
 ## [0.5.5] - 2026-06-18
 
 ### Fixed

@@ -1,0 +1,285 @@
+"""System prompt templates and runtime context for chat tasks."""
+
+from __future__ import annotations
+
+import logging
+import os
+import platform
+import re
+import socket
+from datetime import date
+from importlib.metadata import version as pkg_version
+from pathlib import Path
+
+from cptr.models import Config
+from cptr.utils.skills import build_catalog_xml, discover_skills
+
+logger = logging.getLogger(__name__)
+
+INSTRUCTION_FILENAMES = ["MEMORY.md", "AGENTS.md", "AGENT.md", "CLAUDE.md"]
+
+_TEMPLATE_RE = re.compile(r"\{\{(\w+)\}\}")
+
+DEFAULT_SYSTEM_PROMPT = (
+    "You are cptr, a helpful assistant running inside the user's computer interface. "
+    "You have access to tools to read, search, and modify files in the workspace, "
+    "run commands, and use configured tools. Use them to help the user directly."
+    "\n\n{{CPTR_CONTEXT}}"
+    "\n\n{{INSTRUCTIONS}}"
+    "\n\n{{SKILLS}}"
+    "\n\nWorkspace: {{WORKSPACE_NAME}}"
+    "\nFiles:\n{{FILE_TREE}}"
+)
+
+
+def _get_file_tree(workspace: str, max_entries: int = 200) -> str:
+    """Generate a compact file tree listing for the workspace."""
+    ws = Path(workspace)
+    if not ws.is_dir():
+        return ""
+    ignore = {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".next",
+        "build",
+        "dist",
+        ".cptr",
+        ".svelte-kit",
+        ".DS_Store",
+    }
+    entries = []
+    for item in sorted(ws.iterdir()):
+        if item.name in ignore:
+            continue
+        suffix = "/" if item.is_dir() else ""
+        entries.append(f"  {item.name}{suffix}")
+        if item.is_dir():
+            try:
+                for child in sorted(item.iterdir()):
+                    if child.name in ignore:
+                        continue
+                    csuffix = "/" if child.is_dir() else ""
+                    entries.append(f"    {child.name}{csuffix}")
+                    if len(entries) >= max_entries:
+                        entries.append("    ...")
+                        break
+            except PermissionError:
+                pass
+        if len(entries) >= max_entries:
+            break
+    return "\n".join(entries)
+
+
+def _load_instruction_files(workspace: str, max_bytes: int = 32_000) -> str:
+    """Load well-known AI instruction files from workspace root."""
+    ws = Path(workspace)
+    if not ws.is_dir():
+        return ""
+    parts: list[str] = []
+    total = 0
+    for name in INSTRUCTION_FILENAMES:
+        path = ws / name
+        if path.is_file():
+            remaining = max_bytes - total
+            if remaining <= 0:
+                break
+            try:
+                content = path.read_text(errors="replace")[:remaining].strip()
+            except OSError:
+                continue
+            if content:
+                parts.append(f"# {name}\n{content}")
+                total += len(content)
+                logger.debug("[instructions] Loaded %s (%d bytes)", name, len(content))
+    return "\n\n".join(parts)
+
+
+def _is_containerized() -> bool:
+    """Best-effort detection for Docker/Podman/Kubernetes-style containers."""
+    if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists():
+        return True
+    try:
+        cgroup = Path("/proc/1/cgroup").read_text(errors="replace").lower()
+    except OSError:
+        return False
+    markers = ("docker", "containerd", "kubepods", "podman", "libpod")
+    return any(marker in cgroup for marker in markers)
+
+
+def _runtime_label() -> str:
+    return "container" if _is_containerized() else "host"
+
+
+def _safe_hostname() -> str:
+    try:
+        return socket.gethostname()
+    except OSError:
+        return ""
+
+
+def _safe_version() -> str:
+    try:
+        return pkg_version("cptr")
+    except Exception:
+        return "dev"
+
+
+def _format_cptr_context(workspace: str, model: str = "") -> str:
+    """Return the default cptr runtime context block for the system prompt."""
+    ws_path = Path(workspace)
+    runtime = _runtime_label()
+    shell = os.environ.get("SHELL") or os.environ.get("COMSPEC") or ""
+    host_control = (
+        "Commands run in the cptr backend environment. Because this appears to be a "
+        "container, commands affect the container and mounted paths; host-level controls "
+        "only work when the host exposes them into the container."
+        if runtime == "container"
+        else "Commands run on this machine through the cptr backend environment."
+    )
+
+    lines = [
+        "<cptr_context>",
+        "cptr is serving the user's real computer/environment, not a detached chat sandbox.",
+        "",
+        "Runtime:",
+        f"- Environment: {runtime}",
+        f"- Hostname: {_safe_hostname() or 'unknown'}",
+        f"- OS: {platform.system().replace('Darwin', 'macOS')} {platform.release()}",
+        f"- Architecture: {platform.machine() or 'unknown'}",
+        f"- Shell: {shell or 'unknown'}",
+        f"- Home: {Path.home()}",
+        f"- cptr version: {_safe_version()}",
+    ]
+    if model:
+        lines.append(f"- Model: {model}")
+    lines.extend(
+        [
+            "",
+            "Workspace:",
+            f"- Name: {ws_path.name if ws_path.is_dir() else ''}",
+            f"- Path: {ws_path}",
+            "",
+            "Tool behavior:",
+            f"- {host_control}",
+            "- Use the available tools before claiming you cannot inspect or change something.",
+            "- For machine-level requests such as volume, brightness, apps, services, packages, "
+            "network state, or files, check the runtime and use appropriate shell commands or "
+            "configured tools when available.",
+            "- If a task truly cannot reach the requested host capability, explain the runtime "
+            "boundary briefly and offer the closest useful check or command.",
+            "</cptr_context>",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_template(template: str, variables: dict[str, str]) -> str:
+    """Render {{VARIABLE}} placeholders in a template string.
+
+    Known variables are substituted with their values. Unknown variables are left
+    intact so downstream providers or user-specific placeholders are not broken.
+    """
+
+    def _replace(match: re.Match) -> str:
+        key = match.group(1)
+        if key in variables:
+            return variables[key]
+        return match.group(0)
+
+    result = _TEMPLATE_RE.sub(_replace, template)
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result.strip()
+
+
+def _render_system_template(template: str, variables: dict[str, str]) -> str:
+    """Render a system prompt and ensure cptr runtime context is present."""
+    has_context_slot = "{{CPTR_CONTEXT}}" in template
+    rendered = _render_template(template, variables)
+    context = variables.get("CPTR_CONTEXT", "").strip()
+    if context and not has_context_slot and context not in rendered:
+        rendered = f"{rendered}\n\n{context}" if rendered else context
+    return re.sub(r"\n{3,}", "\n\n", rendered).strip()
+
+
+def _build_template_variables(workspace: str, model: str = "") -> dict[str, str]:
+    """Build the dict of template variable values for the current context."""
+    ws_path = Path(workspace)
+    os_name = platform.system().replace("Darwin", "macOS")
+    shell = os.environ.get("SHELL") or os.environ.get("COMSPEC") or ""
+
+    instructions = _load_instruction_files(workspace)
+    if instructions:
+        instructions_block = (
+            f"<instructions>\n{instructions}\n</instructions>"
+            "\n\nThe above <instructions> were loaded from instruction files in the workspace root. "
+            "These files persist across sessions. "
+            "You can update them with your file tools to save learnings, decisions, or "
+            "project conventions for future sessions."
+        )
+    else:
+        instructions_block = ""
+
+    skills = discover_skills(workspace)
+    skills_block = build_catalog_xml(skills)
+
+    return {
+        "WORKSPACE_NAME": ws_path.name if ws_path.is_dir() else "",
+        "WORKSPACE_PATH": str(ws_path),
+        "FILE_TREE": _get_file_tree(workspace),
+        "INSTRUCTIONS": instructions_block,
+        "SKILLS": skills_block,
+        "CPTR_CONTEXT": _format_cptr_context(workspace, model),
+        "RUNTIME_ENV": _runtime_label(),
+        "HOSTNAME": _safe_hostname(),
+        "OS": os_name,
+        "PLATFORM": platform.platform(),
+        "ARCH": platform.machine(),
+        "SHELL": shell,
+        "HOME": str(Path.home()),
+        "CPTR_VERSION": _safe_version(),
+        "DATE": date.today().isoformat(),
+        "MODEL": model,
+    }
+
+
+async def load_system_prompt(workspace: str, model: str = "") -> str:
+    """Load and render the system prompt for a workspace/model.
+
+    Resolution order:
+      1. .cptr/system.md in the workspace
+      2. Per-model system_prompt from chat.models config
+      3. Global (*) system_prompt from chat.models config
+      4. DEFAULT_SYSTEM_PROMPT
+    """
+    template = None
+
+    ws_prompt = Path(workspace) / ".cptr" / "system.md"
+    if ws_prompt.is_file():
+        template = ws_prompt.read_text(errors="replace").strip()
+
+    if template is None:
+        try:
+            chat_models_config = await Config.get("chat.models") or {}
+            if model:
+                model_prompt = (
+                    chat_models_config.get(model, {}).get("params", {}).get("system_prompt")
+                )
+                if model_prompt:
+                    template = model_prompt
+            if template is None:
+                global_prompt = (
+                    chat_models_config.get("*", {}).get("params", {}).get("system_prompt")
+                )
+                if global_prompt:
+                    template = global_prompt
+        except Exception:
+            logger.debug("[system_prompt] Failed to load from config", exc_info=True)
+
+    if template is None:
+        template = DEFAULT_SYSTEM_PROMPT
+
+    variables = _build_template_variables(workspace, model)
+    return _render_system_template(template, variables)

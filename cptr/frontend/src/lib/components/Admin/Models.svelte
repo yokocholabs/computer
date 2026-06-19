@@ -47,18 +47,30 @@
 	let compactDirty = $state(false);
 
 	const TEMPLATE_VARIABLES = [
+		{ name: 'CPTR_CONTEXT', desc: 'Runtime, machine, workspace, and tool context' },
+		{ name: 'RUNTIME_ENV', desc: 'Runtime environment (host or container)' },
+		{ name: 'HOSTNAME', desc: 'Machine hostname' },
 		{ name: 'WORKSPACE_NAME', desc: 'Workspace folder name' },
 		{ name: 'WORKSPACE_PATH', desc: 'Full workspace path' },
 		{ name: 'FILE_TREE', desc: 'File listing (top-level + 1 depth)' },
 		{ name: 'INSTRUCTIONS', desc: 'MEMORY.md / AGENTS.md / CLAUDE.md content' },
 		{ name: 'OS', desc: 'Operating system (macOS, Linux, Windows)' },
+		{ name: 'PLATFORM', desc: 'Detailed platform string' },
+		{ name: 'ARCH', desc: 'Machine architecture' },
+		{ name: 'SHELL', desc: 'Default shell path' },
+		{ name: 'HOME', desc: 'Home directory' },
+		{ name: 'CPTR_VERSION', desc: 'cptr version' },
 		{ name: 'DATE', desc: 'Current date (ISO format)' },
 		{ name: 'MODEL', desc: 'Model ID being used' }
 	];
 
-	const DEFAULT_PROMPT_PLACEHOLDER = `You are a helpful coding assistant. You have access to tools to read, search, and modify files in the workspace. Use them to help the user with their coding tasks.
+	const DEFAULT_PROMPT_PLACEHOLDER = `You are cptr, a helpful assistant running inside the user's computer interface. You have access to tools to read, search, and modify files in the workspace, run commands, and use configured tools. Use them to help the user directly.
+
+{{CPTR_CONTEXT}}
 
 {{INSTRUCTIONS}}
+
+{{SKILLS}}
 
 Workspace: {{WORKSPACE_NAME}}
 Files:
@@ -228,7 +240,7 @@ Files:
 			class="w-full mt-1 bg-gray-50 dark:bg-white/4 border border-gray-200 dark:border-white/8 rounded-lg px-2.5 py-2 text-[11px] font-mono text-gray-600 dark:text-gray-400 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none resize-y leading-relaxed"
 			rows="6"
 			{placeholder}
-			value={value}
+			{value}
 			oninput={(e) => onInput((e.target as HTMLTextAreaElement).value)}
 			spellcheck="false"
 		></textarea>
@@ -237,7 +249,8 @@ Files:
 				class="text-[10px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-75"
 				onclick={() => (showVariables = !showVariables)}
 			>
-				{$t('models.templateVariables')} {showVariables ? '▾' : '▸'}
+				{$t('models.templateVariables')}
+				{showVariables ? '▾' : '▸'}
 			</button>
 			{#if value.trim()}
 				<button
@@ -254,13 +267,10 @@ Files:
 			>
 				{#each TEMPLATE_VARIABLES as v}
 					<div class="flex items-baseline gap-2 h-5">
-						<code
-							class="text-[10px] font-mono text-gray-500 dark:text-gray-500 shrink-0 select-all"
+						<code class="text-[10px] font-mono text-gray-500 dark:text-gray-500 shrink-0 select-all"
 							>{`{{${v.name}}}`}</code
 						>
-						<span class="text-[10px] text-gray-400 dark:text-gray-600 truncate"
-							>{v.desc}</span
-						>
+						<span class="text-[10px] text-gray-400 dark:text-gray-600 truncate">{v.desc}</span>
 					</div>
 				{/each}
 			</div>
@@ -268,7 +278,12 @@ Files:
 	</div>
 {/snippet}
 
-{#snippet paramRows(rows: ParamRow[], onInput: () => void, onRemove: (i: number) => void, onAdd: () => void)}
+{#snippet paramRows(
+	rows: ParamRow[],
+	onInput: () => void,
+	onRemove: (i: number) => void,
+	onAdd: () => void
+)}
 	<div class="mb-2">
 		<span class="text-[10px] text-gray-400 dark:text-gray-600 uppercase tracking-wide"
 			>request params</span
@@ -349,15 +364,27 @@ Files:
 
 			<div class="flex flex-col gap-2.5 mb-5">
 				<div>
-					<label class="text-xs text-gray-600 dark:text-gray-400" for="compact-threshold">{$t('admin.compactTokenThreshold')}</label>
+					<label class="text-xs text-gray-600 dark:text-gray-400" for="compact-threshold"
+						>{$t('admin.compactTokenThreshold')}</label
+					>
 					<div class="flex items-center gap-1.5 mt-1">
-						<input id="compact-threshold" type="number" bind:value={compactTokenThreshold}
+						<input
+							id="compact-threshold"
+							type="number"
+							bind:value={compactTokenThreshold}
 							oninput={() => (compactDirty = true)}
-							min="10000" max="1000000" step="10000"
-							class="w-24 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors" />
-						<span class="text-[11px] text-gray-400 dark:text-gray-600">{$t('admin.compactTokenThresholdUnit')}</span>
+							min="10000"
+							max="1000000"
+							step="10000"
+							class="w-24 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors"
+						/>
+						<span class="text-[11px] text-gray-400 dark:text-gray-600"
+							>{$t('admin.compactTokenThresholdUnit')}</span
+						>
 					</div>
-					<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">{$t('admin.compactTokenThresholdHint')}</p>
+					<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">
+						{$t('admin.compactTokenThresholdHint')}
+					</p>
 				</div>
 			</div>
 
@@ -437,9 +464,7 @@ Files:
 					>
 						<span
 							class="absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all duration-150
-							{model.is_active
-								? 'left-3 bg-white dark:bg-gray-900'
-								: 'left-0.5 bg-white dark:bg-gray-500'}"
+							{model.is_active ? 'left-3 bg-white dark:bg-gray-900' : 'left-0.5 bg-white dark:bg-gray-500'}"
 						></span>
 					</span>
 				</button>
