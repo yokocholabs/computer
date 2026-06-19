@@ -134,7 +134,12 @@ def _prepare_config_updates(updates: dict) -> dict:
     """Normalize sensitive config values before persisting them."""
     prepared = dict(updates)
     secret = _get_jwt_secret()
-    for key in ("audio.stt_api_key", "audio.tts_api_key"):
+    for key in (
+        "audio.stt_api_key",
+        "audio.tts_api_key",
+        "images.generation_api_key",
+        "images.edit_api_key",
+    ):
         value = prepared.get(key)
         if isinstance(value, str) and value and not value.startswith("encrypted:"):
             prepared[key] = encrypt_key(value, secret)

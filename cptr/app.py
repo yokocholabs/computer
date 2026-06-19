@@ -17,6 +17,8 @@ from cptr.routers import (
     files_router,
     gateway_router,
     git_router,
+    images_router,
+    memory_router,
     proxy_router,
     search_router,
     skills_router,
@@ -75,6 +77,12 @@ async def shutdown():
     bot_manager = getattr(app.state, "bot_manager", None)
     if bot_manager:
         await bot_manager.stop_all()
+    try:
+        from cptr.utils.async_subagents import cancel_all_async_subagents
+
+        await cancel_all_async_subagents(reason="shutdown")
+    except Exception:
+        pass
     # Clean up browser sessions and launched Chrome
     try:
         from cptr.utils.browser.session import session_manager
@@ -257,6 +265,8 @@ app.include_router(events_router)
 app.include_router(files_router)
 app.include_router(gateway_router)
 app.include_router(git_router)
+app.include_router(images_router)
+app.include_router(memory_router)
 app.include_router(proxy_router)
 app.include_router(search_router)
 app.include_router(skills_router)

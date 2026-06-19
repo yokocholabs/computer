@@ -21,10 +21,13 @@ INSTRUCTION_FILENAMES = ["MEMORY.md", "AGENTS.md", "AGENT.md", "CLAUDE.md"]
 _TEMPLATE_RE = re.compile(r"\{\{(\w+)\}\}")
 
 DEFAULT_SYSTEM_PROMPT = (
-    "You are cptr, a helpful assistant running inside the user's computer interface. "
+    "You are Computer (cptr), a helpful assistant running inside the user's computer interface. "
     "You have access to tools to read, search, and modify files in the workspace, "
     "run commands, and use configured tools. Use them to help the user directly."
+    " Approach hard requests with initiative and persistence: make the best possible "
+    "attempt, adapt as needed, and keep going unless a real constraint prevents progress."
     "\n\n{{CPTR_CONTEXT}}"
+    "\n\n{{MEMORY}}"
     "\n\n{{INSTRUCTIONS}}"
     "\n\n{{SKILLS}}"
     "\n\nWorkspace: {{WORKSPACE_NAME}}"
@@ -204,7 +207,7 @@ def _render_system_template(template: str, variables: dict[str, str]) -> str:
     return re.sub(r"\n{3,}", "\n\n", rendered).strip()
 
 
-def _build_template_variables(workspace: str, model: str = "") -> dict[str, str]:
+def _build_template_variables(workspace: str, model: str = "", memory: str = "") -> dict[str, str]:
     """Build the dict of template variable values for the current context."""
     ws_path = Path(workspace)
     os_name = platform.system().replace("Darwin", "macOS")
@@ -215,9 +218,8 @@ def _build_template_variables(workspace: str, model: str = "") -> dict[str, str]
         instructions_block = (
             f"<instructions>\n{instructions}\n</instructions>"
             "\n\nThe above <instructions> were loaded from instruction files in the workspace root. "
-            "These files persist across sessions. "
-            "You can update them with your file tools to save learnings, decisions, or "
-            "project conventions for future sessions."
+            "These files persist across sessions and are user-authored workspace instructions. "
+            "Managed memory is shown separately when available."
         )
     else:
         instructions_block = ""
@@ -230,6 +232,7 @@ def _build_template_variables(workspace: str, model: str = "") -> dict[str, str]
         "WORKSPACE_PATH": str(ws_path),
         "FILE_TREE": _get_file_tree(workspace),
         "INSTRUCTIONS": instructions_block,
+        "MEMORY": memory,
         "SKILLS": skills_block,
         "CPTR_CONTEXT": _format_cptr_context(workspace, model),
         "RUNTIME_ENV": _runtime_label(),
@@ -245,7 +248,7 @@ def _build_template_variables(workspace: str, model: str = "") -> dict[str, str]
     }
 
 
-async def load_system_prompt(workspace: str, model: str = "") -> str:
+async def load_system_prompt(workspace: str, model: str = "", user_id: str | None = None) -> str:
     """Load and render the system prompt for a workspace/model.
 
     Resolution order:
@@ -281,5 +284,17 @@ async def load_system_prompt(workspace: str, model: str = "") -> str:
     if template is None:
         template = DEFAULT_SYSTEM_PROMPT
 
-    variables = _build_template_variables(workspace, model)
+    memory = ""
+    if user_id:
+        try:
+            from cptr.utils.memory import build_memory_prompt
+
+            memory = await build_memory_prompt(user_id, workspace)
+        except Exception:
+            logger.debug("[memory] Failed to load managed memory", exc_info=True)
+
+    if memory and "{{MEMORY}}" not in template:
+        template = template.rstrip() + "\n\n{{MEMORY}}"
+
+    variables = _build_template_variables(workspace, model, memory)
     return _render_system_template(template, variables)

@@ -43,7 +43,11 @@ PLAN_MODE_PROMPT = (
 _tasks: dict[str, asyncio.Task] = {}  # message_id → asyncio.Task
 _task_state: dict[str, dict] = {}  # message_id → {content, output}
 _task_chat: dict[str, str] = {}  # message_id → chat_id
-_queue_locks: dict[str, asyncio.Lock] = {}  # chat_id → Lock
+_pending_input_locks: dict[str, asyncio.Lock] = {}  # chat_id → Lock
+
+
+def get_pending_input_lock(chat_id: str) -> asyncio.Lock:
+    return _pending_input_locks.setdefault(chat_id, asyncio.Lock())
 
 
 def start_task(
@@ -98,37 +102,89 @@ def get_active_chat_ids() -> set[str]:
     return {cid for mid, cid in _task_chat.items() if mid in _tasks and not _tasks[mid].done()}
 
 
-# ── Queue processing ────────────────────────────────────────
+# ── Pending input processing ────────────────────────────────
 
 
-async def _process_queue(chat_id: str, user_id: str, workspace: str):
-    """Check for queued user messages and start the next task.
+def _merge_async_subagent_result_meta(messages: list[ChatMessage]) -> dict | None:
+    if not messages:
+        return None
+
+    if all((m.meta or {}).get("async_subagent_result") for m in messages):
+        delegation_ids = [
+            m.meta.get("delegation_id")
+            for m in messages
+            if m.meta and m.meta.get("delegation_id")
+        ]
+        subagent_chat_ids = [
+            m.meta.get("subagent_chat_id")
+            for m in messages
+            if m.meta and m.meta.get("subagent_chat_id")
+        ]
+        meta = {"async_subagent_result": True}
+        if len(delegation_ids) == 1:
+            meta["delegation_id"] = delegation_ids[0]
+        elif delegation_ids:
+            meta["delegation_ids"] = delegation_ids
+        if len(subagent_chat_ids) == 1:
+            meta["subagent_chat_id"] = subagent_chat_ids[0]
+        elif subagent_chat_ids:
+            meta["subagent_chat_ids"] = subagent_chat_ids
+        return meta
+
+    return None
+
+
+def _is_pending_internal_subagent_result(message: ChatMessage) -> bool:
+    return bool((message.meta or {}).get("async_subagent_pending"))
+
+
+def _is_pending_chat_input(message: ChatMessage) -> bool:
+    meta = message.meta or {}
+    return bool(meta.get("queued") or meta.get("async_subagent_pending"))
+
+
+def _first_pending_input_batch(messages: list[ChatMessage]) -> list[ChatMessage]:
+    if not messages:
+        return []
+
+    first_is_internal_subagent_result = _is_pending_internal_subagent_result(messages[0])
+    batch = []
+    for message in messages:
+        if _is_pending_internal_subagent_result(message) != first_is_internal_subagent_result:
+            break
+        batch.append(message)
+    return batch
+
+
+async def process_pending_chat_inputs(chat_id: str, user_id: str, workspace: str):
+    """Start the next task from user-queued prompts or internal subagent results.
 
     Uses a per-chat lock to prevent concurrent processing from
     both the task's finally block and the API double-check.
     """
-    lock = _queue_locks.setdefault(chat_id, asyncio.Lock())
+    lock = get_pending_input_lock(chat_id)
     async with lock:
         all_msgs = await ChatMessage.get_all_by_chat(chat_id)
 
-        # Don't process queue if there's still an active generation
+        # Wait until the parent assistant turn is idle.
         if any(m.role == "assistant" and not m.done for m in all_msgs):
             return
 
-        # Find queued messages (ordered by created_at)
-        queued = [m for m in all_msgs if m.role == "user" and m.meta and m.meta.get("queued")]
-        if not queued:
+        pending_inputs = [
+            m for m in all_msgs if m.role == "user" and _is_pending_chat_input(m)
+        ]
+        if not pending_inputs:
             return
+        input_batch = _first_pending_input_batch(pending_inputs)
 
-        # Combine all queued prompts into one user message
-        combined_content = "\n\n".join(m.content for m in queued if m.content)
+        combined_content = "\n\n".join(m.content for m in input_batch if m.content)
+        combined_meta = _merge_async_subagent_result_meta(input_batch)
 
         # Find the current leaf (latest done assistant message)
         done_assistants = [m for m in all_msgs if m.role == "assistant" and m.done]
-        parent_id = done_assistants[-1].id if done_assistants else queued[0].parent_id
+        parent_id = done_assistants[-1].id if done_assistants else input_batch[0].parent_id
 
-        # Delete individual queued messages, create one combined message
-        for m in queued:
+        for m in input_batch:
             await ChatMessage.delete(m.id)
 
         combined_msg = await ChatMessage.create(
@@ -136,6 +192,7 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
             role="user",
             content=combined_content,
             parent_id=parent_id,
+            meta=combined_meta,
             created_at=now_ms(),
         )
 
@@ -149,7 +206,10 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
             last_asst = done_assistants[-1] if done_assistants else None
             model_id = (last_asst.model if last_asst else "") or ""
         if not model_id:
-            logger.error("[queue] No model found for chat %s, cannot process queue", chat_id)
+            logger.error(
+                "[chat-input] No model found for chat %s, cannot process pending input",
+                chat_id,
+            )
             return
 
         # Resolve connection
@@ -158,7 +218,7 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
 
             connection, bare_model = await _resolve_connection(model_id)
         except Exception:
-            logger.exception("[queue] Failed to resolve connection for model %s", model_id)
+            logger.exception("[chat-input] Failed to resolve connection for model %s", model_id)
             return
 
         # Create assistant placeholder
@@ -173,10 +233,14 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
         )
         await Chat.update_current_message(chat_id, assistant_msg.id, now_ms())
 
-        # Notify frontend that queue was processed (new messages appeared)
+        # Notify frontend that pending inputs became transcript messages.
         await emit_to_user(
             user_id,
-            {"chat_id": chat_id, "message_id": assistant_msg.id, "queue_processed": True},
+            {
+                "chat_id": chat_id,
+                "message_id": assistant_msg.id,
+                "pending_inputs_processed": True,
+            },
         )
 
         # Start new task
@@ -189,19 +253,19 @@ async def _process_queue(chat_id: str, user_id: str, workspace: str):
             model=bare_model,
         )
         logger.info(
-            "[queue] Processed %d queued message(s) for chat %s",
-            len(queued),
+            "[chat-input] Processed %d pending input message(s) for chat %s",
+            len(input_batch),
             chat_id[:8],
         )
 
 
 async def reconcile_chat_state():
-    """Recover from server crash: fix stuck messages, process orphaned queues.
+    """Recover from server crash: fix stuck messages and resume pending inputs.
 
     Called once on startup when ENABLE_CHAT_RECONCILE_ON_STARTUP=true (default).
     Finds:
       1. Assistant messages with done=False that have no running task → mark done
-      2. Chats with queued user messages → process them
+      2. Chats with pending user prompts or subagent results → process them
     """
     from sqlalchemy import select, and_
     from cptr.utils.db import get_db
@@ -226,15 +290,15 @@ async def reconcile_chat_state():
             await ChatMessage.update(msg.id, done=True, meta=meta)
             healed_chats.add(msg.chat_id)
 
-    # Process orphaned queues for healed chats
+    # Resume pending inputs for healed chats.
     for cid in healed_chats:
         chat = await Chat.get_by_id(cid)
         if chat:
             workspace = (chat.meta or {}).get("workspace", "")
             try:
-                await _process_queue(cid, chat.user_id, workspace)
+                await process_pending_chat_inputs(cid, chat.user_id, workspace)
             except Exception:
-                logger.exception("[reconcile] Failed to process queue for chat %s", cid)
+                logger.exception("[reconcile] Failed to process pending inputs for chat %s", cid)
 
     if healed_chats:
         logger.info("[reconcile] Recovered %d chat(s) on startup", len(healed_chats))
@@ -492,6 +556,9 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                     # Filter calls to only those with matching outputs
                     turn_output_ids = {o["call_id"] for o in turn["outputs"]}
                     matched_calls = [tc for tc in turn["calls"] if tc["id"] in turn_output_ids]
+                    call_names = {
+                        tc["id"]: tc.get("function", {}).get("name", "") for tc in turn["calls"]
+                    }
                     if matched_calls:
                         if ti == 0:
                             # First turn: attach to the existing entry
@@ -514,7 +581,10 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                         entry = {
                             "role": "tool",
                             "tool_call_id": out["call_id"],
-                            "content": out.get("output", ""),
+                            "content": _tool_result_for_model(
+                                call_names.get(out["call_id"], ""),
+                                out.get("output", ""),
+                            ),
                         }
 
         result.append(entry)
@@ -602,6 +672,39 @@ def _parse_image_data_uri(result: str) -> tuple[str, str] | None:
         return None
 
 
+def _tool_result_for_model(tool_name: str, result: str) -> str:
+    """Return the tool result text to send back to the model."""
+    if tool_name != "image_generate":
+        return result
+
+    try:
+        meta = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result
+
+    images = meta.get("images")
+    if not isinstance(images, list):
+        return result
+
+    return json.dumps(
+        {
+            "status": meta.get("status", "success"),
+            "displayed_to_user": True,
+            "note": "The generated image is already displayed in the chat. Do not include markdown image links for it.",
+            "images": [
+                {
+                    "id": image.get("id"),
+                    "path": image.get("path"),
+                    "name": image.get("name"),
+                    "mime_type": image.get("mime_type"),
+                }
+                for image in images
+                if isinstance(image, dict)
+            ],
+        }
+    )
+
+
 def _append_tool_to_messages(
     messages: list[dict],
     event: dict,
@@ -610,6 +713,8 @@ def _append_tool_to_messages(
     reasoning_items: list[dict] | None = None,
 ):
     """Append a tool call + result to the message history for the next API call."""
+    result = _tool_result_for_model(event["name"], result)
+
     # Check for image result before truncation (data URI is large but needed)
     image = _parse_image_data_uri(result)
 
@@ -710,6 +815,8 @@ def _append_batch_to_messages(
     messages.append(assistant_msg)
 
     for event, result in call_results:
+        result = _tool_result_for_model(event["name"], result)
+
         # Guard against oversized tool outputs
         image = _parse_image_data_uri(result)
         if not image:
@@ -857,6 +964,30 @@ def build_artifact_item(tool_name: str, arguments: dict, result: str) -> dict | 
     }
 
 
+def build_image_item(tool_name: str, result: str) -> dict | None:
+    """Build a renderable image output item for image-generation tools."""
+    if tool_name != "image_generate":
+        return None
+
+    try:
+        meta = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    images = meta.get("images")
+    if not isinstance(images, list) or not images:
+        return None
+
+    return {
+        "type": "image",
+        "images": [
+            image
+            for image in images
+            if isinstance(image, dict) and isinstance(image.get("url"), str)
+        ],
+    }
+
+
 def _default_base_url(provider: str) -> str:
     return {
         "anthropic": "https://api.anthropic.com/v1",
@@ -978,7 +1109,7 @@ async def run_chat_task(
 
         chat_obj = await Chat.get_by_id(chat_id)
         chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
-        system = await _load_system_prompt(workspace, model)
+        system = await _load_system_prompt(workspace, model, user_id=user_id)
         messages, loaded_summary = await _load_message_history(chat_id, message_id)
         if loaded_summary:
             system += f"\n\n[CONVERSATION SUMMARY]\n{loaded_summary}"
@@ -993,7 +1124,7 @@ async def run_chat_task(
 
         # Strip delegate_task from sub-agent chats (depth limit = 1)
         if chat_obj and (chat_obj.meta or {}).get("subagent"):
-            tools = [t for t in tools if t["name"] != "delegate_task"]
+            tools = [t for t in tools if t["name"] not in {"delegate_task", "update_memory"}]
 
         # Parse $skill-name mentions from the user message to auto-activate skills
         attached_skill_ids: list[str] = []
@@ -1026,6 +1157,7 @@ async def run_chat_task(
         plan_mode = chat_params.get("plan_mode", False)
         if plan_mode:
             tools = [t for t in tools if ALL_TOOLS.get(t["name"], {}).get("auto")]
+            tools = [t for t in tools if t["name"] not in {"delegate_task", "update_memory"}]
             # Inject create_artifact (only available in plan mode)
             tools.append(_fn_to_schema("create_artifact", create_artifact))
             messages.append({"role": "user", "content": PLAN_MODE_PROMPT})
@@ -1082,7 +1214,7 @@ async def run_chat_task(
                 loaded_summary = summary
 
                 # Append summary to system prompt (works for all providers)
-                system = await _load_system_prompt(workspace, model)
+                system = await _load_system_prompt(workspace, model, user_id=user_id)
                 system += f"\n\n[CONVERSATION SUMMARY]\n{summary}"
                 # Re-inject attached skills after compaction (protect from pruning)
                 if attached_skill_ids:
@@ -1265,7 +1397,12 @@ async def run_chat_task(
                     "workspace": workspace,
                     "user_id": user_id,
                     "model_id": model,
+                    "full_model_id": (
+                        (chat_obj.meta or {}).get("last_model") if chat_obj else None
+                    )
+                    or model,
                     "chat_id": chat_id,
+                    "message_id": message_id,
                     "connection": connection,
                 }
 
@@ -1366,6 +1503,12 @@ async def run_chat_task(
                     if artifact_item:
                         output_items.append(artifact_item)
                         await emit(output=artifact_item)
+                        _sync_state()
+
+                    image_item = build_image_item(tc["name"], result)
+                    if image_item:
+                        output_items.append(image_item)
+                        await emit(output=image_item)
                         _sync_state()
 
                     sequential_results.append((tc, result))
@@ -1555,8 +1698,24 @@ async def run_chat_task(
                 await post_webhook(webhook_url, title, preview)
         except Exception:
             logger.debug("[webhook] Error sending webhook for chat %s", chat_id[:8], exc_info=True)
-        # Process any queued follow-up messages
+        # Best-effort post-turn memory review. Runs detached and never competes
+        # with queued user input processing.
         try:
-            await _process_queue(chat_id, user_id, workspace)
+            from cptr.utils.memory import review_memory_after_turn
+
+            await review_memory_after_turn(
+                user_id=user_id,
+                message_id=message_id,
+                workspace=workspace,
+                conversation_messages=messages,
+                assistant_reply=content,
+                model_connection=connection,
+                model=model,
+            )
         except Exception:
-            logger.exception(f"Failed to process queue for chat {chat_id}")
+            logger.debug("[memory] Failed to review conversation", exc_info=True)
+        # Process any pending user prompts or internal subagent results.
+        try:
+            await process_pending_chat_inputs(chat_id, user_id, workspace)
+        except Exception:
+            logger.exception(f"Failed to process pending inputs for chat {chat_id}")

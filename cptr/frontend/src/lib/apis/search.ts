@@ -10,8 +10,10 @@ export interface ChatSearchResult {
 	workspace: string;
 	updated_at: number;
 	created_at: number;
-	match_type: 'title' | 'message';
+	match_type: 'id' | 'title' | 'summary' | 'message' | 'recent';
 	snippet: string | null;
+	matched_message_id?: string | null;
+	matched_role?: string | null;
 }
 
 export interface FileSearchResult {

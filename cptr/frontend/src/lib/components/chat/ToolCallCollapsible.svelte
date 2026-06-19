@@ -26,6 +26,18 @@
 	const isDone = $derived(item.status === 'completed');
 	const isRejected = $derived(item.status === 'rejected');
 	const isPending = $derived(item.status === 'pending');
+	const imageToolOutput = $derived.by(() => {
+		if (toolName !== 'image_generate' || !pairedOutput?.output) {
+			return null;
+		}
+		try {
+			const parsed = JSON.parse(pairedOutput.output);
+			const images = Array.isArray(parsed.images) ? parsed.images : [];
+			return images.filter((image: any) => image && (image.path || image.url || image.id));
+		} catch {
+			return null;
+		}
+	});
 
 	function toggleExpanded() {
 		expanded = !expanded;
@@ -246,12 +258,22 @@
 							{$t('chat.toolOutput')}
 						</div>
 						<div class="w-full min-w-0 overflow-hidden">
-							<pre
-								class="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words font-mono max-h-64 overflow-auto leading-relaxed">{pairedOutput
-									.output.length > 10000
-									? pairedOutput.output.slice(0, 10000)
-									: pairedOutput.output}</pre>
-							{#if pairedOutput.output.length > 10000}
+							{#if imageToolOutput?.length}
+								<div class="px-1 space-y-1">
+									{#each imageToolOutput as image}
+										<div class="text-xs text-gray-600 dark:text-gray-300 break-all leading-relaxed">
+											{image.path || image.url || image.id}
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<pre
+									class="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words font-mono max-h-64 overflow-auto leading-relaxed">{pairedOutput
+										.output.length > 10000
+										? pairedOutput.output.slice(0, 10000)
+										: pairedOutput.output}</pre>
+							{/if}
+							{#if !imageToolOutput?.length && pairedOutput.output.length > 10000}
 								<div class="text-[10px] text-gray-400 dark:text-gray-600 mt-1 px-1">
 									{$t('chat.totalChars', {
 										count: pairedOutput.output.length.toLocaleString()

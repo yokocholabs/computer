@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 
-from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Text, select, update, delete
+from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Text, delete, or_, select, update
 from sqlalchemy.dialects.sqlite import JSON
 
 from cptr.models.base import Base
@@ -123,84 +124,220 @@ class Chat(Base):
         query: str,
         limit: int = 10,
         offset: int = 0,
+        workspace: str | None = None,
+        include_subagents: bool = False,
     ) -> list[dict]:
-        """Search chats by title AND message content (case-insensitive).
+        """Search chats by id, title, summary, and message content.
 
-        Returns dicts with chat fields + 'match_type' ('title' | 'message')
-        and 'snippet' (matching message excerpt or null).
-        Title matches rank first.
+        Ranking favors exact/prefix id and title matches, then summary matches,
+        then message content. This intentionally avoids schema changes or FTS
+        dependencies; it is a better-ranked LIKE search over the current tables.
         """
-        from sqlalchemy import literal, union_all
+        needle = (query or "").strip()
+        if not needle or limit <= 0:
+            return []
+        terms = _search_terms(needle)
 
         async with await get_db() as db:
-            pattern = f"%{query}%"
-
-            # 1) Chats matching by title
-            title_q = (
-                select(
-                    Chat.id,
-                    Chat.title,
-                    Chat.summary,
-                    Chat.meta,
-                    Chat.updated_at,
-                    Chat.created_at,
-                    literal("title").label("match_type"),
-                    literal("").label("snippet"),
+            pattern = f"%{needle}%"
+            term_patterns = [f"%{term}%" for term in terms]
+            metadata_clauses = [
+                Chat.id.ilike(pattern),
+                Chat.title.ilike(pattern),
+                Chat.summary.ilike(pattern),
+            ]
+            message_clauses = [ChatMessage.content.ilike(pattern)]
+            for term_pattern in term_patterns:
+                metadata_clauses.extend(
+                    (
+                        Chat.id.ilike(term_pattern),
+                        Chat.title.ilike(term_pattern),
+                        Chat.summary.ilike(term_pattern),
+                    )
                 )
-                .where(Chat.user_id == user_id)
-                .where(Chat.title.ilike(pattern))
+                message_clauses.append(ChatMessage.content.ilike(term_pattern))
+
+            chat_rows = await db.execute(
+                select(Chat).where(Chat.user_id == user_id).where(or_(*metadata_clauses))
             )
+            chats = list(chat_rows.scalars().all())
 
-            # 2) Chats matching by message content (exclude title-matched)
-            message_q = (
-                select(
-                    Chat.id,
-                    Chat.title,
-                    Chat.summary,
-                    Chat.meta,
-                    Chat.updated_at,
-                    Chat.created_at,
-                    literal("message").label("match_type"),
-                    ChatMessage.content.label("snippet"),
-                )
+            message_rows = await db.execute(
+                select(Chat, ChatMessage)
                 .join(ChatMessage, ChatMessage.chat_id == Chat.id)
                 .where(Chat.user_id == user_id)
-                .where(ChatMessage.content.ilike(pattern))
-                .where(~Chat.title.ilike(pattern))  # avoid duplicates
-                .group_by(Chat.id)  # one result per chat
+                .where(or_(*message_clauses))
+                .order_by(Chat.updated_at.desc(), ChatMessage.created_at.desc())
+                .limit(max(200, (limit + offset) * 50))
+            )
+            message_matches = list(message_rows.all())
+
+        results: dict[str, dict] = {}
+
+        def allowed(chat: Chat) -> bool:
+            meta = chat.meta or {}
+            if not include_subagents and meta.get("subagent"):
+                return False
+            if workspace and meta.get("workspace") != workspace:
+                return False
+            return True
+
+        def add_candidate(
+            chat: Chat,
+            match_type: str,
+            rank: int,
+            snippet_source: str | None = None,
+            matched_message: ChatMessage | None = None,
+        ) -> None:
+            if not allowed(chat):
+                return
+            payload = {
+                "id": chat.id,
+                "title": chat.title,
+                "summary": chat.summary,
+                "meta": chat.meta,
+                "updated_at": chat.updated_at,
+                "created_at": chat.created_at,
+                "match_type": match_type,
+                "snippet": _extract_snippet(snippet_source, needle, terms)
+                if snippet_source
+                else None,
+                "matched_message_id": matched_message.id if matched_message else None,
+                "matched_role": matched_message.role if matched_message else None,
+                "_rank": rank,
+            }
+            existing = results.get(chat.id)
+            if not existing or (rank, -chat.updated_at) < (
+                existing["_rank"],
+                -existing["updated_at"],
+            ):
+                results[chat.id] = payload
+
+        for chat in chats:
+            rank, match_type, snippet_source = _rank_chat_match(chat, needle, terms)
+            add_candidate(chat, match_type, rank, snippet_source)
+
+        for chat, message in message_matches:
+            phrase_or_terms_rank = 60 if needle.casefold() in message.content.casefold() else 70
+            coverage = _term_coverage(message.content, terms)
+            add_candidate(
+                chat,
+                "message",
+                phrase_or_terms_rank - min(coverage, 5),
+                message.content,
+                matched_message=message,
             )
 
-            # Union, order by match_type (title first), then recency
-            combined = union_all(title_q, message_q).subquery()
-            result = await db.execute(
-                select(combined)
-                .order_by(combined.c.match_type, combined.c.updated_at.desc())
-                .limit(limit)
-                .offset(offset)
-            )
-
-            rows = result.all()
-            return [
-                {
-                    "id": r.id,
-                    "title": r.title,
-                    "summary": r.summary,
-                    "meta": r.meta,
-                    "updated_at": r.updated_at,
-                    "created_at": r.created_at,
-                    "match_type": r.match_type,
-                    "snippet": _extract_snippet(r.snippet, query) if r.snippet else None,
-                }
-                for r in rows
-            ]
+        ordered = sorted(
+            results.values(), key=lambda r: (r["_rank"], -r["updated_at"], r["title"].lower())
+        )
+        page = ordered[offset : offset + limit]
+        for row in page:
+            row.pop("_rank", None)
+        return page
 
 
-def _extract_snippet(content: str, query: str, context_chars: int = 80) -> str | None:
+_SEARCH_STOPWORDS = {
+    "a",
+    "am",
+    "an",
+    "and",
+    "are",
+    "do",
+    "does",
+    "how",
+    "i",
+    "is",
+    "me",
+    "my",
+    "of",
+    "or",
+    "the",
+    "to",
+    "was",
+    "what",
+    "when",
+}
+
+
+def _search_terms(query: str) -> list[str]:
+    """Return useful term fallbacks for non-phrase recall queries."""
+    terms: list[str] = []
+    for token in re.findall(r"[\w'-]+", query.casefold()):
+        token = token.strip("-'")
+        if len(token) < 2 or token in _SEARCH_STOPWORDS:
+            continue
+        if token not in terms:
+            terms.append(token)
+    return terms[:8]
+
+
+def _term_coverage(content: str | None, terms: list[str]) -> int:
+    if not content or not terms:
+        return 0
+    folded = content.casefold()
+    return sum(1 for term in terms if term in folded)
+
+
+def _rank_chat_match(chat: Chat, query: str, terms: list[str]) -> tuple[int, str, str | None]:
+    """Return rank, match_type, and optional snippet source for chat metadata."""
+    q = query.casefold()
+    values = {
+        "id": chat.id or "",
+        "title": chat.title or "",
+        "summary": chat.summary or "",
+    }
+    folded = {key: value.casefold() for key, value in values.items()}
+
+    if folded["id"] == q:
+        return (0, "id", f"Chat ID: {values['id']}")
+    if folded["title"] == q:
+        return (1, "title", None)
+    if folded["id"].startswith(q):
+        return (2, "id", f"Chat ID: {values['id']}")
+    if folded["title"].startswith(q):
+        return (3, "title", None)
+    if q in folded["id"]:
+        return (10, "id", f"Chat ID: {values['id']}")
+    if q in folded["title"]:
+        return (11, "title", None)
+    if q in folded["summary"]:
+        return (40, "summary", values["summary"])
+
+    best: tuple[int, str, str | None] | None = None
+    for field, value in folded.items():
+        coverage = _term_coverage(value, terms)
+        if coverage <= 0:
+            continue
+        if field == "id":
+            candidate = (20 - min(coverage, 5), "id", f"Chat ID: {values['id']}")
+        elif field == "title":
+            candidate = (30 - min(coverage, 5), "title", None)
+        else:
+            candidate = (50 - min(coverage, 5), "summary", values["summary"])
+        if best is None or candidate[0] < best[0]:
+            best = candidate
+    return best or (90, "summary", values["summary"])
+
+
+def _extract_snippet(
+    content: str | None, query: str, terms: list[str] | None = None, context_chars: int = 96
+) -> str | None:
     """Extract a short snippet around the first match in message content."""
     if not content:
         return None
-    lower = content.lower()
-    idx = lower.find(query.lower())
+    query = (query or "").strip()
+    if not query:
+        return content[: context_chars * 2] + ("..." if len(content) > context_chars * 2 else "")
+
+    lower = content.casefold()
+    idx = lower.find(query.casefold())
+    if idx == -1:
+        for token in terms or query.split():
+            idx = lower.find(token.casefold())
+            if idx != -1:
+                query = token
+                break
     if idx == -1:
         return content[: context_chars * 2] + ("..." if len(content) > context_chars * 2 else "")
     start = max(0, idx - context_chars)
@@ -228,7 +365,9 @@ class ChatMessage(Base):
     output = Column(JSON, nullable=True)  # Responses API output items
     usage = Column(JSON, nullable=True)  # {input_tokens, output_tokens, ...}
     meta = Column(JSON, nullable=True)  # {files, followups, error, ...}
-    chat_summary = Column(Text, nullable=True)  # Compaction summary (covers all ancestors before this msg)
+    chat_summary = Column(
+        Text, nullable=True
+    )  # Compaction summary (covers all ancestors before this msg)
     created_at = Column(BigInteger, nullable=False)
 
     # ── Class methods ────────────────────────────────────────

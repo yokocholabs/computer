@@ -9,7 +9,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from cptr.models import Chat
-from cptr.routers.workspace import walk_and_rank_files, SearchResult
+from cptr.routers.workspace import walk_and_rank_files
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -47,7 +47,7 @@ async def unified_search(
     ws_paths = [workspace] if workspace else workspaces
 
     # Run chat search and file search concurrently
-    chat_task = Chat.search_by_text(user_id, q, chat_limit)
+    chat_task = Chat.search_by_text(user_id, q, chat_limit, workspace=workspace)
 
     async def _search_files() -> list[dict]:
         if not ws_paths:
@@ -82,12 +82,6 @@ async def unified_search(
 
     chat_results, file_results = await asyncio.gather(chat_task, _search_files())
 
-    # Filter chats by workspace if scoped
-    if workspace:
-        chat_results = [
-            c for c in chat_results if (c.get("meta") or {}).get("workspace") == workspace
-        ]
-
     # Build chat response (strip meta, add workspace)
     chats_out = []
     for c in chat_results:
@@ -101,6 +95,8 @@ async def unified_search(
                 "created_at": c["created_at"],
                 "match_type": c.get("match_type", "title"),
                 "snippet": c.get("snippet"),
+                "matched_message_id": c.get("matched_message_id"),
+                "matched_role": c.get("matched_role"),
             }
         )
 
@@ -120,12 +116,10 @@ async def recent_chats(
 
     async with await get_db() as db:
         result = await db.execute(
-            select(Chat)
-            .where(Chat.user_id == user_id)
-            .order_by(Chat.updated_at.desc())
-            .limit(limit)
+            select(Chat).where(Chat.user_id == user_id).order_by(Chat.updated_at.desc())
         )
         rows = list(result.scalars().all())
+    rows = [c for c in rows if not (c.meta or {}).get("subagent")][:limit]
 
     return {
         "chats": [

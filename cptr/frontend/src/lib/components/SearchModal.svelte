@@ -264,7 +264,7 @@
 								<span class="text-xs font-medium truncate">{chat.title}</span>
 								<span class="text-[10px] text-gray-400 dark:text-gray-600 shrink-0">{relativeTime(chat.updated_at)}</span>
 							</div>
-							{#if chat.match_type === 'message' && chat.snippet}
+							{#if chat.snippet}
 								<div class="text-[11px] text-gray-400 dark:text-gray-600 truncate mt-0.5">{chat.snippet}</div>
 							{/if}
 						</div>

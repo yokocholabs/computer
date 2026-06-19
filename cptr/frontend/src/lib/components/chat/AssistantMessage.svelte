@@ -177,6 +177,8 @@
 				return _t('chat.tool.checkTask', { id: args.task_id || '?' });
 			case 'kill_task':
 				return _t('chat.tool.killTask', { id: args.task_id || '?' });
+			case 'image_generate':
+				return args.image || args.images?.length ? 'Edit image' : 'Generate image';
 			case 'web_search':
 				return _t('chat.tool.webSearch', { query: args.query || '?' });
 			case 'read_url': {
@@ -188,7 +190,8 @@
 			}
 			case 'delegate_task': {
 				const t = args.task || '?';
-				return `Sub-agent: "${t.length > 60 ? t.slice(0, 60) + '…' : t}"`;
+				const label = args.background ? 'Background sub-agent' : 'Sub-agent';
+				return `${label}: "${t.length > 60 ? t.slice(0, 60) + '…' : t}"`;
 			}
 			default: {
 				// External tool: {server_id}_{tool_name} → "tool_name (server_id)"
@@ -224,7 +227,12 @@
 		item: any;
 	}
 
-	type DisplayItem = ActivityGroup | MessageItem | ArtifactItem;
+	interface ImageItem {
+		type: 'image_item';
+		item: any;
+	}
+
+	type DisplayItem = ActivityGroup | MessageItem | ArtifactItem | ImageItem;
 
 	const outputText = $derived.by((): string => {
 		return (output || [])
@@ -235,6 +243,14 @@
 			.join('');
 	});
 
+	const structuredImageUrls = $derived.by((): string[] => {
+		return (output || [])
+			.filter((i: any) => i.type === 'image')
+			.flatMap((i: any) => i.images || [])
+			.map((image: any) => image?.url)
+			.filter((url: any): url is string => typeof url === 'string' && url.length > 0);
+	});
+
 	const unrenderedContent = $derived.by((): string => {
 		if (!content) return '';
 		if (!outputText) return content;
@@ -243,6 +259,20 @@
 
 	function messageItemText(item: any): string {
 		return (item.content || []).map((c: any) => c.text || '').join('');
+	}
+
+	function escapeRegExp(value: string): string {
+		return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	}
+
+	function stripStructuredImageMarkdown(text: string): string {
+		let cleaned = text;
+		for (const url of structuredImageUrls) {
+			const escapedUrl = escapeRegExp(url);
+			cleaned = cleaned.replace(new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'g'), '');
+			cleaned = cleaned.replace(new RegExp(`(^|\\n)[ \\t]*${escapedUrl}[ \\t]*(?=\\n|$)`, 'g'), '$1');
+		}
+		return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 	}
 
 	const displayItems = $derived.by((): DisplayItem[] => {
@@ -297,6 +327,9 @@
 			} else if (item.type === 'artifact') {
 				flushGroup();
 				items.push({ type: 'artifact_item', item });
+			} else if (item.type === 'image') {
+				flushGroup();
+				items.push({ type: 'image_item', item });
 			}
 			// function_call_output items are handled via outputMap, skip standalone render
 		}
@@ -378,9 +411,10 @@
 				{/if}
 				{#each displayItems as displayItem, groupIdx}
 					{#if displayItem.type === 'message_item'}
-						<MarkdownRenderer
-							content={displayItem.item.content?.map((c: any) => c.text).join('') || ''}
-						/>
+						{@const messageText = stripStructuredImageMarkdown(messageItemText(displayItem.item))}
+						{#if messageText}
+							<MarkdownRenderer content={messageText} />
+						{/if}
 					{:else if displayItem.type === 'artifact_item'}
 						{@const artifact = displayItem.item}
 						{@const preview = (artifact.content || '').replace(/^#.*\n*/m, '').trim()}
@@ -415,6 +449,23 @@
 								{/if}
 							</div>
 						</button>
+					{:else if displayItem.type === 'image_item'}
+						<div class="my-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+							{#each displayItem.item.images || [] as image}
+								<a
+									href={image.url}
+									target="_blank"
+									rel="noreferrer"
+									class="block overflow-hidden rounded-lg border border-gray-200 dark:border-white/8 bg-gray-50 dark:bg-white/[0.03]"
+								>
+									<img
+										src={image.url}
+										alt={image.name || 'Generated image'}
+										class="max-h-96 w-full object-contain"
+									/>
+								</a>
+							{/each}
+						</div>
 					{:else if displayItem.type === 'activity_group'}
 						{#if displayItem.entries.length === 1}
 							{@const item = displayItem.entries[0]}
@@ -448,10 +499,14 @@
 					{/if}
 				{/each}
 				{#if done && unrenderedContent && displayItems.length > 0}
-					<MarkdownRenderer content={unrenderedContent} />
+					{@const leftoverText = stripStructuredImageMarkdown(unrenderedContent)}
+					{#if leftoverText}
+						<MarkdownRenderer content={leftoverText} />
+					{/if}
 				{:else if !done}
-					{#if unrenderedContent}
-						<MarkdownRenderer content={unrenderedContent} />
+					{@const leftoverText = stripStructuredImageMarkdown(unrenderedContent)}
+					{#if leftoverText}
+						<MarkdownRenderer content={leftoverText} />
 					{/if}
 					<span
 						class="inline-block w-[2px] h-3.5 bg-gray-400 dark:bg-gray-500 ml-0.5 animate-pulse align-text-bottom"
