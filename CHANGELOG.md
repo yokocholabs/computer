@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-20
+
+### Added
+
+- 🧠 **Memory.** The AI can now remember things about you and your projects. Memories are stored per user and per workspace, and are automatically included in future conversations. You can view, edit, and delete memories from the new Memory tab in Settings. Admins can also turn on background memory review, which lets the AI quietly pick up on preferences and patterns as you chat.
+- 🎨 **Image generation and editing.** Ask the AI to create or edit images right from the chat. Generated images are saved to your workspace and displayed inline in the conversation. Supports any OpenAI-compatible image API. Configure from the new Images tab in admin settings.
+- 🔀 **Background sub-agents.** Sub-agents can now run in the background. The AI kicks off a task, keeps chatting with you, and brings the results back when the background work is done. Great for long-running research or multi-step tasks you don't want to wait on.
+- 🔍 **Better chat search.** Searching your chats now looks at chat IDs, titles, summaries, and message content all at once, with smarter ranking. Exact and prefix matches on titles and IDs show up first, then summary matches, then message content. You can also filter by workspace and choose whether to include sub-agent chats.
+
+### Changed
+
+- 🖼️ **Generated images show inline.** Images created by the AI now appear as proper image previews in the chat instead of raw file paths or JSON. The tool call output also shows a cleaner summary instead of a wall of data.
+- 🏷️ **Background sub-agents are labeled.** When the AI runs a task in the background, the tool call label now says "Background sub-agent" so you can tell it apart from a regular sub-agent at a glance.
+- 🧹 **Code cleanup.** Formatting and style improvements across the codebase for better readability.
+
 ## [0.5.6] - 2026-06-19
 
 ### Changed
