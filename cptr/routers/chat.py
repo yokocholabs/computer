@@ -660,7 +660,7 @@ async def approve_tool(chat_id: str, message_id: str, body: ApproveRequest, requ
         )
 
         # Emit artifact card if the tool produced an artifact
-        from cptr.utils.chat_task import build_artifact_item
+        from cptr.utils.chat_task import build_artifact_item, build_image_item
 
         artifact_item = build_artifact_item(call["name"], call.get("arguments", {}), result)
         if artifact_item:
@@ -670,6 +670,16 @@ async def approve_tool(chat_id: str, message_id: str, body: ApproveRequest, requ
             await emit_to_user(
                 user_id,
                 {"chat_id": chat_id, "message_id": message_id, "output": artifact_item},
+            )
+
+        image_item = build_image_item(call["name"], result)
+        if image_item:
+            output.append(image_item)
+            from cptr.socket.main import emit_to_user
+
+            await emit_to_user(
+                user_id,
+                {"chat_id": chat_id, "message_id": message_id, "output": image_item},
             )
 
         await ChatMessage.update(message_id, output=output, done=False)

@@ -654,6 +654,17 @@
 	"admin.audio.voiceModeSystemPromptHint": "Applied only while voice mode is on. Keep it short to make spoken replies useful.",
 	"admin.audio.saveFailed": "Failed to save audio settings",
 
+	"admin.images.title": "Images",
+	"admin.images.generation": "Image Generation",
+	"admin.images.editing": "Image Editing",
+	"admin.images.enableGeneration": "Enable image generation",
+	"admin.images.enableEditing": "Enable image editing",
+	"admin.images.size": "Size",
+	"admin.images.generationHint": "Compatible with OpenAI's images/generations API.",
+	"admin.images.editHint": "Compatible with OpenAI's images/edits API. If no edit key is set, the generation key is reused.",
+	"admin.images.editKeyPlaceholder": "Leave blank to reuse generation key",
+	"admin.images.saveFailed": "Failed to save image settings",
+
 	"sqlite.loadError": "Failed to load database.",
 	"sqlite.null": "NULL",
 	"sqlite.blob": "[BLOB {{size}}B]",

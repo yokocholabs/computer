@@ -20,7 +20,7 @@ import re
 import time
 import uuid
 from pathlib import Path
-from typing import Callable, Optional, Pattern, get_type_hints
+from typing import Callable, Optional, Pattern, get_args, get_origin, get_type_hints
 from cptr.env import CHAT_TOOL_COMMAND_MAX_CHARS, CHAT_TOOL_MAX_CHARS, EXECUTE_TIMEOUT
 
 try:
@@ -1439,6 +1439,72 @@ async def browser_evaluate(javascript: str, *, __context__: dict) -> str:
     return await client.evaluate(javascript)
 
 
+async def generate_image(
+    prompt: str,
+    size: Optional[str] = None,
+    n: int = 1,
+    *,
+    __context__: dict,
+) -> str:
+    """Generate image files from a text prompt.
+    :param prompt: Detailed description of the image to generate.
+    :param size: Optional image size, such as 1024x1024.
+    :param n: Number of images to generate, from 1 to 4.
+    """
+    from cptr.utils.images import generate_images
+
+    images = await generate_images(
+        prompt,
+        user_id=__context__.get("user_id"),
+        size=size,
+        n=n,
+        workspace=__context__.get("workspace"),
+    )
+    return json.dumps(
+        {
+            "status": "success",
+            "images": [image.as_dict() for image in images],
+        },
+        ensure_ascii=False,
+    )
+
+
+async def edit_image(
+    prompt: str,
+    image_ids: list[str],
+    size: Optional[str] = None,
+    n: int = 1,
+    background: Optional[str] = None,
+    *,
+    __context__: dict,
+) -> str:
+    """Edit existing cptr image files from a text prompt.
+    :param prompt: Description of the requested image changes.
+    :param image_ids: List of cptr file IDs or /api/files/... URLs for the source images.
+    :param size: Optional image size, such as 1024x1024.
+    :param n: Number of images to create, from 1 to 4.
+    :param background: Optional background setting supported by the image provider.
+    """
+    from cptr.utils.images import edit_images
+
+    images = await edit_images(
+        prompt,
+        image_ids,
+        user_id=__context__.get("user_id"),
+        size=size,
+        n=n,
+        background=background,
+        workspace=__context__.get("workspace"),
+    )
+    return json.dumps(
+        {
+            "status": "success",
+            "images": [image.as_dict() for image in images],
+        },
+        ensure_ascii=False,
+    )
+
+
 # ── Registry ────────────────────────────────────────────────
 
 TOOLS: dict[str, dict] = {
@@ -1463,6 +1529,8 @@ TOOLS: dict[str, dict] = {
     "update_automation": {"fn": update_automation, "auto": False},
     "toggle_automation": {"fn": toggle_automation, "auto": False},
     "delete_automation": {"fn": delete_automation, "auto": False},
+    "generate_image": {"fn": generate_image, "auto": False},
+    "edit_image": {"fn": edit_image, "auto": False},
 }
 
 # Browser tools — conditionally included in schemas based on browser.enabled
@@ -1960,6 +2028,18 @@ def _unwrap_optional(hint):
     return hint
 
 
+def _schema_for_type(hint) -> dict:
+    origin = get_origin(hint)
+    if origin is list:
+        args = get_args(hint)
+        item_hint = _unwrap_optional(args[0]) if args else str
+        return {
+            "type": "array",
+            "items": _schema_for_type(item_hint),
+        }
+    return {"type": _TYPE_MAP.get(hint, "string")}  # type: ignore[arg-type]
+
+
 def _parse_param_descriptions(docstring: str) -> dict[str, str]:
     """Extract :param name: description lines from docstring."""
     descs: dict[str, str] = {}
@@ -1990,8 +2070,7 @@ def _fn_to_schema(name: str, fn) -> dict:
             continue
         raw_hint = hints.get(pname)
         hint = _unwrap_optional(raw_hint) if raw_hint else raw_hint
-        ptype = _TYPE_MAP.get(hint, "string")  # type: ignore[arg-type]
-        prop: dict = {"type": ptype}
+        prop: dict = _schema_for_type(hint)
         if pname in param_descs:
             prop["description"] = param_descs[pname]
         if param.default is not inspect.Parameter.empty:
@@ -2049,7 +2128,13 @@ async def get_tool_list() -> list[dict]:
                 "true",
                 "1",
             )
+        if (await Config.get("images.generation_enabled")) not in (True, "true", "1"):
+            tools.pop("generate_image", None)
+        if (await Config.get("images.edit_enabled")) not in (True, "true", "1"):
+            tools.pop("edit_image", None)
     except Exception:
+        tools.pop("generate_image", None)
+        tools.pop("edit_image", None)
         pass
 
     schemas = [_fn_to_schema(name, t["fn"]) for name, t in tools.items()]

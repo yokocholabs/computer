@@ -13,6 +13,7 @@
 	import Messaging from './Admin/Messaging.svelte';
 	import Gateway from './Admin/Gateway.svelte';
 	import AudioSettings from './Admin/AudioSettings.svelte';
+	import Images from './Admin/Images.svelte';
 	import AdminWeb from './Admin/Web.svelte';
 	import ToolServers from './Admin/ToolServers.svelte';
 	import Subagents from './Admin/Subagents.svelte';
@@ -31,6 +32,7 @@
 		| 'messaging'
 		| 'gateway'
 		| 'audio'
+		| 'images'
 		| 'web'
 		| 'toolservers'
 		| 'subagents';
@@ -67,6 +69,7 @@
 		{ id: 'messaging', label: $t('admin.messaging'), icon: 'chat-bubble' },
 		{ id: 'gateway', label: $t('admin.gateway.tab'), icon: 'gateway' },
 		{ id: 'audio', label: $t('admin.audio.title'), icon: 'microphone' },
+		{ id: 'images', label: $t('admin.images.title'), icon: 'image' },
 		{ id: 'web', label: $t('admin.web'), icon: 'globe' },
 		{ id: 'toolservers', label: $t('admin.toolServers'), icon: 'plug' },
 		{ id: 'subagents', label: $t('admin.subagents'), icon: 'user' }
@@ -168,6 +171,8 @@
 			<Gateway />
 		{:else if activeTab === 'audio'}
 			<AudioSettings />
+		{:else if activeTab === 'images'}
+			<Images />
 		{:else if activeTab === 'web'}
 			<AdminWeb />
 		{:else if activeTab === 'toolservers'}

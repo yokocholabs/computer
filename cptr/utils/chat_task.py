@@ -556,6 +556,9 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                     # Filter calls to only those with matching outputs
                     turn_output_ids = {o["call_id"] for o in turn["outputs"]}
                     matched_calls = [tc for tc in turn["calls"] if tc["id"] in turn_output_ids]
+                    call_names = {
+                        tc["id"]: tc.get("function", {}).get("name", "") for tc in turn["calls"]
+                    }
                     if matched_calls:
                         if ti == 0:
                             # First turn: attach to the existing entry
@@ -578,7 +581,10 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                         entry = {
                             "role": "tool",
                             "tool_call_id": out["call_id"],
-                            "content": out.get("output", ""),
+                            "content": _tool_result_for_model(
+                                call_names.get(out["call_id"], ""),
+                                out.get("output", ""),
+                            ),
                         }
 
         result.append(entry)
@@ -666,6 +672,39 @@ def _parse_image_data_uri(result: str) -> tuple[str, str] | None:
         return None
 
 
+def _tool_result_for_model(tool_name: str, result: str) -> str:
+    """Return the tool result text to send back to the model."""
+    if tool_name not in {"generate_image", "edit_image"}:
+        return result
+
+    try:
+        meta = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result
+
+    images = meta.get("images")
+    if not isinstance(images, list):
+        return result
+
+    return json.dumps(
+        {
+            "status": meta.get("status", "success"),
+            "displayed_to_user": True,
+            "note": "The generated image is already displayed in the chat. Do not include markdown image links for it.",
+            "images": [
+                {
+                    "id": image.get("id"),
+                    "path": image.get("path"),
+                    "name": image.get("name"),
+                    "mime_type": image.get("mime_type"),
+                }
+                for image in images
+                if isinstance(image, dict)
+            ],
+        }
+    )
+
+
 def _append_tool_to_messages(
     messages: list[dict],
     event: dict,
@@ -674,6 +713,8 @@ def _append_tool_to_messages(
     reasoning_items: list[dict] | None = None,
 ):
     """Append a tool call + result to the message history for the next API call."""
+    result = _tool_result_for_model(event["name"], result)
+
     # Check for image result before truncation (data URI is large but needed)
     image = _parse_image_data_uri(result)
 
@@ -774,6 +815,8 @@ def _append_batch_to_messages(
     messages.append(assistant_msg)
 
     for event, result in call_results:
+        result = _tool_result_for_model(event["name"], result)
+
         # Guard against oversized tool outputs
         image = _parse_image_data_uri(result)
         if not image:
@@ -918,6 +961,30 @@ def build_artifact_item(tool_name: str, arguments: dict, result: str) -> dict | 
         or artifact_type.replace("_", " ").title(),
         "content": arguments.get("content", ""),
         "path": meta.get("path") or arguments.get("path", ""),
+    }
+
+
+def build_image_item(tool_name: str, result: str) -> dict | None:
+    """Build a renderable image output item for image-generation tools."""
+    if tool_name not in {"generate_image", "edit_image"}:
+        return None
+
+    try:
+        meta = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    images = meta.get("images")
+    if not isinstance(images, list) or not images:
+        return None
+
+    return {
+        "type": "image",
+        "images": [
+            image
+            for image in images
+            if isinstance(image, dict) and isinstance(image.get("url"), str)
+        ],
     }
 
 
@@ -1436,6 +1503,12 @@ async def run_chat_task(
                     if artifact_item:
                         output_items.append(artifact_item)
                         await emit(output=artifact_item)
+                        _sync_state()
+
+                    image_item = build_image_item(tc["name"], result)
+                    if image_item:
+                        output_items.append(image_item)
+                        await emit(output=image_item)
                         _sync_state()
 
                     sequential_results.append((tc, result))
