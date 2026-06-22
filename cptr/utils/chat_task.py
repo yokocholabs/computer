@@ -11,7 +11,7 @@ import logging
 import uuid
 
 from cptr.env import CHAT_MAX_ITERATIONS, CHAT_TOOL_MAX_CHARS
-from cptr.utils.context import should_compact
+from cptr.utils.context import resolve_compact_token_threshold, should_compact
 from cptr.utils.skills import discover_skills, load_skill, format_skill_content
 from cptr.utils.summarize import summarize_messages
 from cptr.models import Chat, ChatMessage, Config
@@ -1149,6 +1149,7 @@ async def run_chat_task(
 
         chat_obj = await Chat.get_by_id(chat_id)
         chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
+        configured_model = (msg.model if msg else None) or model
         system = await _load_system_prompt(workspace, model, user_id=user_id)
         messages, loaded_summary = await _load_message_history(chat_id, message_id)
         if loaded_summary:
@@ -1222,17 +1223,28 @@ async def run_chat_task(
         chat_request_params = chat_params.get("request_params") or {}
         global_rp = {}
         model_rp = {}
+        compact_token_threshold = None
         try:
             chat_models_config = await Config.get("chat.models") or {}
             global_rp = chat_models_config.get("*", {}).get("params", {}).get("request_params", {})
             model_rp = chat_models_config.get(model, {}).get("params", {}).get("request_params", {})
+            compact_token_threshold = resolve_compact_token_threshold(
+                configured_model, chat_models_config=chat_models_config
+            )
         except Exception:
             pass
+        compact_token_threshold = compact_token_threshold or resolve_compact_token_threshold()
         request_params = {**global_rp, **model_rp, **chat_request_params} or None
 
         for _iteration in range(CHAT_MAX_ITERATIONS):
             # ── Context compaction: summarize older messages if too large ──
-            if should_compact(messages, system, last_usage, new_messages_since):
+            if should_compact(
+                messages,
+                system,
+                last_usage,
+                new_messages_since,
+                threshold=compact_token_threshold,
+            ):
                 target_keep = max(2, len(messages) * 2 // 5)
                 split_idx = _find_safe_split(messages, target_keep)
                 drop_zone = messages[:split_idx]
