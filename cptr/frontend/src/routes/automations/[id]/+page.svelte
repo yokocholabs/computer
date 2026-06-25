@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Automation / cptr</title>
+	<title>Automation / Computer</title>
 </svelte:head>
 
 <AutomationsPanel {automationId} />

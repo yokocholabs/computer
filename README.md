@@ -1,4 +1,4 @@
-# cptr
+# Computer (cptr)
 
 ![GitHub stars](https://img.shields.io/github/stars/open-webui/computer?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/open-webui/computer?style=social)
@@ -16,7 +16,7 @@
 
 `cptr` (short for "computer") runs on your machine and serves your whole computer (files, terminal, editor, git) to any browser. It literally is your computer.
 
-Use it from your phone, tablet, laptop, another computer, or the machine it's running on. Designed to feel native on every screen. Plug in an AI that can actually read, write, and run things on your machine, or bring your favourite terminal agent. Terminal multiplexer, parallel AI agents, full workstation, one tool, your computer, any device.
+Use it from your phone, tablet, laptop, another computer, or the machine it's running on. Designed to feel native on every screen. Connect your own AI via API key, or plug in a coding agent you already subscribe to and skip the key entirely. Terminal multiplexer, parallel AI agents, full workstation, one tool, your computer, any device.
 
 ## Install
 
@@ -69,7 +69,7 @@ Or skip networking entirely and connect a [messaging bot](#messaging-bots) inste
 
 ## AI agent
 
-Bring your own API key. Works with OpenAI, Anthropic, Ollama, or any OpenAI-compatible endpoint.
+Bring your own API key (OpenAI, Anthropic, Ollama, or any OpenAI-compatible endpoint), or connect a coding agent you already subscribe to.
 
 | | |
 |---|---|
@@ -91,7 +91,15 @@ Bring your own API key. Works with OpenAI, Anthropic, Ollama, or any OpenAI-comp
 | 🔌 **Tool servers** | Connect external tools via MCP or OpenAPI. |
 | 🧠 **Context compaction** | Long conversations are automatically summarised to stay fast. |
 
-Already have a favourite terminal agent? Claude Code, Codex, Gemini CLI, Cursor, Grok, OpenCode, Kilo Code, and Pi all plug straight in. Use the subscription you already pay for.
+## Coding agents
+
+Connect a coding agent as a native backend and use the subscription you already pay for. No separate API key needed.
+
+**Codex** · **Claude Code** · **Cursor** · **Grok** · **OpenCode**
+
+Add an agent profile from Settings, pick your models, and it shows up in the model selector like any other provider. Conversations run inside your workspace with full tool access and resume where you left off.
+
+Prefer to run agents yourself? Any terminal agent (Gemini CLI, Kilo Code, Pi, and others) works in the terminal tab the way it always has.
 
 ## Messaging bots
 

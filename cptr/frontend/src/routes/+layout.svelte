@@ -408,11 +408,11 @@
 	<title
 		>{$activeTab && $activeTab.type !== 'files'
 			? $currentWorkspace
-				? `${$activeTab.label} / ${$currentWorkspace.name} / cptr`
-				: `${$activeTab.label} / cptr`
+				? `${$activeTab.label} / ${$currentWorkspace.name} / Computer`
+				: `${$activeTab.label} / Computer`
 			: $currentWorkspace
-				? `${$currentWorkspace.name} / cptr`
-				: 'cptr'}</title
+				? `${$currentWorkspace.name} / Computer`
+				: 'Computer'}</title
 	>
 	<meta name="description" content={$t('app.tagline')} />
 </svelte:head>

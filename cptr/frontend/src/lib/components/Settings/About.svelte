@@ -3,7 +3,7 @@
 	import { appVersion, showChangelog, updateAvailable, latestVersion } from '$lib/stores';
 
 	const REPO_URL = 'https://github.com/open-webui/computer';
-	const SHARE_TEXT = 'Check out cptr. Your computer, from anywhere.';
+	const SHARE_TEXT = 'Check out Computer. Your computer, from anywhere.';
 
 	const shareLinks = [
 		{
@@ -39,7 +39,7 @@
 			href="https://github.com/open-webui/computer"
 			target="_blank"
 			rel="noopener noreferrer"
-			class="text-xs font-semibold text-gray-900 dark:text-white hover:underline">cptr</a
+			class="text-xs font-semibold text-gray-900 dark:text-white hover:underline">Computer</a
 		>
 		{#if $appVersion}
 			<button
@@ -104,4 +104,3 @@
 <p class="text-[11px] text-gray-300 dark:text-gray-700 pt-4">
 	{$t('about.createdBy')}
 </p>
-

@@ -193,6 +193,8 @@
 				const label = args.background ? 'Background sub-agent' : 'Sub-agent';
 				return `${label}: "${t.length > 60 ? t.slice(0, 60) + '…' : t}"`;
 			}
+			case 'agent_tool':
+				return args.title || 'Agent tool';
 			default: {
 				// External tool: {server_id}_{tool_name} → "tool_name (server_id)"
 				const idx = name.indexOf('_');
@@ -270,7 +272,10 @@
 		for (const url of structuredImageUrls) {
 			const escapedUrl = escapeRegExp(url);
 			cleaned = cleaned.replace(new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'g'), '');
-			cleaned = cleaned.replace(new RegExp(`(^|\\n)[ \\t]*${escapedUrl}[ \\t]*(?=\\n|$)`, 'g'), '$1');
+			cleaned = cleaned.replace(
+				new RegExp(`(^|\\n)[ \\t]*${escapedUrl}[ \\t]*(?=\\n|$)`, 'g'),
+				'$1'
+			);
 		}
 		return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 	}

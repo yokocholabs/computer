@@ -18,6 +18,7 @@
 	import DirectoryPicker from './DirectoryPicker.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import SettingsModal from './SettingsModal.svelte';
+	import SystemInfoModal from './SystemInfoModal.svelte';
 
 	import { tooltip } from '$lib/tooltip';
 	import { session, clearSession } from '$lib/session';
@@ -34,6 +35,7 @@
 	let showPicker = $state(false);
 	let showMenu = $state(false);
 	let showSettings = $state(false);
+	let showSystemInfo = $state(false);
 	let settingsTab = $state<string>('general');
 	let wsMenuPath = $state<string | null>(null);
 	let wsMenuAnchor = $state<HTMLElement | null>(null);
@@ -214,6 +216,11 @@
 		showSettings = true;
 	}
 
+	function openSystemInfo() {
+		showMenu = false;
+		showSystemInfo = true;
+	}
+
 	function logout() {
 		clearSession();
 	}
@@ -282,7 +289,7 @@
 					e.preventDefault();
 					goto('/');
 					if (typeof window !== 'undefined' && window.innerWidth < 768) sidebarOpen.set(false);
-				}}><img src="/favicon.png" alt="cptr logo" class="w-4 h-4" />cptr</a
+				}}><img src="/favicon.png" alt="Computer logo" class="w-4 h-4" />Computer</a
 			>
 			<button
 				class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors duration-100"
@@ -503,6 +510,11 @@
 				shortcut: formatChord($keybindings.openSettings),
 				onclick: openSettings
 			},
+			{
+				label: 'System info',
+				icon: 'info',
+				onclick: openSystemInfo
+			},
 			{ divider: true, label: '', onclick: () => {} },
 			{ label: $t('sidebar.logOut'), icon: 'log-out', onclick: logout }
 		]}
@@ -536,6 +548,10 @@
 			settingsTab = 'general';
 		}}
 	/>
+{/if}
+
+{#if showSystemInfo}
+	<SystemInfoModal onclose={() => (showSystemInfo = false)} />
 {/if}
 
 <style>
