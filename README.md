@@ -10,11 +10,11 @@
 [![Discord](https://img.shields.io/badge/Discord-Open_WebUI-blue?logo=discord&logoColor=white)](https://discord.gg/5rJgQTnV4s)
 [![](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/tjbck)
 
-![Cptr Demo](./demo.png)
+![Open WebUI Computer Demo](./demo.png)
 
 <sub>See more at [cptr.sh](https://cptr.sh/)</sub>
 
-`cptr` (short for "computer") runs on your machine and serves your whole computer (files, terminal, editor, git) to any browser. It literally is your computer.
+Open WebUI Computer (`cptr`) runs on your machine and serves your whole computer (files, terminal, editor, git) to any browser. It literally is your computer.
 
 Use it from your phone, tablet, laptop, another computer, or the machine it's running on. Designed to feel native on every screen. Connect your own AI via API key, or plug in a coding agent you already subscribe to and skip the key entirely. Terminal multiplexer, parallel AI agents, full workstation, one tool, your computer, any device.
 
@@ -170,9 +170,9 @@ The `:dev` image is also available and tracks the `main` branch.
 
 ## Security model
 
-cptr is designed as **your computer, served to you**. Once authenticated, a user has full access to the host filesystem and shell, equivalent to an SSH session. There is no path sandboxing and no per-user isolation.
+Open WebUI Computer is designed as **your computer, served to you**. Once authenticated, a user has full access to the host filesystem and shell, equivalent to an SSH session. There is no path sandboxing and no per-user isolation.
 
-This is safe when you are the only user and you control the network. It is not safe if untrusted users share the instance, it is exposed to the public internet, or a reverse proxy forwards spoofable auth headers. Treat a shared cptr like an open SSH port.
+This is safe when you are the only user and you control the network. It is not safe if untrusted users share the instance, it is exposed to the public internet, or a reverse proxy forwards spoofable auth headers. Treat a shared Open WebUI Computer like an open SSH port.
 
 ## License
 
