@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Automations / cptr</title>
+	<title>Automations / Computer</title>
 </svelte:head>
 
 <AutomationsPanel />

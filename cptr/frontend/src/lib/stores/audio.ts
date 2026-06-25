@@ -74,8 +74,8 @@ export function setTtsAudioPlaybackSource(src: string, title?: string): HTMLAudi
 	// Control Center (iOS) while TTS is playing.
 	if ('mediaSession' in navigator) {
 		navigator.mediaSession.metadata = new MediaMetadata({
-			title: title || 'cptr',
-			artist: 'cptr',
+			title: title || 'Computer',
+			artist: 'Computer',
 			artwork: [
 				{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
 				{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' }

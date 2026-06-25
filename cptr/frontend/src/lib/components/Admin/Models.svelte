@@ -61,12 +61,12 @@
 		{ name: 'ARCH', desc: 'Machine architecture' },
 		{ name: 'SHELL', desc: 'Default shell path' },
 		{ name: 'HOME', desc: 'Home directory' },
-		{ name: 'CPTR_VERSION', desc: 'cptr version' },
+		{ name: 'CPTR_VERSION', desc: 'Computer version' },
 		{ name: 'DATE', desc: 'Current date (ISO format)' },
 		{ name: 'MODEL', desc: 'Model ID being used' }
 	];
 
-	const DEFAULT_PROMPT_PLACEHOLDER = `You are Computer (cptr), a helpful assistant running inside the user's computer interface. You have access to tools to read, search, and modify files in the workspace, run commands, and use configured tools. Use them to help the user directly. Approach hard requests with initiative and persistence: make the best possible attempt, adapt as needed, and keep going unless a real constraint prevents progress.
+	const DEFAULT_PROMPT_PLACEHOLDER = `You are Computer, a helpful assistant running inside the user's computer interface. You have access to tools to read, search, and modify files in the workspace, run commands, and use configured tools. Use them to help the user directly. Approach hard requests with initiative and persistence: make the best possible attempt, adapt as needed, and keep going unless a real constraint prevents progress.
 
 {{CPTR_CONTEXT}}
 

@@ -543,21 +543,41 @@
 		if (resume.terminalCount) signals.push(`${resume.terminalCount} term`);
 		if (resume.previewPorts.length)
 			signals.push(resume.previewPorts.map((port) => `:${port}`).join(', '));
-		if (resume.fileCount)
-			signals.push(`${resume.fileCount} file${resume.fileCount === 1 ? '' : 's'}`);
 		if (resume.chatCount || resume.activeChatCount) {
 			signals.push(
-				resume.activeChatCount ? `${resume.activeChatCount} active` : `${resume.chatCount} chat`
+				resume.activeChatCount
+					? `${resume.activeChatCount} active chat${resume.activeChatCount === 1 ? '' : 's'}`
+					: `${resume.chatCount} chat${resume.chatCount === 1 ? '' : 's'}`
 			);
 		}
 		return signals;
 	}
 
-	function workspaceItems() {
-		const recent = welcomeData?.recent ?? [];
-		if (recent.length) return recent.slice(0, 6);
-		return (welcomeData?.suggestions ?? []).slice(0, 6);
+	function hasMeaningfulResume(resume: WorkspaceResume | undefined): boolean {
+		return !!resume && (resumeSignals(resume).length > 0 || resume.activeLabels.length > 0);
 	}
+
+	function continueWorkspace() {
+		const recent = welcomeData?.recent ?? [];
+		return recent.find((item) => hasMeaningfulResume(workspaceResumes.get(item.path))) ?? recent[0];
+	}
+
+	function recentItems(continuePath?: string) {
+		const recent = welcomeData?.recent ?? [];
+		return recent.filter((item) => item.path !== continuePath).slice(0, 6);
+	}
+
+	function nearbyItems() {
+		return (welcomeData?.suggestions ?? []).slice(0, 5);
+	}
+
+	const continuation = $derived(continueWorkspace());
+	const continueResume = $derived(
+		continuation ? workspaceResumes.get(continuation.path) : undefined
+	);
+	const continueSignals = $derived(resumeSignals(continueResume));
+	const recent = $derived(recentItems(continuation?.path));
+	const nearby = $derived(nearbyItems());
 
 	// ── Draggable divider ──────────────────────────────────────────
 
@@ -717,13 +737,43 @@
 				</button>
 			</div>
 
-			{#if workspaceItems().length}
+			{#if continuation}
 				<div class="mb-6">
-					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">
-						{welcomeData?.recent?.length ? $t('home.recent') : $t('home.folders')}
-					</h2>
+					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">Continue</h2>
+					<button
+						class="group w-full min-w-0 py-1.5 text-left transition-colors duration-100"
+						onclick={() => quickOpen(continuation.path)}
+					>
+						<span class="flex min-w-0 items-baseline gap-2">
+							<span
+								class="truncate text-[13px] text-gray-800 group-hover:text-gray-950 dark:text-gray-200 dark:group-hover:text-white"
+							>
+								{continuation.name}
+							</span>
+							<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">
+								{shortenPath(continuation.path)}
+							</span>
+						</span>
+						{#if continueSignals.length}
+							<span
+								class="mt-0.5 block truncate font-mono text-[10px] text-gray-400 dark:text-gray-600"
+							>
+								{continueSignals.join('  ')}
+							</span>
+						{:else if continueResume?.activeLabels.length}
+							<span class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600">
+								{continueResume.activeLabels.join(' · ')}
+							</span>
+						{/if}
+					</button>
+				</div>
+			{/if}
+
+			{#if recent.length}
+				<div class="mb-6">
+					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.recent')}</h2>
 					<div class="flex flex-col">
-						{#each workspaceItems() as item}
+						{#each recent as item}
 							{@const resume = workspaceResumes.get(item.path)}
 							{@const signals = resumeSignals(resume)}
 							<button
@@ -751,17 +801,11 @@
 										{resume.activeLabels.join(' · ')}
 									</span>
 								{/if}
-								{#if resume?.recentChats[0]?.is_active}
-									<span class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600">
-										active
-										{resume.recentChats[0].title}
-									</span>
-								{/if}
 							</button>
 						{/each}
 					</div>
 				</div>
-			{:else}
+			{:else if !continuation}
 				<div class="mb-6">
 					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.recent')}</h2>
 					<button
@@ -773,11 +817,11 @@
 				</div>
 			{/if}
 
-			{#if welcomeData?.suggestions?.length && welcomeData?.recent?.length}
+			{#if nearby.length && !welcomeData?.recent?.length}
 				<div>
 					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.folders')}</h2>
 					<div class="flex flex-col">
-						{#each welcomeData.suggestions.slice(0, 5) as item}
+						{#each nearby as item}
 							<button
 								class="flex min-w-0 items-center gap-2 py-1.5 text-left text-[13px] text-gray-600 transition-colors duration-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 								onclick={() => quickOpen(item.path)}

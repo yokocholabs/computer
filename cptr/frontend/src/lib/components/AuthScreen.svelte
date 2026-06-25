@@ -72,7 +72,9 @@
 
 <div class="flex items-center justify-center h-dvh bg-white dark:bg-black p-6">
 	<div class="w-full max-w-md">
-		<h1 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white mb-3">cptr</h1>
+		<h1 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white mb-3">
+			Computer
+		</h1>
 
 		{#if isSetup}
 			<p class="text-xs text-gray-400 dark:text-gray-600 -mt-2 mb-3">

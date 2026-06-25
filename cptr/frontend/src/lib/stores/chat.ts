@@ -121,7 +121,7 @@ export function bindGlobalChatListener() {
 			// Browser notification (only when tab is hidden)
 			if (document.hidden && get(notificationsEnabled)) {
 				try {
-					const notification = new Notification(`${title} • cptr`, {
+					const notification = new Notification(`${title} • Computer`, {
 						body: body.slice(0, 200),
 						icon: '/favicon.png'
 					});
