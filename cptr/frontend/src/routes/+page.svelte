@@ -20,12 +20,13 @@
 		showSearch,
 		pwaPreferences
 	} from '$lib/stores';
-	import type { Tab, EditorGroup } from '$lib/stores';
+	import type { Tab, EditorGroup, WorkspaceState } from '$lib/stores';
 	import { t } from '$lib/i18n';
 	import { get } from 'svelte/store';
-	import { getWelcome } from '$lib/apis/state';
+	import { getWelcome, getWorkspaceState } from '$lib/apis/state';
 	import { createSession } from '$lib/apis/terminal';
 	import { createEntry, writeFile, uploadFiles as uploadFilesApi } from '$lib/apis/files';
+	import { getChats, type ChatInfo } from '$lib/apis/chat';
 	import { deleteSharePayload, getSharePayload } from '$lib/intents/payloadStore';
 	import type { LaunchIntent, ShareBehavior, SharePayload } from '$lib/intents/types';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
@@ -38,7 +39,7 @@
 	import GroupTabBar from '$lib/components/GroupTabBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import WorkspacePicker from '$lib/components/WorkspacePicker.svelte';
-	import SystemInfo from '$lib/components/SystemInfo.svelte';
+	import WorkspaceResumeSheet from '$lib/components/WorkspaceResumeSheet.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { isSupportedWorkspacePath } from '$lib/utils/paths';
 
@@ -46,6 +47,7 @@
 	let pendingIntent = $state<LaunchIntent | null>(null);
 	let folderPickerIntent = $state<LaunchIntent | null>(null);
 	let folderPickerWorkspace = $state<string | null>(null);
+	let dismissedResumePath = $state<string | null>(null);
 	const INTENT_URL_KEYS = [
 		'intent',
 		'chatId',
@@ -392,6 +394,21 @@
 		recent: { name: string; path: string }[];
 	} | null>(null);
 
+	type WorkspaceResume = {
+		path: string;
+		tabs: Tab[];
+		terminalCount: number;
+		previewPorts: number[];
+		chatCount: number;
+		fileCount: number;
+		recentChats: ChatInfo[];
+		activeChatCount: number;
+		activeLabels: string[];
+	};
+
+	let workspaceResumes = $state<Map<string, WorkspaceResume>>(new Map());
+	let resumeLoadSeq = 0;
+
 	// Fetch welcome data whenever no workspace is active
 	$effect(() => {
 		if (!$currentWorkspace) {
@@ -402,6 +419,74 @@
 				.catch(() => {});
 		}
 	});
+
+	$effect(() => {
+		if ($currentWorkspace || !welcomeData) return;
+		const paths = [
+			...(welcomeData.recent ?? []).map((item) => item.path),
+			...(welcomeData.suggestions ?? []).map((item) => item.path)
+		]
+			.filter((path, index, all) => path && all.indexOf(path) === index)
+			.slice(0, 8);
+		loadWorkspaceResumes(paths);
+	});
+
+	async function loadWorkspaceResumes(paths: string[]) {
+		const seq = ++resumeLoadSeq;
+		if (!paths.length) {
+			workspaceResumes = new Map();
+			return;
+		}
+		const entries = await Promise.all(
+			paths.map(async (path) => {
+				try {
+					const [state, chatsData] = await Promise.all([
+						getWorkspaceState(path).catch(() => null),
+						getChats(path, 3, 0, 'updated_at', 'desc').catch(() => null)
+					]);
+					if (!state) return null;
+					return [
+						path,
+						buildWorkspaceResume(path, state as unknown as WorkspaceState, chatsData?.chats ?? [])
+					] as const;
+				} catch {
+					return null;
+				}
+			})
+		);
+		if (seq !== resumeLoadSeq) return;
+		workspaceResumes = new Map(
+			entries.filter((entry): entry is [string, WorkspaceResume] => !!entry)
+		);
+	}
+
+	function buildWorkspaceResume(
+		path: string,
+		state: WorkspaceState,
+		recentChats: ChatInfo[]
+	): WorkspaceResume {
+		const tabs = (state.groups ?? []).flatMap((group) => group.tabs ?? []);
+		const previewPorts = tabs
+			.filter((tab) => tab.type === 'preview' && tab.port)
+			.map((tab) => tab.port!)
+			.filter((port, index, all) => all.indexOf(port) === index);
+		const activeLabels = tabs
+			.filter((tab) => !tab.permanent && ['terminal', 'chat', 'preview', 'file'].includes(tab.type))
+			.slice(0, 3)
+			.map((tab) => tab.label);
+
+		return {
+			path,
+			tabs,
+			terminalCount: tabs.filter((tab) => tab.type === 'terminal').length,
+			previewPorts,
+			chatCount: tabs.filter((tab) => tab.type === 'chat').length,
+			fileCount: tabs.filter((tab) => tab.type === 'file').length,
+			recentChats,
+			activeChatCount: recentChats.filter((chat) => chat.is_active).length,
+			activeLabels
+		};
+	}
 
 	// Lazy-init terminal sessions for any group's active tab
 	let initingTerminal = $state(false);
@@ -454,6 +539,28 @@
 		return path;
 	}
 
+	function resumeSignals(resume: WorkspaceResume | undefined): string[] {
+		if (!resume) return [];
+		const signals: string[] = [];
+		if (resume.terminalCount) signals.push(`${resume.terminalCount} term`);
+		if (resume.previewPorts.length)
+			signals.push(resume.previewPorts.map((port) => `:${port}`).join(', '));
+		if (resume.fileCount)
+			signals.push(`${resume.fileCount} file${resume.fileCount === 1 ? '' : 's'}`);
+		if (resume.chatCount || resume.activeChatCount) {
+			signals.push(
+				resume.activeChatCount ? `${resume.activeChatCount} active` : `${resume.chatCount} chat`
+			);
+		}
+		return signals;
+	}
+
+	function workspaceItems() {
+		const recent = welcomeData?.recent ?? [];
+		if (recent.length) return recent.slice(0, 6);
+		return (welcomeData?.suggestions ?? []).slice(0, 6);
+	}
+
 	// ── Draggable divider ──────────────────────────────────────────
 
 	let isDragging = $state(false);
@@ -493,6 +600,10 @@
 		}
 		window.addEventListener('resize', onResize);
 		return () => window.removeEventListener('resize', onResize);
+	});
+
+	$effect(() => {
+		if (!$currentWorkspace) dismissedResumePath = null;
 	});
 
 	const allGroups = $derived($currentWorkspace?.groups ?? []);
@@ -579,40 +690,31 @@
 </script>
 
 {#if !$currentWorkspace}
-	<div class="flex items-center justify-center h-full p-6 overflow-y-auto">
+	<div class="flex h-full items-center justify-center overflow-y-auto p-6">
 		<div class="w-full max-w-md">
-			<!-- Header -->
-			<div class="mb-4">
+			<div class="mb-5">
 				<div class="flex items-baseline gap-2">
 					<h1 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">cptr</h1>
 					{#if $appVersion}
 						<button
 							onclick={() => showChangelog.set(true)}
-							class="text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 font-mono hover:underline cursor-pointer"
+							class="cursor-pointer font-mono text-[11px] text-gray-400 hover:text-gray-500 hover:underline dark:text-gray-600 dark:hover:text-gray-400"
 						>
 							v{$appVersion}
 						</button>
 					{/if}
 				</div>
 				{#if welcomeData?.hostname}
-					<p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5 font-mono">
+					<p class="mt-0.5 font-mono text-xs text-gray-400 dark:text-gray-600">
 						{welcomeData.hostname}
 					</p>
 				{/if}
 			</div>
 
-			<!-- System -->
-			{#if welcomeData?.system}
-				<div class="mb-6">
-					<SystemInfo system={welcomeData.system} processes={welcomeData.processes} />
-				</div>
-			{/if}
-
-			<!-- Start -->
 			<div class="mb-6">
-				<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('home.start')}</h2>
+				<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.start')}</h2>
 				<button
-					class="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-100"
+					class="flex items-center gap-2 text-[13px] text-gray-600 transition-colors duration-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 					onclick={() => (showPicker = true)}
 				>
 					<Icon name="folder" size={15} strokeWidth={1.3} />
@@ -620,44 +722,94 @@
 				</button>
 			</div>
 
-			<!-- Recent -->
-			{#if welcomeData?.recent?.length}
+			{#if workspaceItems().length}
 				<div class="mb-6">
-					<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('home.recent')}</h2>
+					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">
+						{welcomeData?.recent?.length ? $t('home.recent') : $t('home.folders')}
+					</h2>
 					<div class="flex flex-col">
-						{#each welcomeData.recent.slice(0, 5) as item}
+						{#each workspaceItems() as item}
+							{@const resume = workspaceResumes.get(item.path)}
+							{@const signals = resumeSignals(resume)}
 							<button
-								class="flex items-center gap-3 py-1.5 group text-left transition-colors duration-100"
+								class="group flex w-full min-w-0 items-start gap-2 py-1.5 text-left transition-colors duration-100"
 								onclick={() => quickOpen(item.path)}
 							>
-								<span
-									class="text-[13px] text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white"
-									>{item.name}</span
-								>
-								<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
-									>{shortenPath(item.path)}</span
-								>
+								<Icon
+									name="folder"
+									size={14}
+									strokeWidth={1.3}
+									class="mt-[3px] shrink-0 text-gray-400 dark:text-gray-600"
+								/>
+								<span class="min-w-0 flex-1">
+									<span class="flex min-w-0 items-baseline gap-2">
+										<span
+											class="truncate text-[13px] text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white"
+										>
+											{item.name}
+										</span>
+										<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">
+											{shortenPath(item.path)}
+										</span>
+									</span>
+									{#if signals.length}
+										<span
+											class="mt-0.5 block truncate font-mono text-[10px] text-gray-400 dark:text-gray-600"
+										>
+											{signals.join('  ')}
+										</span>
+									{:else if resume?.activeLabels.length}
+										<span
+											class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600"
+										>
+											{resume.activeLabels.join(' · ')}
+										</span>
+									{/if}
+									{#if resume?.recentChats[0]?.is_active}
+										<span
+											class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600"
+										>
+											active
+											{resume.recentChats[0].title}
+										</span>
+									{/if}
+								</span>
 							</button>
 						{/each}
 					</div>
 				</div>
+			{:else}
+				<div class="mb-6">
+					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.recent')}</h2>
+					<button
+						class="flex items-center gap-2 text-[13px] text-gray-500 transition-colors duration-100 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white"
+						onclick={() => (showPicker = true)}
+					>
+						<Icon name="folder" size={14} strokeWidth={1.3} />
+						No workspaces yet
+					</button>
+				</div>
 			{/if}
 
-			<!-- Suggestions -->
-			{#if welcomeData?.suggestions?.length}
+			{#if welcomeData?.suggestions?.length && welcomeData?.recent?.length}
 				<div>
-					<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('home.folders')}</h2>
+					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.folders')}</h2>
 					<div class="flex flex-col">
 						{#each welcomeData.suggestions.slice(0, 5) as item}
 							<button
-								class="flex items-center gap-2 py-1.5 text-[13px] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-100"
+								class="flex min-w-0 items-center gap-2 py-1.5 text-left text-[13px] text-gray-600 transition-colors duration-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 								onclick={() => quickOpen(item.path)}
 							>
-								<Icon name="folder" size={14} strokeWidth={1.3} />
-								<span>{item.name}</span>
-								<span class="text-[11px] text-gray-400 dark:text-gray-600 font-mono"
-									>{shortenPath(item.path)}</span
-								>
+								<Icon
+									name="folder"
+									size={14}
+									strokeWidth={1.3}
+									class="shrink-0 text-gray-400 dark:text-gray-600"
+								/>
+								<span class="truncate">{item.name}</span>
+								<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">
+									{shortenPath(item.path)}
+								</span>
 							</button>
 						{/each}
 					</div>
@@ -767,6 +919,10 @@
 			<div class="split-drop-zone split-drop-bottom"></div>
 		{/if}
 	</div>
+
+	{#if dismissedResumePath !== $currentWorkspace.path}
+		<WorkspaceResumeSheet onclose={() => (dismissedResumePath = $currentWorkspace?.path ?? null)} />
+	{/if}
 {/if}
 
 {#if pendingIntent}

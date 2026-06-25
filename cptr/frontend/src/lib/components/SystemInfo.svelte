@@ -28,9 +28,10 @@
 	interface Props {
 		system: SystemInfo;
 		processes?: Process[];
+		defaultOpen?: boolean;
 	}
 
-	let { system: sys, processes = [] }: Props = $props();
+	let { system: sys, processes = [], defaultOpen = false }: Props = $props();
 
 	function formatBytes(bytes: number): string {
 		if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(0)} MB`;
@@ -64,7 +65,7 @@
 	});
 </script>
 
-<Collapsible title={$t('system.title')} {summary}>
+<Collapsible title={$t('system.title')} {summary} open={defaultOpen}>
 	<div class="flex flex-col gap-3">
 		{#if sys.cpu_usage != null}
 			<div>

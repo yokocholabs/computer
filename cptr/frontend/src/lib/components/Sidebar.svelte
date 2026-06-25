@@ -18,6 +18,7 @@
 	import DirectoryPicker from './DirectoryPicker.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import SettingsModal from './SettingsModal.svelte';
+	import SystemInfoModal from './SystemInfoModal.svelte';
 
 	import { tooltip } from '$lib/tooltip';
 	import { session, clearSession } from '$lib/session';
@@ -34,6 +35,7 @@
 	let showPicker = $state(false);
 	let showMenu = $state(false);
 	let showSettings = $state(false);
+	let showSystemInfo = $state(false);
 	let settingsTab = $state<string>('general');
 	let wsMenuPath = $state<string | null>(null);
 	let wsMenuAnchor = $state<HTMLElement | null>(null);
@@ -212,6 +214,11 @@
 	function openSettings() {
 		showMenu = false;
 		showSettings = true;
+	}
+
+	function openSystemInfo() {
+		showMenu = false;
+		showSystemInfo = true;
 	}
 
 	function logout() {
@@ -503,6 +510,11 @@
 				shortcut: formatChord($keybindings.openSettings),
 				onclick: openSettings
 			},
+			{
+				label: 'System info',
+				icon: 'info',
+				onclick: openSystemInfo
+			},
 			{ divider: true, label: '', onclick: () => {} },
 			{ label: $t('sidebar.logOut'), icon: 'log-out', onclick: logout }
 		]}
@@ -536,6 +548,10 @@
 			settingsTab = 'general';
 		}}
 	/>
+{/if}
+
+{#if showSystemInfo}
+	<SystemInfoModal onclose={() => (showSystemInfo = false)} />
 {/if}
 
 <style>
