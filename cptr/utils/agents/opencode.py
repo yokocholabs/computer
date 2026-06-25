@@ -9,11 +9,19 @@ import os
 import re
 import socket
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 import httpx
 
-from cptr.utils.agents.events import AgentDone, AgentError, AgentEvent, AgentTextDelta
+from cptr.utils.agents.attachments import PreparedAgentAttachments
+from cptr.utils.agents.events import (
+    AgentDone,
+    AgentError,
+    AgentEvent,
+    AgentTextDelta,
+    AgentToolUpdate,
+)
 
 
 def _prompt_from_messages(messages: list[dict[str, Any]]) -> str:
@@ -137,6 +145,22 @@ def _parse_model(model: str) -> dict[str, str]:
     return {"providerID": provider_id, "modelID": model_id}
 
 
+def _opencode_parts(prompt: str, attachments: PreparedAgentAttachments) -> list[dict[str, Any]]:
+    parts: list[dict[str, Any]] = []
+    if prompt.strip():
+        parts.append({"type": "text", "text": prompt})
+    for item in [*attachments.images, *attachments.files]:
+        parts.append(
+            {
+                "type": "file",
+                "mime": item.mime_type,
+                "filename": item.name,
+                "url": Path(item.path).resolve().as_uri(),
+            }
+        )
+    return parts
+
+
 def _text_from_event(event: dict[str, Any], emitted: dict[str, str]) -> str | None:
     event_type = event.get("type")
     props = event.get("properties") if isinstance(event.get("properties"), dict) else {}
@@ -161,6 +185,49 @@ def _text_from_event(event: dict[str, Any], emitted: dict[str, str]) -> str | No
     return None
 
 
+def _tool_from_event(event: dict[str, Any]) -> AgentToolUpdate | None:
+    if event.get("type") != "message.part.updated":
+        return None
+    props = event.get("properties") if isinstance(event.get("properties"), dict) else {}
+    part = props.get("part") if isinstance(props.get("part"), dict) else {}
+    if part.get("type") != "tool":
+        return None
+    call_id = part.get("callID") or part.get("id")
+    if not isinstance(call_id, str) or not call_id.strip():
+        return None
+    state = part.get("state") if isinstance(part.get("state"), dict) else {}
+    tool = str(part.get("tool") or state.get("title") or "Agent tool").strip()
+    status = _opencode_tool_status(state.get("status"))
+    output = _opencode_tool_output(state)
+    return AgentToolUpdate(
+        call_id=call_id.strip(),
+        name="agent_tool",
+        status=status,
+        arguments={"title": tool, **({"state": state} if state else {})},
+        output=output,
+    )
+
+
+def _opencode_tool_status(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized == "completed":
+        return "completed"
+    if normalized == "error":
+        return "failed"
+    if normalized == "pending":
+        return "pending"
+    return "in_progress"
+
+
+def _opencode_tool_output(state: dict[str, Any]) -> str | None:
+    for key in ("output", "result", "message", "error"):
+        value = state.get(key)
+        if value is None:
+            continue
+        return value if isinstance(value, str) else json.dumps(value, indent=2)
+    return None
+
+
 async def run_opencode_agent(
     *,
     profile: dict[str, Any],
@@ -170,6 +237,7 @@ async def run_opencode_agent(
     system_prompt: str,
     chat_params: dict[str, Any],
     resume_state: dict[str, Any] | None,
+    attachments: PreparedAgentAttachments,
 ) -> AsyncIterator[AgentEvent]:
     del chat_params, resume_state
     try:
@@ -190,7 +258,7 @@ async def run_opencode_agent(
                     raise RuntimeError("OpenCode did not return a session id")
 
                 emitted: dict[str, str] = {}
-                event_queue: asyncio.Queue[str | None] = asyncio.Queue()
+                event_queue: asyncio.Queue[AgentEvent | None] = asyncio.Queue()
                 event_task = asyncio.create_task(
                     _collect_opencode_events(client, headers, session_id, emitted, event_queue)
                 )
@@ -199,6 +267,7 @@ async def run_opencode_agent(
                 if system_prompt:
                     prompt = f"{system_prompt}\n\n{prompt}" if prompt else system_prompt
                 parsed_model = _parse_model(model)
+                parts = _opencode_parts(prompt, attachments)
                 try:
                     await _request(
                         client,
@@ -208,7 +277,7 @@ async def run_opencode_agent(
                         json_body={
                             "sessionID": session_id,
                             "model": parsed_model,
-                            "parts": [{"type": "text", "text": prompt}],
+                            "parts": parts,
                         },
                     )
 
@@ -216,7 +285,7 @@ async def run_opencode_agent(
                         item = await event_queue.get()
                         if item is None:
                             break
-                        yield AgentTextDelta(item)
+                        yield item
                 except asyncio.CancelledError:
                     with suppress(Exception):
                         await _request(
@@ -251,7 +320,7 @@ async def _collect_opencode_events(
     headers: dict[str, str],
     session_id: str,
     emitted: dict[str, str],
-    queue: asyncio.Queue[str | None],
+    queue: asyncio.Queue[AgentEvent | None],
 ) -> None:
     try:
         for path in ("event.subscribe", "event/subscribe", "event"):
@@ -276,11 +345,17 @@ async def _collect_opencode_events(
                                 continue
                             text = _text_from_event(event, emitted)
                             if text:
-                                await queue.put(text)
+                                await queue.put(AgentTextDelta(text))
+                            tool = _tool_from_event(event)
+                            if tool:
+                                await queue.put(tool)
                             status = (
                                 props.get("status") if isinstance(props.get("status"), dict) else {}
                             )
-                            if event.get("type") == "session.status" and status.get("type") == "idle":
+                            if (
+                                event.get("type") == "session.status"
+                                and status.get("type") == "idle"
+                            ):
                                 await queue.put(None)
                                 return
             except Exception:

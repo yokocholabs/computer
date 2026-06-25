@@ -7,7 +7,15 @@ import os
 import shlex
 from typing import Any, AsyncIterator
 
-from cptr.utils.agents.events import AgentDone, AgentError, AgentEvent, AgentReasoningDelta, AgentTextDelta
+from cptr.utils.agents.attachments import PreparedAgentAttachments
+from cptr.utils.agents.events import (
+    AgentDone,
+    AgentError,
+    AgentEvent,
+    AgentReasoningDelta,
+    AgentTextDelta,
+    AgentToolUpdate,
+)
 
 
 def _prompt_from_messages(messages: list[dict[str, Any]]) -> str:
@@ -26,6 +34,26 @@ def _prompt_from_messages(messages: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
+def _claude_query_input(prompt: str, attachments: PreparedAgentAttachments) -> Any:
+    if not attachments.images:
+        return prompt
+    content: list[dict[str, Any]] = []
+    if prompt.strip():
+        content.append({"type": "text", "text": prompt})
+    for image in attachments.images:
+        content.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": image.mime_type,
+                    "data": image.base64,
+                },
+            }
+        )
+    return content
+
+
 def _chat_approval_mode(chat_params: dict[str, Any]) -> str:
     if "tool_approval_mode" in chat_params:
         return str(chat_params.get("tool_approval_mode") or "auto")
@@ -42,6 +70,32 @@ def _permission_mode(chat_approval_mode: str) -> str:
     return "default"
 
 
+def _tool_update_from_claude_start(
+    event: dict[str, Any],
+) -> tuple[int | None, AgentToolUpdate | None]:
+    block = event.get("content_block")
+    if not isinstance(block, dict):
+        return None, None
+    if block.get("type") not in {"tool_use", "server_tool_use", "mcp_tool_use"}:
+        return None, None
+    call_id = block.get("id")
+    if not isinstance(call_id, str) or not call_id.strip():
+        return None, None
+    index = event.get("index")
+    name = str(block.get("name") or block.get("type") or "Claude action").strip()
+    raw_input = block.get("input")
+    arguments = raw_input if isinstance(raw_input, dict) else {}
+    return (
+        index if isinstance(index, int) else None,
+        AgentToolUpdate(
+            call_id=call_id.strip(),
+            name="agent_tool",
+            status="in_progress",
+            arguments={"title": name, **arguments},
+        ),
+    )
+
+
 async def run_claude_code_agent(
     *,
     profile: dict[str, Any],
@@ -51,6 +105,7 @@ async def run_claude_code_agent(
     system_prompt: str,
     chat_params: dict[str, Any],
     resume_state: dict[str, Any] | None,
+    attachments: PreparedAgentAttachments,
 ) -> AsyncIterator[AgentEvent]:
     try:
         import claude_agent_sdk as sdk
@@ -92,11 +147,17 @@ async def run_claude_code_agent(
             session_id = value if isinstance(value, str) and value else None
 
         try:
-            query = client.query(prompt, session_id=session_id) if session_id else client.query(prompt)
+            query_input = _claude_query_input(prompt, attachments)
+            query = (
+                client.query(query_input, session_id=session_id)
+                if session_id
+                else client.query(query_input)
+            )
             await asyncio.wait_for(query, timeout=20)
             stream = client.receive_response()
             usage: dict[str, Any] | None = None
             observed_session_id = session_id
+            tool_calls: dict[int, AgentToolUpdate] = {}
 
             async for message in stream:
                 event = getattr(message, "event", None)
@@ -105,12 +166,31 @@ async def run_claude_code_agent(
                     if event_type == "content_block_delta":
                         delta = event.get("delta", {})
                         if isinstance(delta, dict):
-                            if delta.get("type") == "text_delta" and isinstance(delta.get("text"), str):
+                            if delta.get("type") == "text_delta" and isinstance(
+                                delta.get("text"), str
+                            ):
                                 yield AgentTextDelta(delta["text"])
                             elif delta.get("type") == "thinking_delta" and isinstance(
                                 delta.get("thinking"), str
                             ):
                                 yield AgentReasoningDelta(delta["thinking"])
+                    elif event_type == "content_block_start":
+                        index, tool = _tool_update_from_claude_start(event)
+                        if tool:
+                            if index is not None:
+                                tool_calls[index] = tool
+                            yield tool
+                    elif event_type == "content_block_stop":
+                        index = event.get("index")
+                        tool = tool_calls.get(index) if isinstance(index, int) else None
+                        if tool:
+                            yield AgentToolUpdate(
+                                call_id=tool.call_id,
+                                name=tool.name,
+                                status="completed",
+                                arguments=tool.arguments,
+                                output="",
+                            )
                     continue
 
                 class_name = message.__class__.__name__
@@ -125,7 +205,9 @@ async def run_claude_code_agent(
                             if text:
                                 yield AgentReasoningDelta(text)
                 elif class_name == "ResultMessage":
-                    observed_session_id = getattr(message, "session_id", None) or observed_session_id
+                    observed_session_id = (
+                        getattr(message, "session_id", None) or observed_session_id
+                    )
                     raw_usage = getattr(message, "usage", None)
                     if isinstance(raw_usage, dict):
                         usage = {

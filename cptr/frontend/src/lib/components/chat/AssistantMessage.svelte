@@ -193,6 +193,8 @@
 				const label = args.background ? 'Background sub-agent' : 'Sub-agent';
 				return `${label}: "${t.length > 60 ? t.slice(0, 60) + '…' : t}"`;
 			}
+			case 'agent_tool':
+				return args.title || 'Agent tool';
 			default: {
 				// External tool: {server_id}_{tool_name} → "tool_name (server_id)"
 				const idx = name.indexOf('_');
@@ -270,9 +272,24 @@
 		for (const url of structuredImageUrls) {
 			const escapedUrl = escapeRegExp(url);
 			cleaned = cleaned.replace(new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'g'), '');
-			cleaned = cleaned.replace(new RegExp(`(^|\\n)[ \\t]*${escapedUrl}[ \\t]*(?=\\n|$)`, 'g'), '$1');
+			cleaned = cleaned.replace(
+				new RegExp(`(^|\\n)[ \\t]*${escapedUrl}[ \\t]*(?=\\n|$)`, 'g'),
+				'$1'
+			);
 		}
 		return cleaned.replace(/\n{3,}/g, '\n\n').trim();
+	}
+
+	function isPseudoAgentMessageTool(item: any): boolean {
+		const title = String(item?.arguments?.title || item?.arguments?.item?.type || '').toLowerCase();
+		return (
+			item?.name === 'agent_tool' &&
+			(title === 'usermessage' ||
+				title === 'agentmessage' ||
+				title === 'assistantmessage' ||
+				title === 'assistant message' ||
+				title === 'user message')
+		);
 	}
 
 	const displayItems = $derived.by((): DisplayItem[] => {
@@ -310,6 +327,7 @@
 
 		for (const item of output) {
 			if (item.type === 'function_call') {
+				if (isPseudoAgentMessageTool(item)) continue;
 				ensureGroup();
 				currentGroup!.entries.push(item);
 				currentGroup!.calls.push(item);

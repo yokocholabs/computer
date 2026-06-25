@@ -7,8 +7,20 @@ import os
 from contextlib import suppress
 from typing import Any, AsyncIterator
 
-from cptr.utils.agents.acp import AcpClient, acp_event_stream, acp_text_from_update
-from cptr.utils.agents.events import AgentDone, AgentError, AgentEvent, AgentTextDelta
+from cptr.utils.agents.attachments import PreparedAgentAttachments
+from cptr.utils.agents.acp import (
+    AcpClient,
+    acp_event_stream,
+    acp_text_from_update,
+    acp_tool_from_update,
+)
+from cptr.utils.agents.events import (
+    AgentDone,
+    AgentError,
+    AgentEvent,
+    AgentTextDelta,
+    AgentToolUpdate,
+)
 
 
 CURSOR_CAPABILITIES = {"_meta": {"parameterizedModelPicker": True}}
@@ -45,6 +57,7 @@ async def run_cursor_agent(
     system_prompt: str,
     chat_params: dict[str, Any],
     resume_state: dict[str, Any] | None,
+    attachments: PreparedAgentAttachments,
 ) -> AsyncIterator[AgentEvent]:
     env = os.environ.copy()
     if profile.get("home"):
@@ -79,24 +92,35 @@ async def run_cursor_agent(
         if system_prompt:
             prompt = f"{system_prompt}\n\n{prompt}" if prompt else system_prompt
 
-        prompt_task = asyncio.create_task(client.prompt(prompt))
+        images = [
+            {"data": image.base64, "mimeType": image.mime_type} for image in attachments.images
+        ]
+        prompt_task = asyncio.create_task(client.prompt(prompt, images=images))
         try:
             async for event in acp_event_stream(client):
                 params = event.get("params") if isinstance(event.get("params"), dict) else {}
                 text = acp_text_from_update(params)
                 if text:
                     yield AgentTextDelta(text)
+                tool = acp_tool_from_update(params)
+                if tool:
+                    yield AgentToolUpdate(**tool)
                 if prompt_task.done():
                     try:
                         next_event = await asyncio.wait_for(client.events.get(), timeout=0.25)
                     except asyncio.TimeoutError:
                         break
                     next_params = (
-                        next_event.get("params") if isinstance(next_event.get("params"), dict) else {}
+                        next_event.get("params")
+                        if isinstance(next_event.get("params"), dict)
+                        else {}
                     )
                     next_text = acp_text_from_update(next_params)
                     if next_text:
                         yield AgentTextDelta(next_text)
+                    next_tool = acp_tool_from_update(next_params)
+                    if next_tool:
+                        yield AgentToolUpdate(**next_tool)
             await prompt_task
         finally:
             if not prompt_task.done():

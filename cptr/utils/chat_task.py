@@ -35,7 +35,9 @@ from cptr.utils.agents.events import (
     AgentError,
     AgentReasoningDelta,
     AgentTextDelta,
+    AgentToolUpdate,
 )
+from cptr.utils.agents.attachments import prepare_agent_attachments
 from cptr.utils.model_targets import AgentModelTarget, ApiModelTarget, ModelTarget
 
 logger = logging.getLogger(__name__)
@@ -567,11 +569,21 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
         # reasoning_items) followed by the corresponding tool-result
         # messages.
         if m.output:
+            native_agent_call_ids = {
+                item["call_id"]
+                for item in m.output
+                if item.get("type") == "function_call"
+                and item.get("call_id")
+                and _is_native_agent_tool_item(item)
+            }
             # ── Collect the set of call_ids that have outputs ──
             # This is needed to filter out orphaned function_calls
             # (e.g. from crashes, partial persistence, or data corruption).
             output_call_ids = {
-                item["call_id"] for item in m.output if item.get("type") == "function_call_output"
+                item["call_id"]
+                for item in m.output
+                if item.get("type") == "function_call_output"
+                and item.get("call_id") not in native_agent_call_ids
             }
 
             # ── Group output items into per-iteration turns ──
@@ -588,6 +600,8 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                         current_turn = {"reasoning": [], "calls": [], "outputs": []}
                     current_turn["reasoning"].append(item)
                 elif itype == "function_call" and item.get("status") == "completed":
+                    if item.get("call_id") in native_agent_call_ids:
+                        continue
                     # Only include calls that have a matching output
                     if item["call_id"] not in output_call_ids:
                         logger.warning(
@@ -613,7 +627,10 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                     if item.get("fc_id"):
                         tc["fc_id"] = item["fc_id"]
                     current_turn["calls"].append(tc)
-                elif itype == "function_call_output":
+                elif (
+                    itype == "function_call_output"
+                    and item.get("call_id") not in native_agent_call_ids
+                ):
                     current_turn["outputs"].append(item)
                 # Skip other types (message, artifact, pending calls, etc.)
 
@@ -983,6 +1000,38 @@ def _upsert_output_item(items: list[dict], item: dict) -> bool:
     return True
 
 
+def _safe_tool_name(name: str | None) -> str:
+    if not name:
+        return "agent_tool"
+    value = re.sub(r"[^a-zA-Z0-9_-]+", "_", name.strip()).strip("_")
+    return value or "agent_tool"
+
+
+def _is_native_agent_tool_item(item: dict) -> bool:
+    return bool(
+        item.get("native_agent")
+        or (isinstance(item.get("id"), str) and item["id"].startswith("agent-"))
+    )
+
+
+def _append_prompt_suffix(messages: list[dict], suffix: str) -> None:
+    if not suffix:
+        return
+    for message in reversed(messages):
+        if message.get("role") != "user":
+            continue
+        content = message.get("content", "")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    block["text"] = f"{block.get('text') or ''}{suffix}"
+                    return
+            content.append({"type": "text", "text": suffix.strip()})
+        else:
+            message["content"] = f"{content or ''}{suffix}"
+        return
+
+
 def _find_safe_split(messages: list[dict], target_keep: int) -> int:
     """Find a safe split index that doesn't break tool call pairs.
 
@@ -1226,6 +1275,19 @@ async def run_chat_task(
         )
         if loaded_summary:
             system += f"\n\n[CONVERSATION SUMMARY]\n{loaded_summary}"
+        current_user_files = []
+        if msg and msg.parent_id:
+            parent_msg = await ChatMessage.get_by_id(msg.parent_id)
+            meta_files = (parent_msg.meta or {}).get("files") if parent_msg else None
+            if isinstance(meta_files, list):
+                current_user_files = meta_files
+        agent_attachments = await prepare_agent_attachments(
+            workspace=workspace,
+            chat_id=chat_id,
+            message_id=(msg.parent_id if msg and msg.parent_id else message_id),
+            files=current_user_files,
+        )
+        _append_prompt_suffix(messages, agent_attachments.prompt_suffix)
         if regeneration_prompt:
             messages.append({"role": "user", "content": regeneration_prompt})
         if chat_params.get("plan_mode", False):
@@ -1259,6 +1321,7 @@ async def run_chat_task(
             system_prompt=system,
             chat_params=chat_params,
             resume_state=resume_state,
+            attachments=agent_attachments,
         ):
             if isinstance(event, AgentTextDelta):
                 content += event.text
@@ -1275,6 +1338,43 @@ async def run_chat_task(
                 }
                 _upsert_output_item(output_items, item)
                 await emit(output=item)
+                _sync_state()
+            elif isinstance(event, AgentToolUpdate):
+                flushed_item = _flush_text()
+                if flushed_item:
+                    await emit(output=flushed_item)
+                existing = next(
+                    (
+                        item
+                        for item in output_items
+                        if item.get("type") == "function_call"
+                        and item.get("call_id") == event.call_id
+                    ),
+                    {},
+                )
+                call_item = {
+                    "type": "function_call",
+                    "id": existing.get("id") or f"agent-{event.call_id}",
+                    "call_id": event.call_id,
+                    "name": _safe_tool_name(event.name or existing.get("name")),
+                    "native_agent": True,
+                    "arguments": {
+                        **(existing.get("arguments") or {}),
+                        **(event.arguments or {}),
+                    },
+                    "status": event.status,
+                }
+                _upsert_output_item(output_items, call_item)
+                await emit(output=call_item)
+                if event.output is not None or event.status == "completed":
+                    output_item = {
+                        "type": "function_call_output",
+                        "call_id": event.call_id,
+                        "native_agent": True,
+                        "output": event.output or "",
+                    }
+                    _upsert_output_item(output_items, output_item)
+                    await emit(output=output_item)
                 _sync_state()
             elif isinstance(event, AgentError):
                 raise RuntimeError(event.message)

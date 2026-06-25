@@ -101,12 +101,23 @@ class AcpClient:
     async def notify(self, method: str, params: dict[str, Any]) -> None:
         await self._send({"jsonrpc": "2.0", "method": method, "params": params})
 
-    async def prompt(self, text: str) -> dict[str, Any]:
+    async def prompt(self, text: str, images: list[dict[str, str]] | None = None) -> dict[str, Any]:
         if not self.session_id:
             raise RuntimeError("ACP session has not started")
+        prompt: list[dict[str, str]] = []
+        if text.strip():
+            prompt.append({"type": "text", "text": text})
+        for image in images or []:
+            prompt.append(
+                {
+                    "type": "image",
+                    "data": image["data"],
+                    "mimeType": image["mimeType"],
+                }
+            )
         return await self.request(
             "session/prompt",
-            {"sessionId": self.session_id, "prompt": [{"type": "text", "text": text}]},
+            {"sessionId": self.session_id, "prompt": prompt},
         )
 
     async def cancel(self) -> None:
@@ -121,11 +132,17 @@ class AcpClient:
             with suppress(Exception):
                 await self.request(
                     "session/set_config_option",
-                    {"sessionId": self.session_id, "configId": self.model_config_id, "value": model},
+                    {
+                        "sessionId": self.session_id,
+                        "configId": self.model_config_id,
+                        "value": model,
+                    },
                 )
                 return
         with suppress(Exception):
-            await self.request("session/set_model", {"sessionId": self.session_id, "modelId": model})
+            await self.request(
+                "session/set_model", {"sessionId": self.session_id, "modelId": model}
+            )
 
     async def _open_session(self) -> None:
         setup: dict[str, Any] | None = None
@@ -173,7 +190,11 @@ class AcpClient:
             pass
 
     async def _handle_message(self, message: dict[str, Any]) -> None:
-        if "id" in message and ("result" in message or "error" in message) and "method" not in message:
+        if (
+            "id" in message
+            and ("result" in message or "error" in message)
+            and "method" not in message
+        ):
             future = self.pending.pop(int(message["id"]), None)
             if future and not future.done():
                 future.set_result(message)
@@ -189,9 +210,9 @@ class AcpClient:
     async def _reply_permission(self, request_id: int, params: dict[str, Any]) -> None:
         option_id = None
         if self.auto_approve_permissions:
-            option_id = _select_permission_option(params, "allow_always") or _select_permission_option(
-                params, "allow_once"
-            )
+            option_id = _select_permission_option(
+                params, "allow_always"
+            ) or _select_permission_option(params, "allow_once")
         outcome = (
             {"outcome": {"outcome": "selected", "optionId": option_id}}
             if option_id
@@ -273,6 +294,83 @@ def acp_text_from_update(params: dict[str, Any]) -> str | None:
         text = content.get("text")
         return text if isinstance(text, str) and text else None
     return None
+
+
+def acp_tool_from_update(params: dict[str, Any]) -> dict[str, Any] | None:
+    update = params.get("update")
+    if not isinstance(update, dict):
+        return None
+    if update.get("sessionUpdate") not in {"tool_call", "tool_call_update"}:
+        return None
+    call_id = update.get("toolCallId")
+    if not isinstance(call_id, str) or not call_id.strip():
+        return None
+
+    raw_input = update.get("rawInput")
+    command = _command_from_raw_input(raw_input)
+    title = str(update.get("title") or update.get("kind") or "Agent tool").strip()
+    status = _tool_status(update.get("status"))
+    args: dict[str, Any] = {}
+    if command:
+        name = "run_command"
+        args["command"] = command
+    else:
+        name = "agent_tool"
+        args["title"] = title
+        if raw_input is not None:
+            args["input"] = raw_input
+    output = _tool_output(update)
+    return {
+        "call_id": call_id.strip(),
+        "name": name,
+        "status": status,
+        "arguments": args,
+        "output": output,
+    }
+
+
+def _tool_status(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"completed", "success"}:
+        return "completed"
+    if normalized in {"failed", "error"}:
+        return "failed"
+    if normalized in {"pending"}:
+        return "pending"
+    return "in_progress"
+
+
+def _command_from_raw_input(raw_input: Any) -> str | None:
+    if not isinstance(raw_input, dict):
+        return None
+    command = raw_input.get("command")
+    if isinstance(command, str) and command.strip():
+        return command.strip()
+    executable = raw_input.get("executable")
+    args = raw_input.get("args")
+    if isinstance(executable, str) and isinstance(args, list):
+        parts = [executable, *(str(arg) for arg in args)]
+        return " ".join(part for part in parts if part.strip())
+    return None
+
+
+def _tool_output(update: dict[str, Any]) -> str | None:
+    raw_output = update.get("rawOutput")
+    if raw_output is not None:
+        return raw_output if isinstance(raw_output, str) else json.dumps(raw_output, indent=2)
+    content = update.get("content")
+    if not isinstance(content, list):
+        return None
+    text: list[str] = []
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        nested = item.get("content")
+        if isinstance(nested, dict) and nested.get("type") == "text":
+            value = nested.get("text")
+            if isinstance(value, str) and value.strip():
+                text.append(value.strip())
+    return "\n".join(text) or None
 
 
 def acp_models_from_setup(setup: dict[str, Any]) -> list[str]:

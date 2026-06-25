@@ -5,15 +5,18 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 from contextlib import suppress
 from typing import Any, AsyncIterator
 
+from cptr.utils.agents.attachments import PreparedAgentAttachments
 from cptr.utils.agents.events import (
     AgentDone,
     AgentError,
     AgentEvent,
     AgentReasoningDelta,
     AgentTextDelta,
+    AgentToolUpdate,
 )
 
 
@@ -101,8 +104,10 @@ class CodexAppServer:
                 message = json.loads(line.decode())
             except Exception:
                 continue
-            if "id" in message and "method" not in message and (
-                "result" in message or "error" in message
+            if (
+                "id" in message
+                and "method" not in message
+                and ("result" in message or "error" in message)
             ):
                 future = self.pending.pop(int(message["id"]), None)
                 if future and not future.done():
@@ -150,6 +155,59 @@ def _sandbox_for_approval(value: str) -> str:
     return "workspace-write"
 
 
+def _tool_from_item_event(method: str, params: dict[str, Any]) -> AgentToolUpdate | None:
+    if method not in {"item/started", "item/completed"}:
+        return None
+    item = params.get("item") if isinstance(params.get("item"), dict) else {}
+    item_type = str(item.get("type") or "").strip()
+    normalized_type = re.sub(r"[^a-z0-9]+", " ", item_type.lower()).strip()
+    if not _is_tool_item_type(normalized_type):
+        return None
+    call_id = params.get("itemId") or item.get("id") or item.get("callId")
+    if not isinstance(call_id, str) or not call_id.strip():
+        return None
+    title = str(item.get("title") or item.get("name") or item_type or "Codex action").strip()
+    detail = _item_detail(item)
+    return AgentToolUpdate(
+        call_id=call_id.strip(),
+        name="run_command" if "command" in normalized_type and detail else "agent_tool",
+        status="completed" if method == "item/completed" else "in_progress",
+        arguments={"command": detail}
+        if "command" in normalized_type and detail
+        else {"title": title},
+        output=detail if method == "item/completed" else None,
+    )
+
+
+def _is_tool_item_type(normalized_type: str) -> bool:
+    if not normalized_type:
+        return False
+    blocked = ("user", "agent message", "assistant", "reasoning", "thought", "plan", "todo")
+    if any(value in normalized_type for value in blocked):
+        return False
+    allowed = (
+        "command",
+        "file change",
+        "patch",
+        "edit",
+        "mcp",
+        "dynamic tool",
+        "collab",
+        "web search",
+        "image",
+        "error",
+    )
+    return any(value in normalized_type for value in allowed)
+
+
+def _item_detail(item: dict[str, Any]) -> str | None:
+    for key in ("command", "title", "summary", "text", "path", "prompt"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 async def run_codex_agent(
     *,
     profile: dict[str, Any],
@@ -159,6 +217,7 @@ async def run_codex_agent(
     system_prompt: str,
     chat_params: dict[str, Any],
     resume_state: dict[str, Any] | None,
+    attachments: PreparedAgentAttachments,
 ) -> AsyncIterator[AgentEvent]:
     env = os.environ.copy()
     if profile.get("home"):
@@ -188,11 +247,21 @@ async def run_codex_agent(
             return
 
         prompt = _messages_to_prompt(messages)
+        turn_input: list[dict[str, Any]] = []
+        if prompt:
+            turn_input.append({"type": "text", "text": prompt})
+        for image in attachments.images:
+            turn_input.append(
+                {
+                    "type": "image",
+                    "url": f"data:{image.mime_type};base64,{image.base64}",
+                }
+            )
         turn_response = await client.request(
             "turn/start",
             {
                 "threadId": thread_id,
-                "input": [{"type": "text", "text": prompt}],
+                "input": turn_input,
             },
         )
         turn = turn_response.get("result", {}).get("turn", {})
@@ -213,7 +282,11 @@ async def run_codex_agent(
                 delta = params.get("delta")
                 if isinstance(delta, str) and delta:
                     yield AgentReasoningDelta(delta)
-            elif method == "turn/completed":
+            else:
+                tool = _tool_from_item_event(str(method or ""), params)
+                if tool:
+                    yield tool
+            if method == "turn/completed":
                 yield AgentDone(
                     resume_state={
                         "profile_id": profile["id"],
