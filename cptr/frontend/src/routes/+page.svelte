@@ -39,7 +39,6 @@
 	import GroupTabBar from '$lib/components/GroupTabBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import WorkspacePicker from '$lib/components/WorkspacePicker.svelte';
-	import WorkspaceResumeSheet from '$lib/components/WorkspaceResumeSheet.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { isSupportedWorkspacePath } from '$lib/utils/paths';
 
@@ -47,7 +46,6 @@
 	let pendingIntent = $state<LaunchIntent | null>(null);
 	let folderPickerIntent = $state<LaunchIntent | null>(null);
 	let folderPickerWorkspace = $state<string | null>(null);
-	let dismissedResumePath = $state<string | null>(null);
 	const INTENT_URL_KEYS = [
 		'intent',
 		'chatId',
@@ -602,10 +600,6 @@
 		return () => window.removeEventListener('resize', onResize);
 	});
 
-	$effect(() => {
-		if (!$currentWorkspace) dismissedResumePath = null;
-	});
-
 	const allGroups = $derived($currentWorkspace?.groups ?? []);
 	const splitDirection = $derived($currentWorkspace?.splitDirection ?? 'horizontal');
 	const splitRatio = $derived($currentWorkspace?.splitRatio ?? 0.5);
@@ -694,7 +688,9 @@
 		<div class="w-full max-w-md">
 			<div class="mb-5">
 				<div class="flex items-baseline gap-2">
-					<h1 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">cptr</h1>
+					<h1 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
+						Computer
+					</h1>
 					{#if $appVersion}
 						<button
 							onclick={() => showChangelog.set(true)}
@@ -714,11 +710,10 @@
 			<div class="mb-6">
 				<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.start')}</h2>
 				<button
-					class="flex items-center gap-2 text-[13px] text-gray-600 transition-colors duration-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+					class="text-[13px] text-gray-600 transition-colors duration-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 					onclick={() => (showPicker = true)}
 				>
-					<Icon name="folder" size={15} strokeWidth={1.3} />
-					{$t('home.openFolder')}
+					Open workspace
 				</button>
 			</div>
 
@@ -732,48 +727,36 @@
 							{@const resume = workspaceResumes.get(item.path)}
 							{@const signals = resumeSignals(resume)}
 							<button
-								class="group flex w-full min-w-0 items-start gap-2 py-1.5 text-left transition-colors duration-100"
+								class="group w-full min-w-0 py-1.5 text-left transition-colors duration-100"
 								onclick={() => quickOpen(item.path)}
 							>
-								<Icon
-									name="folder"
-									size={14}
-									strokeWidth={1.3}
-									class="mt-[3px] shrink-0 text-gray-400 dark:text-gray-600"
-								/>
-								<span class="min-w-0 flex-1">
-									<span class="flex min-w-0 items-baseline gap-2">
-										<span
-											class="truncate text-[13px] text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white"
-										>
-											{item.name}
-										</span>
-										<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">
-											{shortenPath(item.path)}
-										</span>
+								<span class="flex min-w-0 items-baseline gap-2">
+									<span
+										class="truncate text-[13px] text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white"
+									>
+										{item.name}
 									</span>
-									{#if signals.length}
-										<span
-											class="mt-0.5 block truncate font-mono text-[10px] text-gray-400 dark:text-gray-600"
-										>
-											{signals.join('  ')}
-										</span>
-									{:else if resume?.activeLabels.length}
-										<span
-											class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600"
-										>
-											{resume.activeLabels.join(' · ')}
-										</span>
-									{/if}
-									{#if resume?.recentChats[0]?.is_active}
-										<span
-											class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600"
-										>
-											active
-											{resume.recentChats[0].title}
-										</span>
-									{/if}
+									<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">
+										{shortenPath(item.path)}
+									</span>
 								</span>
+								{#if signals.length}
+									<span
+										class="mt-0.5 block truncate font-mono text-[10px] text-gray-400 dark:text-gray-600"
+									>
+										{signals.join('  ')}
+									</span>
+								{:else if resume?.activeLabels.length}
+									<span class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600">
+										{resume.activeLabels.join(' · ')}
+									</span>
+								{/if}
+								{#if resume?.recentChats[0]?.is_active}
+									<span class="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-600">
+										active
+										{resume.recentChats[0].title}
+									</span>
+								{/if}
 							</button>
 						{/each}
 					</div>
@@ -782,10 +765,9 @@
 				<div class="mb-6">
 					<h2 class="mb-2 text-xs text-gray-400 dark:text-gray-600">{$t('home.recent')}</h2>
 					<button
-						class="flex items-center gap-2 text-[13px] text-gray-500 transition-colors duration-100 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white"
+						class="text-[13px] text-gray-500 transition-colors duration-100 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white"
 						onclick={() => (showPicker = true)}
 					>
-						<Icon name="folder" size={14} strokeWidth={1.3} />
 						No workspaces yet
 					</button>
 				</div>
@@ -919,10 +901,6 @@
 			<div class="split-drop-zone split-drop-bottom"></div>
 		{/if}
 	</div>
-
-	{#if dismissedResumePath !== $currentWorkspace.path}
-		<WorkspaceResumeSheet onclose={() => (dismissedResumePath = $currentWorkspace?.path ?? null)} />
-	{/if}
 {/if}
 
 {#if pendingIntent}
