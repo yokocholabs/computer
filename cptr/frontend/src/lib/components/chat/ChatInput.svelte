@@ -39,6 +39,7 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { t } from '$lib/i18n';
 	import { TAB_DRAG_MIME } from '$lib/constants';
+	import { tooltip } from '$lib/tooltip';
 
 	// Keep screen awake during voice mode conversations
 	let voiceWakeLock: WakeLockSentinel | null = null;
@@ -73,6 +74,7 @@
 		oncompact?: () => void;
 		onplan?: () => void;
 		onstatus?: () => void;
+		onskillslist?: () => void;
 		oncancel?: () => void;
 		onqueuesendnow?: (id: string) => void;
 		onqueueedit?: (id: string) => void;
@@ -91,6 +93,7 @@
 		oncompact,
 		onplan,
 		onstatus,
+		onskillslist,
 		oncancel,
 		onqueuesendnow,
 		onqueueedit,
@@ -927,6 +930,14 @@
 		if (oncompact && '/compact'.startsWith(slashCommandQuery)) ids.push('compact');
 		if (onplan && '/plan'.startsWith(slashCommandQuery)) ids.push('plan');
 		if (onstatus && '/status'.startsWith(slashCommandQuery)) ids.push('status');
+		if (
+			onskillslist &&
+			slashCommandQuery !== '/skills:list' &&
+			'/skills:list'.startsWith(slashCommandQuery)
+		)
+			ids.push('skills:list');
+		if (slashCommandQuery !== '/skills:create' && '/skills:create'.startsWith(slashCommandQuery))
+			ids.push('skills:create');
 		return ids;
 	});
 	const showSlashCommands = $derived(slashCommandIds.length > 0);
@@ -953,6 +964,15 @@
 		if (commandId === 'status' && onstatus) {
 			inputText = '';
 			onstatus();
+			return;
+		}
+		if (commandId === 'skills:list' && onskillslist) {
+			inputText = '';
+			onskillslist();
+			return;
+		}
+		if (commandId === 'skills:create') {
+			inputText = '/skills:create ';
 			return;
 		}
 		onsend();
@@ -1010,6 +1030,8 @@
 			{#if slashCommandIds.includes('compact')}
 				<button
 					type="button"
+					aria-label="Compact: shorten older messages so this chat can keep going."
+					use:tooltip={{ content: 'Shorten older messages so this chat can keep going.', placement: 'right' }}
 					class="slash-command-row flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs text-left transition-colors duration-75
 						{slashCommandIds[selectedSlashCommandIndex] === 'compact'
 						? 'app-interactive-active'
@@ -1056,6 +1078,11 @@
 			{#if slashCommandIds.includes('plan')}
 				<button
 					type="button"
+					aria-label="Plan: work out a plan first, then wait before changing files."
+					use:tooltip={{
+						content: 'Work out a plan first, then wait before changing files.',
+						placement: 'right'
+					}}
 					class="slash-command-row flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs text-left transition-colors duration-75
 						{slashCommandIds[selectedSlashCommandIndex] === 'plan' ? 'app-interactive-active' : ''}"
 					onmousedown={(e) => e.preventDefault()}
@@ -1092,6 +1119,11 @@
 			{#if slashCommandIds.includes('status')}
 				<button
 					type="button"
+					aria-label="Status: check what is running in this chat."
+					use:tooltip={{
+						content: 'Check what is running in this chat.',
+						placement: 'right'
+					}}
 					class="slash-command-row flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs text-left transition-colors duration-75
 						{slashCommandIds[selectedSlashCommandIndex] === 'status' ? 'app-interactive-active' : ''}"
 					onmousedown={(e) => e.preventDefault()}
@@ -1120,6 +1152,60 @@
 						<span class="app-muted text-[0.625rem] truncate shrink-0">
 							{$t('chat.commandStatusDesc')}
 						</span>
+					</span>
+				</button>
+			{/if}
+			{#if slashCommandIds.includes('skills:list')}
+				<button
+					type="button"
+					aria-label="List skills: see the skills available in this workspace."
+					use:tooltip={{
+						content: 'See the skills available in this workspace.',
+						placement: 'right'
+					}}
+					class="slash-command-row flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs text-left transition-colors duration-75
+						{slashCommandIds[selectedSlashCommandIndex] === 'skills:list'
+						? 'app-interactive-active'
+						: ''}"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => {
+						runSlashCommand('skills:list');
+					}}
+					onmouseenter={() => (selectedSlashCommandIndex = slashCommandIds.indexOf('skills:list'))}
+				>
+					<span class="app-icon-muted flex items-center justify-center w-4 shrink-0">
+						<Icon name="list" size={14} />
+					</span>
+					<span class="flex-1 min-w-0 flex items-baseline gap-1.5 overflow-hidden">
+						<span class="truncate">List skills</span>
+						<span class="app-muted text-[0.625rem] truncate shrink-0">/skills:list</span>
+					</span>
+				</button>
+			{/if}
+			{#if slashCommandIds.includes('skills:create')}
+				<button
+					type="button"
+					aria-label="Create skill: teach Computer a reusable workflow."
+					use:tooltip={{
+						content: 'Teach Computer a reusable workflow.',
+						placement: 'right'
+					}}
+					class="slash-command-row flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs text-left transition-colors duration-75
+						{slashCommandIds[selectedSlashCommandIndex] === 'skills:create'
+						? 'app-interactive-active'
+						: ''}"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => {
+						runSlashCommand('skills:create');
+					}}
+					onmouseenter={() => (selectedSlashCommandIndex = slashCommandIds.indexOf('skills:create'))}
+				>
+					<span class="app-icon-muted flex items-center justify-center w-4 shrink-0">
+						<Icon name="plus" size={14} />
+					</span>
+					<span class="flex-1 min-w-0 flex items-baseline gap-1.5 overflow-hidden">
+						<span class="truncate">Create skill</span>
+						<span class="app-muted text-[0.625rem] truncate shrink-0">/skills:create</span>
 					</span>
 				</button>
 			{/if}

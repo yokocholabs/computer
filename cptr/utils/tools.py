@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import mimetypes
 import os
 import time
 import uuid
@@ -231,6 +232,37 @@ def _human_size(size: int) -> str:
             return f"{size}{unit}" if unit == "B" else f"{size:.1f}{unit}"
         size /= 1024
     return f"{size:.1f}TB"
+
+
+def _file_kind(path: Path, mime_type: str) -> str:
+    ext = path.suffix.lower()
+    if mime_type.startswith("image/"):
+        return "image"
+    if mime_type.startswith("audio/"):
+        return "audio"
+    if mime_type.startswith("video/"):
+        return "video"
+    if mime_type == "application/pdf":
+        return "pdf"
+    if ext in {".md", ".markdown", ".mdx"}:
+        return "markdown"
+    if ext in {".json", ".jsonc", ".json5"}:
+        return "json"
+    if ext in {".csv", ".tsv"}:
+        return "csv"
+    if ext in {".html", ".htm"}:
+        return "html"
+    if ext == ".svg":
+        return "svg"
+    if ext in {".txt", ".log", ".diff", ".patch"} or mime_type.startswith("text/"):
+        return "text"
+    if ext in {".docx", ".xlsx", ".xls", ".pptx"}:
+        return "office"
+    if ext in {".sqlite", ".sqlite3", ".db", ".db3"}:
+        return "sqlite"
+    if ext in {".zip", ".tar", ".gz", ".tgz", ".rar", ".7z"}:
+        return "archive"
+    return "binary"
 
 
 def _truncate_output(text: str, max_chars: int = 80_000) -> str:
@@ -814,6 +846,48 @@ async def write_file(path: str, content: str, *, workspace: str) -> str:
 
     await asyncio.to_thread(_write)
     return f"Wrote {len(content)} bytes to {path}"
+
+
+async def display_file(path: str, *, workspace: str) -> str:
+    """Display a workspace file inline in chat.
+    Use when the user asks to see, preview, render, or display a file you created or found.
+    :param path: Path relative to workspace root.
+    """
+    if not path:
+        return "Error: path is required."
+
+    try:
+        full = _resolve_path(path, workspace)
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+    if _is_dotenv(full):
+        return _DOTENV_ERROR
+    if not full.exists():
+        return f"Error: file not found: {path}"
+    if not full.is_file():
+        return f"Error: not a file: {path}"
+
+    stat = await asyncio.to_thread(full.stat)
+    mime_type = mimetypes.guess_type(str(full))[0] or "application/octet-stream"
+    ws = Path(workspace).resolve()
+    try:
+        display_path = str(full.relative_to(ws))
+    except ValueError:
+        display_path = str(full)
+    return json.dumps(
+        {
+            "type": "file",
+            "path": display_path,
+            "full_path": str(full),
+            "workspace": str(ws),
+            "name": full.name,
+            "size": stat.st_size,
+            "mime_type": mime_type,
+            "kind": _file_kind(full, mime_type),
+        },
+        ensure_ascii=False,
+    )
 
 
 async def edit_file(
@@ -1421,6 +1495,43 @@ async def view_skill(
     return format_skill_content(skill)
 
 
+async def manage_skill(
+    action: Literal["create", "write_file"],
+    name: str,
+    content: Optional[str] = None,
+    scope: Literal["workspace", "global"] = "workspace",
+    file_path: Optional[str] = None,
+    file_content: Optional[str] = None,
+    *,
+    __context__: dict,
+) -> str:
+    """Create Computer-managed skills and supporting bundle files.
+
+    Use this only when the user asks to create a reusable skill. New skills
+    default to the current workspace. For supporting files, write only under
+    references/, templates/, scripts/, or assets/.
+    :param action: "create" to write SKILL.md, or "write_file" to add a bundle file.
+    :param name: Lowercase hyphenated skill name.
+    :param content: Full SKILL.md content for action="create".
+    :param scope: "workspace" for .cptr/skills, or "global" for ~/.cptr/skills.
+    :param file_path: Relative bundle path for action="write_file".
+    :param file_content: File content for action="write_file".
+    """
+    from cptr.utils.skills import create_managed_skill, write_managed_skill_file
+
+    workspace = __context__.get("workspace", "")
+    try:
+        if action == "create":
+            result = create_managed_skill(workspace, name, content or "", scope)
+        elif action == "write_file":
+            result = write_managed_skill_file(workspace, name, file_path or "", file_content)
+        else:
+            result = {"success": False, "error": f"unsupported action '{action}'"}
+    except Exception as e:
+        result = {"success": False, "error": str(e)}
+    return json.dumps(result, ensure_ascii=False)
+
+
 # ── Browser tools ────────────────────────────────────────────
 
 
@@ -1589,6 +1700,8 @@ async def image_generate(
     __context__: dict,
 ) -> str:
     """Generate or edit image files from a prompt.
+    Returns saved image file paths. You must call display_file next for each returned path
+    before responding to the user.
     :param prompt: Detailed description of the image to create or the edits to make.
     :param image: Optional source image file id, /api/files/... URL, or workspace path for edit mode.
     :param images: Optional source image file ids, /api/files/... URLs, or workspace paths for edit mode.
@@ -1922,6 +2035,7 @@ TOOLS: dict[str, dict] = {
     "view_skill": {"fn": view_skill, "auto": True},
     # Write / mutate (require approval unless auto_approve_all)
     "create_file": {"fn": create_file, "auto": False},
+    "display_file": {"fn": display_file, "auto": False},
     "edit_file": {"fn": edit_file, "auto": False},
     "multi_edit_file": {"fn": multi_edit_file, "auto": False},
     "write_file": {"fn": write_file, "auto": False},
@@ -1934,6 +2048,7 @@ TOOLS: dict[str, dict] = {
     "delete_automation": {"fn": delete_automation, "auto": False},
     "notify": {"fn": notify, "auto": False},
     "image_generate": {"fn": image_generate, "auto": False},
+    "manage_skill": {"fn": manage_skill, "auto": False},
     "update_memory": {"fn": update_memory, "auto": True},
 }
 
