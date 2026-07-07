@@ -1522,6 +1522,24 @@ async def run_chat_task(
         if runner is None:
             raise RuntimeError(f"Unsupported agent type: {agent_target.agent}")
         reasoning_buffer = ""
+        reasoning_item_id = f"reasoning-{message_id}"
+
+        async def _finish_reasoning_item():
+            existing = next(
+                (item for item in output_items if item.get("id") == reasoning_item_id), None
+            )
+            if not existing or existing.get("status") == "completed":
+                return
+            item = {
+                "type": "reasoning",
+                "id": reasoning_item_id,
+                "status": "completed",
+                "content": [{"type": "reasoning_text", "text": reasoning_buffer}],
+            }
+            _upsert_output_item(output_items, item)
+            await emit(output=item)
+            _sync_state()
+
         async for event in runner(
             profile=agent_target.config,
             model=agent_target.model,
@@ -1533,6 +1551,7 @@ async def run_chat_task(
             attachments=agent_attachments,
         ):
             if isinstance(event, AgentTextDelta):
+                await _finish_reasoning_item()
                 content += event.text
                 text_buffer += event.text
                 await emit(delta=event.text)
@@ -1541,7 +1560,7 @@ async def run_chat_task(
                 reasoning_buffer += event.text
                 item = {
                     "type": "reasoning",
-                    "id": f"reasoning-{message_id}",
+                    "id": reasoning_item_id,
                     "status": "in_progress",
                     "content": [{"type": "reasoning_text", "text": reasoning_buffer}],
                 }
@@ -1549,6 +1568,7 @@ async def run_chat_task(
                 await emit(output=item)
                 _sync_state()
             elif isinstance(event, AgentToolUpdate):
+                await _finish_reasoning_item()
                 flushed_item = _flush_text()
                 if flushed_item:
                     await emit(output=flushed_item)
@@ -1609,6 +1629,7 @@ async def run_chat_task(
                     await emit(output=output_item)
                 _sync_state()
             elif isinstance(event, AgentToolOutputDelta):
+                await _finish_reasoning_item()
                 flushed_item = _flush_text()
                 if flushed_item:
                     await emit(output=flushed_item)
@@ -1665,16 +1686,7 @@ async def run_chat_task(
             elif isinstance(event, AgentError):
                 raise RuntimeError(event.message)
             elif isinstance(event, AgentDone):
-                if reasoning_buffer:
-                    _upsert_output_item(
-                        output_items,
-                        {
-                            "type": "reasoning",
-                            "id": f"reasoning-{message_id}",
-                            "status": "completed",
-                            "content": [{"type": "reasoning_text", "text": reasoning_buffer}],
-                        },
-                    )
+                await _finish_reasoning_item()
                 flushed_item = _flush_text()
                 if flushed_item:
                     await emit(output=flushed_item)
@@ -1704,6 +1716,7 @@ async def run_chat_task(
         flushed_item = _flush_text()
         if flushed_item:
             await emit(output=flushed_item)
+        await _finish_reasoning_item()
         await _save_message("agent stream ended", content=content, output=output_items, done=True)
         _task_state.pop(message_id, None)
         await _emit_done()
