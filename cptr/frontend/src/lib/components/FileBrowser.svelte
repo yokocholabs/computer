@@ -74,6 +74,7 @@
 	let contextMenu = $state<{ x: number; y: number; entry: TreeEntry; anchor?: HTMLElement } | null>(
 		null
 	);
+	let directoryMenu = $state<{ x: number; y: number } | null>(null);
 	let renamingEntry = $state<string | null>(null);
 	let renameValue = $state('');
 
@@ -864,16 +865,35 @@
 	// ── Context menu ───────────────────────────────────────────
 	function onContextMenu(e: MouseEvent, entry: TreeEntry) {
 		e.preventDefault();
+		e.stopPropagation();
+		directoryMenu = null;
 		contextMenu = { x: e.clientX, y: e.clientY, entry };
 	}
 
 	function openEntryMenu(e: MouseEvent | KeyboardEvent, entry: TreeEntry) {
 		e.stopPropagation();
+		directoryMenu = null;
 		contextMenu = { x: 0, y: 0, entry, anchor: e.currentTarget as HTMLElement };
+	}
+
+	function onDirectoryContextMenu(e: MouseEvent) {
+		if ((e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"]')) {
+			return;
+		}
+
+		e.preventDefault();
+		contextMenu = null;
+		addMenuOpen = false;
+		sortMenuOpen = false;
+		directoryMenu = { x: e.clientX, y: e.clientY };
 	}
 
 	function closeMenu() {
 		contextMenu = null;
+	}
+
+	function closeDirectoryMenu() {
+		directoryMenu = null;
 	}
 
 	function startRename(entry: TreeEntry) {
@@ -1044,7 +1064,7 @@
 	<!-- Sort bar replaced with dropdown in toolbar -->
 
 	<!-- File list -->
-	<div class="flex-1 overflow-y-auto p-1">
+	<div class="flex-1 overflow-y-auto p-1" oncontextmenu={onDirectoryContextMenu}>
 		<!-- New item input -->
 		{#if showNewInput}
 			<div class="flex items-center gap-2 h-7 px-2">
@@ -1208,9 +1228,14 @@
 						{/if}
 						{#if fileGitStatus && entryGitDecoration}
 							<span
-								class="text-[0.625rem] font-mono font-bold shrink-0 {entryGitDecoration.badgeColor}"
-								use:tooltip={gitStatusTooltip(fileGitStatus, entry)}>{entryGitDecoration.char}</span
+								class="flex shrink-0 items-center gap-1 text-[0.625rem] font-mono font-medium"
+								use:tooltip={gitStatusTooltip(fileGitStatus, entry)}
 							>
+								<span class="text-green-600 dark:text-green-400"
+									>+{fileGitStatus.additions ?? 0}</span
+								>
+								<span class="text-red-500 dark:text-red-400">-{fileGitStatus.deletions ?? 0}</span>
+							</span>
 						{/if}
 						{#if entry.type !== 'directory' && entry.size !== null}
 							<span
@@ -1322,6 +1347,30 @@
 			}
 		]}
 		onclose={() => (addMenuOpen = false)}
+	/>
+{/if}
+
+{#if directoryMenu}
+	<DropdownMenu
+		anchor={{ x: directoryMenu.x, y: directoryMenu.y }}
+		items={[
+			{
+				label: $t('files.refresh'),
+				icon: 'refresh',
+				onclick: () => fetchDirectory(cwd)
+			},
+			{ label: '', divider: true, onclick: () => {} },
+			{ label: $t('files.newFile'), icon: 'plus', onclick: () => startNew('file') },
+			{ label: $t('files.newFolder'), icon: 'folder', onclick: () => startNew('folder') },
+			{ label: $t('files.uploadFile'), icon: 'upload', onclick: () => handleUploadFromMenu() },
+			{ label: '', divider: true, onclick: () => {} },
+			{
+				label: showHidden ? $t('files.hideHidden') : $t('files.showHidden'),
+				icon: 'eye',
+				onclick: () => toggleHidden()
+			}
+		]}
+		onclose={closeDirectoryMenu}
 	/>
 {/if}
 

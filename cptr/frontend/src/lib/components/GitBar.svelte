@@ -26,12 +26,16 @@
 		renameGitBranch
 	} from '$lib/apis/git';
 	import { gitStatusStore } from '$lib/stores/gitStatus.svelte';
+	import { diffDisplayMode, hideWhitespaceChanges } from '$lib/stores/gitDiffSettings';
 	import Icon from './Icon.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import Modal from './Modal.svelte';
 	import { tooltip } from '$lib/tooltip';
 	import { t } from '$lib/i18n';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import DiffSettingsMenu from './DiffSettingsMenu.svelte';
+	import { countDiffStats, type DiffFile } from '$lib/utils/diff';
+	import DiffHunkList from './DiffHunkList.svelte';
 
 	type GitFile = {
 		path: string;
@@ -40,9 +44,9 @@
 		unstaged?: boolean;
 		staged_status?: string;
 		unstaged_status?: string;
+		additions?: number;
+		deletions?: number;
 	};
-	type DiffHunk = { header: string; lines: { type: string; content: string }[] };
-	type DiffFile = { path: string; hunks: DiffHunk[] };
 	type Commit = { hash: string; short_hash: string; author: string; date: string; message: string };
 	type BranchItem = {
 		name: string;
@@ -77,8 +81,10 @@
 	let showDiff = $state(false);
 	let showBranches = $state(false);
 	let showWorktrees = $state(false);
+	let showDiffSettings = $state(false);
 	let branchBtnEl = $state<HTMLButtonElement | undefined>();
 	let worktreeBtnEl = $state<HTMLButtonElement | undefined>();
+	let diffSettingsBtnEl = $state<HTMLButtonElement | undefined>();
 	let branchSearchInputEl = $state<HTMLInputElement | undefined>();
 	let worktreeSearchInputEl = $state<HTMLInputElement | undefined>();
 	let newBranchInputEl = $state<HTMLInputElement | undefined>();
@@ -112,6 +118,13 @@
 	const stagedFiles = $derived((gitStatus?.files ?? []).filter((f) => f.staged));
 	const unstagedFiles = $derived((gitStatus?.files ?? []).filter((f) => !f.staged));
 	const totalChanges = $derived((gitStatus?.files ?? []).length);
+	const totalAdditions = $derived(
+		(gitStatus?.files ?? []).reduce((sum, file) => sum + (file.additions ?? 0), 0)
+	);
+	const totalDeletions = $derived(
+		(gitStatus?.files ?? []).reduce((sum, file) => sum + (file.deletions ?? 0), 0)
+	);
+	const selectedDiffStats = $derived(countDiffStats(fileDiff));
 	const allStaged = $derived(totalChanges > 0 && unstagedFiles.length === 0);
 	const someStaged = $derived(stagedFiles.length > 0 && unstagedFiles.length > 0);
 
@@ -180,6 +193,15 @@
 		}
 	});
 
+	let _prevHideWhitespace = false;
+	$effect(() => {
+		const hideWhitespace = $hideWhitespaceChanges;
+		if (hideWhitespace === _prevHideWhitespace) return;
+		_prevHideWhitespace = hideWhitespace;
+		if (!expanded || !showDiff) return;
+		reloadSelectedDiff();
+	});
+
 	// Auto-select first file
 	$effect(() => {
 		if (
@@ -206,7 +228,8 @@
 			const params = new URLSearchParams({
 				root: workspacePath,
 				file: path,
-				staged: String(staged)
+				staged: String(staged),
+				ignore_whitespace: String($hideWhitespaceChanges)
 			});
 			if (untracked) params.set('untracked', 'true');
 			const d = await getGitDiff(params.toString());
@@ -221,7 +244,7 @@
 		selectedFile = null;
 		showDiff = true;
 		try {
-			const d = await getGitShow(workspacePath, c.hash);
+			const d = await getGitShow(workspacePath, c.hash, $hideWhitespaceChanges);
 			fileDiff = d.diff?.files ?? [];
 		} catch {
 			fileDiff = [];
@@ -230,6 +253,16 @@
 
 	function backToList() {
 		showDiff = false;
+	}
+
+	function reloadSelectedDiff() {
+		if (selectedCommit) {
+			selectCommit(selectedCommit);
+			return;
+		}
+		if (!selectedFile) return;
+		const file = (gitStatus?.files ?? []).find((item) => item.path === selectedFile);
+		if (file) selectFile(file.path, file.staged, file.status === 'untracked');
 	}
 
 	async function loadHistory() {
@@ -640,25 +673,6 @@
 		return `${Math.floor(s / 86400)}d`;
 	}
 
-	function statusChar(s: string): { char: string; color: string } {
-		switch (s) {
-			case 'added':
-				return { char: 'A', color: 'text-green-500' };
-			case 'untracked':
-				return { char: 'U', color: 'text-green-500' };
-			case 'modified':
-				return { char: 'M', color: 'text-amber-500' };
-			case 'deleted':
-				return { char: 'D', color: 'text-red-400' };
-			case 'renamed':
-				return { char: 'R', color: 'text-blue-400' };
-			case 'conflict':
-				return { char: '!', color: 'text-orange-500' };
-			default:
-				return { char: '?', color: 'text-gray-400' };
-		}
-	}
-
 	const syncAction = $derived.by(() => {
 		if (!gitStatus) return { label: $t('git.fetch'), icon: 'refresh', action: doFetch };
 		if (gitStatus.behind > 0)
@@ -710,32 +724,6 @@
 		}
 	}
 
-	type LineGroup = { type: string; lines: { type: string; content: string }[] };
-
-	function groupLines(lines: { type: string; content: string }[]): LineGroup[] {
-		const groups: LineGroup[] = [];
-		for (const line of lines) {
-			const last = groups[groups.length - 1];
-			if (last && last.type === line.type) {
-				last.lines.push(line);
-			} else {
-				groups.push({ type: line.type, lines: [line] });
-			}
-		}
-		return groups;
-	}
-
-	function blockClass(type: string): string {
-		switch (type) {
-			case 'added':
-				return 'bg-green-100 border-l-[0.1875rem] border-l-green-500 dark:bg-green-500/15 dark:border-l-green-400';
-			case 'removed':
-				return 'bg-red-100 diff-gutter-removed dark:bg-red-500/15';
-			default:
-				return '';
-		}
-	}
-
 	$effect(() => {
 		if (!expanded) return;
 		function onKeydown(e: KeyboardEvent) {
@@ -764,7 +752,7 @@
 		<!-- Collapsed bar (entire bar is clickable to expand) -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="flex items-center h-7 px-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75"
+			class="flex min-w-0 items-center h-7 px-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75"
 			onclick={() => {
 				expanded = !expanded;
 				if (expanded) {
@@ -776,11 +764,12 @@
 			<!-- Branch button (opens branch picker, stops expand) -->
 			<button
 				bind:this={branchBtnEl}
-				class="flex items-center gap-1.5 h-6 px-1.5 -ml-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
+				class="flex min-w-0 max-w-32 shrink items-center gap-1.5 h-6 px-1.5 -ml-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
 				onclick={toggleBranches}
 			>
 				<Icon name="git-branch" size={12} class="text-gray-400 dark:text-gray-600 shrink-0" />
-				<span class="text-[0.6875rem] text-gray-600 dark:text-gray-400 font-mono"
+				<span
+					class="min-w-0 truncate whitespace-nowrap text-[0.6875rem] text-gray-600 dark:text-gray-400 font-mono"
 					>{gitStatus.branch}</span
 				>
 				<Icon name="chevron-down" size={9} class="text-gray-400 dark:text-gray-600" />
@@ -788,18 +777,19 @@
 
 			<button
 				bind:this={worktreeBtnEl}
-				class="flex items-center gap-1.5 h-6 px-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
+				class="flex min-w-0 max-w-32 shrink items-center gap-1.5 h-6 px-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
 				onclick={toggleWorktrees}
 			>
 				<Icon name="folder" size={12} class="text-gray-400 dark:text-gray-600 shrink-0" />
-				<span class="text-[0.6875rem] text-gray-500 dark:text-gray-500 font-mono"
+				<span
+					class="min-w-0 truncate whitespace-nowrap text-[0.6875rem] text-gray-500 dark:text-gray-500 font-mono"
 					>{pathTail(workspacePath)}</span
 				>
 				<Icon name="chevron-down" size={9} class="text-gray-400 dark:text-gray-600" />
 			</button>
 
 			{#if gitStatus.ahead > 0}<span
-					class="text-[0.625rem] font-mono text-gray-400 dark:text-gray-600 ml-1.5"
+					class="ml-1.5 shrink-0 whitespace-nowrap text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
 					>↑{gitStatus.ahead}</span
 				>{/if}
 			{#if gitStatus.behind > 0}<span
@@ -807,11 +797,14 @@
 					>↓{gitStatus.behind}</span
 				>{/if}
 			{#if totalChanges > 0}<span
-					class="text-[0.625rem] font-mono text-gray-400 dark:text-gray-600 ml-1.5"
+					class="mx-1.5 block min-w-0 max-w-20 shrink truncate whitespace-nowrap text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
 					>{$t('git.changedCount', { count: totalChanges })}</span
+				><span class="mx-1.5 flex shrink-0 items-center gap-1 text-[0.625rem] font-mono"
+					><span class="text-green-600 dark:text-green-400">+{totalAdditions}</span>
+					<span class="text-red-500 dark:text-red-400">-{totalDeletions}</span></span
 				>{/if}
 			{#if actionMsg}<span
-					class="text-[0.625rem] font-mono text-gray-400 dark:text-gray-600 ml-auto"
+					class="ml-auto min-w-0 max-w-32 truncate whitespace-nowrap text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
 					>{actionMsg}</span
 				>{/if}
 
@@ -819,7 +812,7 @@
 
 			<!-- Sync button (stops expand) -->
 			<button
-				class="flex items-center gap-1 h-6 px-2 rounded-md text-[0.6875rem] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
+				class="flex shrink-0 items-center gap-1 h-6 px-2 rounded-md text-[0.6875rem] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
 				onclick={(e) => {
 					e.stopPropagation();
 					syncAction.action();
@@ -827,7 +820,7 @@
 				disabled={loading}
 			>
 				<Icon name={syncAction.icon} size={12} />
-				<span>{syncAction.label}</span>
+				<span class="whitespace-nowrap">{syncAction.label}</span>
 			</button>
 
 			<!-- Chevron indicator -->
@@ -1174,6 +1167,16 @@
 						</a>
 					{/if}
 
+					<button
+						bind:this={diffSettingsBtnEl}
+						class="flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
+						onclick={() => (showDiffSettings = true)}
+						use:tooltip={'Diff settings'}
+						aria-label="Diff settings"
+					>
+						<Icon name="settings" size={12} />
+					</button>
+
 					<!-- Maximize toggle -->
 					<button
 						class="flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
@@ -1184,18 +1187,26 @@
 					</button>
 				</div>
 
+				{#if showDiffSettings && diffSettingsBtnEl}
+					<DiffSettingsMenu
+						anchor={diffSettingsBtnEl}
+						onclose={() => (showDiffSettings = false)}
+						preferAbove
+					/>
+				{/if}
+
 				<!-- Content -->
-				<div class="flex min-h-36" style="height: {panelHeight}px;">
+				<div class="flex min-h-36 min-w-0" style="height: {panelHeight}px;">
 					<!-- Left pane: file list or commit list -->
 					<div
-						class="w-full md:w-60 lg:w-72 shrink-0 md:border-r md:border-gray-100 md:dark:border-white/4 flex flex-col overflow-hidden
+						class="w-full min-w-0 md:w-60 lg:w-72 shrink-0 md:border-r md:border-gray-100 md:dark:border-white/4 flex flex-col overflow-hidden
 						{showDiff ? 'hidden md:flex' : 'flex'}"
 					>
 						{#if view === 'changes'}
 							<!-- Global checkbox -->
 							{#if totalChanges > 0}
 								<button
-									class="flex items-center gap-1.5 h-7 px-2.5 border-b border-gray-100 dark:border-white/4 hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75 shrink-0"
+									class="flex min-w-0 items-center gap-1.5 h-7 px-2.5 border-b border-gray-100 dark:border-white/4 hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-75 shrink-0"
 									onclick={toggleAll}
 								>
 									<span
@@ -1214,19 +1225,18 @@
 											/>
 										{/if}
 									</span>
-									<span class="text-[0.6875rem] text-gray-600 dark:text-gray-400"
+									<span class="min-w-0 truncate text-[0.6875rem] text-gray-600 dark:text-gray-400"
 										>{$t('git.changedFile', { count: totalChanges })}</span
 									>
 								</button>
 							{/if}
 
 							<!-- File list -->
-							<div class="flex-1 overflow-y-auto">
+							<div class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 								{#each gitStatus?.files ?? [] as file (file.path)}
 									{@const fp = fPath(file.path)}
-									{@const sc = statusChar(file.status)}
 									<button
-										class="group flex items-center gap-1.5 w-full h-7 px-2.5 text-left transition-colors duration-75
+										class="group flex min-w-0 items-center gap-1.5 w-full h-7 px-2.5 text-left transition-colors duration-75
 											{selectedFile === file.path
 											? 'bg-gray-100 dark:bg-white/8'
 											: 'hover:bg-gray-50 dark:hover:bg-white/3'}"
@@ -1247,23 +1257,28 @@
 												<Icon name="check" size={7} class="text-white dark:text-black" />
 											{/if}
 										</span>
-										{#if fp.dir}
+										<span class="flex min-w-0 flex-1 items-baseline gap-1.5">
+											{#if fp.dir}
+												<span
+													class="min-w-0 truncate text-[0.625rem] text-gray-400 dark:text-gray-600"
+													>{fp.dir}</span
+												>
+											{/if}
+											<!-- svelte-ignore a11y_no_static_element_interactions -->
 											<span
-												class="text-[0.625rem] text-gray-400 dark:text-gray-600 truncate shrink min-w-0"
-												>{fp.dir}</span
+												class="min-w-0 max-w-[55%] shrink-0 truncate text-[0.6875rem] text-gray-800 dark:text-gray-200 hover:underline cursor-pointer"
+												onclick={(e) => {
+													e.stopPropagation();
+													openFileTab(workspacePath.replace(/\/$/, '') + '/' + file.path);
+												}}>{fp.name}</span
 											>
-										{/if}
-										<!-- svelte-ignore a11y_no_static_element_interactions -->
+										</span>
 										<span
-											class="text-[0.6875rem] text-gray-800 dark:text-gray-200 truncate shrink-0 hover:underline cursor-pointer"
-											onclick={(e) => {
-												e.stopPropagation();
-												openFileTab(workspacePath.replace(/\/$/, '') + '/' + file.path);
-											}}>{fp.name}</span
+											class="flex shrink-0 items-center gap-1 text-[0.625rem] font-mono font-medium"
 										>
-										<span class="ml-auto text-[0.625rem] font-mono font-bold shrink-0 {sc.color}"
-											>{sc.char}</span
-										>
+											<span class="text-green-600 dark:text-green-400">+{file.additions ?? 0}</span>
+											<span class="text-red-500 dark:text-red-400">-{file.deletions ?? 0}</span>
+										</span>
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
 										<span
 											class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
@@ -1319,7 +1334,7 @@
 							</div>
 						{:else}
 							<!-- History: commit list -->
-							<div class="flex-1 overflow-y-auto">
+							<div class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 								{#each commits as c, i}
 									{#if i === unpushedCount && unpushedCount > 0}
 										<div
@@ -1381,23 +1396,31 @@
 
 					<!-- Right pane: diff viewer -->
 					<div
-						class="flex-1 overflow-hidden font-mono text-[0.6875rem] leading-[1.125rem]
+						class="min-w-0 flex-1 overflow-hidden font-mono text-[0.6875rem] leading-[1.125rem]
 						{showDiff ? 'flex flex-col' : 'hidden md:flex md:flex-col'}"
 					>
 						{#if fileDiff.length}
 							<div
 								class="hidden md:flex items-center h-6 px-2 border-b border-gray-100 dark:border-white/4 shrink-0"
 							>
-								<span class="text-[0.625rem] text-gray-400 dark:text-gray-600 font-mono truncate">
+								<span
+									class="min-w-0 flex-1 text-[0.625rem] text-gray-400 dark:text-gray-600 font-mono truncate"
+								>
 									{#if selectedCommit}
 										{selectedCommit.short_hash} · {selectedCommit.message}
 									{:else}
 										{selectedFile}
 									{/if}
 								</span>
+								<span class="ml-2 text-[0.625rem] font-mono text-green-600 dark:text-green-400"
+									>+{selectedDiffStats.additions}</span
+								>
+								<span class="text-[0.625rem] font-mono text-red-500 dark:text-red-400"
+									>-{selectedDiffStats.deletions}</span
+								>
 							</div>
 							<div class="flex-1 overflow-auto">
-								<div class="diff-content">
+								<div class="diff-content" class:diff-content-split={$diffDisplayMode === 'split'}>
 									{#each fileDiff as df}
 										{#if fileDiff.length > 1}
 											<div
@@ -1406,39 +1429,7 @@
 												{df.path}
 											</div>
 										{/if}
-										{#each df.hunks as hunk}
-											<div
-												class="px-2 py-0.5 text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-white/3 border-b border-gray-100 dark:border-white/4 w-full"
-											>
-												{hunk.header}
-											</div>
-											{#each groupLines(hunk.lines) as group}
-												<div class="w-full {blockClass(group.type)}">
-													{#each group.lines as line}
-														<div class="px-2 whitespace-pre-wrap break-all">
-															<span
-																class={line.type === 'added'
-																	? 'text-green-600 dark:text-green-400'
-																	: line.type === 'removed'
-																		? 'text-red-500 dark:text-red-400'
-																		: 'text-gray-400 dark:text-gray-600'}
-																>{line.type === 'added'
-																	? '+'
-																	: line.type === 'removed'
-																		? '-'
-																		: ' '}</span
-															><span
-																class={line.type === 'added'
-																	? 'text-green-900 dark:text-green-300'
-																	: line.type === 'removed'
-																		? 'text-red-900 dark:text-red-300'
-																		: 'text-gray-600 dark:text-gray-400'}>{line.content}</span
-															>
-														</div>
-													{/each}
-												</div>
-											{/each}
-										{/each}
+										<DiffHunkList hunks={df.hunks} path={df.path} />
 									{/each}
 								</div>
 							</div>
@@ -1632,16 +1623,8 @@
 		min-width: 100%;
 	}
 
-	.diff-gutter-removed {
-		border-left: 0.1875rem solid transparent;
-		border-image: repeating-linear-gradient(
-				-45deg,
-				#ef4444 0,
-				#ef4444 1px,
-				transparent 1px,
-				transparent 0.1875rem
-			)
-			3;
+	.diff-content-split {
+		width: 100%;
 	}
 
 	.git-resize-handle {

@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { clearTabEdit, markTabUnsaved, updateTabFilePath, activeWorkspace } from '$lib/stores';
 	import { get } from 'svelte/store';
 	import { t } from '$lib/i18n';
 	import { tooltip } from '$lib/tooltip';
 	import { readFile, writeFile } from '$lib/apis/files';
 	import { getGitDiff } from '$lib/apis/git';
+	import { diffDisplayMode, hideWhitespaceChanges } from '$lib/stores/gitDiffSettings';
 	import { gitStatusStore, type GitFile } from '$lib/stores/gitStatus.svelte';
 	import Icon from './Icon.svelte';
 	import SaveDialog from './SaveDialog.svelte';
@@ -20,6 +21,7 @@
 	import SvgPreview from './preview/SvgPreview.svelte';
 	import OfficePreview from './preview/OfficePreview.svelte';
 	import Spinner from './common/Spinner.svelte';
+	import DiffHunkList from './DiffHunkList.svelte';
 	import {
 		EditorState,
 		StateEffect,
@@ -158,11 +160,11 @@
 	type DiffHunk = { header: string; lines: DiffLine[] };
 	type DiffFileEntry = { path: string; hunks: DiffHunk[] };
 	type NumberedLine = DiffLine & { oldNumber: number | null; newNumber: number | null };
-	type LineGroup = { type: DiffLine['type']; lines: NumberedLine[] };
 	type GitLineChange = { line: number; type: 'added' | 'modified' };
 	let diffMode = $state(false);
 	let diffFiles = $state<DiffFileEntry[]>([]);
 	let diffLoading = $state(false);
+	let diffScrollEl: HTMLDivElement | undefined;
 	let hasGitChanges = $state(false);
 	let gitLineChanges: GitLineChange[] = [];
 	let gitBaseContent: string | null = null;
@@ -263,16 +265,6 @@
 			if (line.type === 'removed') return { ...line, oldNumber: oldStart++, newNumber: null };
 			return { ...line, oldNumber: oldStart++, newNumber: newStart++ };
 		});
-	}
-
-	function diffGroupLines(lines: NumberedLine[]): LineGroup[] {
-		const groups: LineGroup[] = [];
-		for (const line of lines) {
-			const last = groups[groups.length - 1];
-			if (last && last.type === line.type) last.lines.push(line);
-			else groups.push({ type: line.type, lines: [line] });
-		}
-		return groups;
 	}
 
 	function splitLines(text: string): string[] {
@@ -402,6 +394,8 @@
 		const relPath = relativeGitPath(path);
 		return status.files?.find((f) => f.path === relPath);
 	}
+
+	let currentFileStatus = $derived(fileData ? gitFileStatus(fileData.path) : undefined);
 
 	function applyGitLineChanges() {
 		gitLineChanges = normalizeGitLineChanges(gitLineChanges);
@@ -533,31 +527,6 @@
 		}
 
 		applyGitLineChanges();
-	}
-
-	function diffBlockClass(type: DiffLine['type']): string {
-		if (type === 'added')
-			return 'bg-green-100 border-l-[0.1875rem] border-l-green-500 dark:bg-green-500/15 dark:border-l-green-400';
-		if (type === 'removed') return 'bg-red-100 diff-gutter-removed dark:bg-red-500/15';
-		return '';
-	}
-
-	function diffTextClass(type: DiffLine['type']): string {
-		if (type === 'added') return 'text-green-900 dark:text-green-300';
-		if (type === 'removed') return 'text-red-900 dark:text-red-300';
-		return 'text-gray-600 dark:text-gray-400';
-	}
-
-	function diffPrefixClass(type: DiffLine['type']): string {
-		if (type === 'added') return 'text-green-600 dark:text-green-400';
-		if (type === 'removed') return 'text-red-500 dark:text-red-400';
-		return 'text-gray-400 dark:text-gray-600';
-	}
-
-	function diffPrefix(type: DiffLine['type']): string {
-		if (type === 'added') return '+';
-		if (type === 'removed') return '-';
-		return ' ';
 	}
 
 	// Editing state: true when the code editor should be active
@@ -796,11 +765,13 @@
 				!fileData.binary &&
 				!isBinaryPreview &&
 				!isCsv &&
-				!isMarkdown &&
+				!(isMarkdown && markdownMode !== 'raw') &&
 				!(isHtml || isSvg) &&
 				!(isJson && !jsonParseError)
 			) {
-				requestAnimationFrame(() => initEditor(fileData!.content!, fileData!.language));
+				requestAnimationFrame(() =>
+					initEditor(fileData!.content!, isMarkdown ? 'markdown' : fileData!.language)
+				);
 			}
 			return;
 		}
@@ -820,7 +791,8 @@
 				root: ws.path,
 				file: relPath,
 				staged: 'false',
-				untracked: String(fileStatus?.status === 'untracked')
+				untracked: String(fileStatus?.status === 'untracked'),
+				ignore_whitespace: String($hideWhitespaceChanges)
 			});
 			const d = (await getGitDiff(params.toString())) as { files?: DiffFileEntry[] };
 			diffFiles = d.files ?? [];
@@ -828,6 +800,8 @@
 			diffFiles = [];
 		} finally {
 			diffLoading = false;
+			await tick();
+			if (diffScrollEl) diffScrollEl.scrollLeft = 0;
 		}
 	}
 
@@ -1063,7 +1037,15 @@
 		<!-- Universal toolbar (hidden for untitled files with no content yet) -->
 		<div class="toolbar">
 			<div class="toolbar-left">
-				<span class="file-name scrollbar-none">{fileData.name}</span>
+				<span class="file-title">
+					<span class="file-name scrollbar-none">{fileData.name}</span>
+					{#if currentFileStatus}
+						<span class="file-git-stats">
+							<span class="file-git-additions">+{currentFileStatus.additions ?? 0}</span>
+							<span class="file-git-deletions">-{currentFileStatus.deletions ?? 0}</span>
+						</span>
+					{/if}
+				</span>
 				<span class="file-size">{formatSize(fileData.size)}</span>
 			</div>
 			<div class="toolbar-right">
@@ -1155,6 +1137,25 @@
 		{:else if error}
 			<div class="state error">{error}</div>
 
+			<!-- Diff view -->
+		{:else if diffMode}
+			{#if diffLoading}
+				<div class="state"><Spinner size={20} /></div>
+			{:else if diffFiles.length === 0}
+				<div class="state">
+					<p class="state-title">{$t('editor.noChanges')}</p>
+					<p class="state-sub">{$t('editor.noUncommittedModifications')}</p>
+				</div>
+			{:else}
+				<div class="diff-scroll" bind:this={diffScrollEl}>
+					<div class="diff-content" class:diff-content-split={$diffDisplayMode === 'split'}>
+						{#each diffFiles as df}
+							<DiffHunkList hunks={df.hunks} path={df.path} />
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			<!-- ── Binary previews ─────────────────────────────── -->
 		{:else if isImage && binaryUrl}
 			<ImagePreview src={binaryUrl} alt={fileData?.name ?? ''} />
@@ -1214,58 +1215,8 @@
 				<p class="state-title">{$t('editor.binaryFile')}</p>
 				<p class="state-sub">{fileData.name} ({formatSize(fileData.size)})</p>
 			</div>
-		{:else if diffMode}
-			<!-- Diff view -->
-			{#if diffLoading}
-				<div class="state"><Spinner size={20} /></div>
-			{:else if diffFiles.length === 0}
-				<div class="state">
-					<p class="state-title">{$t('editor.noChanges')}</p>
-					<p class="state-sub">{$t('editor.noUncommittedModifications')}</p>
-				</div>
-			{:else}
-				<div class="diff-scroll">
-					{#each diffFiles as df}
-						{#each df.hunks as hunk}
-							<div
-								class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] border-b border-gray-100 bg-gray-50 text-gray-400 dark:border-white/4 dark:bg-white/3 dark:text-gray-600 font-mono text-[0.6875rem]"
-							>
-								<span></span>
-								<span></span>
-								<span></span>
-								<code class="whitespace-pre px-2 py-0.5">{hunk.header}</code>
-							</div>
-							{#each diffGroupLines(diffNumberedLines(hunk)) as group}
-								<div class="w-full {diffBlockClass(group.type)}">
-									{#each group.lines as line}
-										<div
-											class="grid w-full grid-cols-[2.75rem_2.75rem_1.25rem_auto] font-mono text-[0.6875rem] leading-[1.125rem]"
-										>
-											<span
-												class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600"
-												>{line.oldNumber ?? ''}</span
-											>
-											<span
-												class="select-none border-r border-black/5 px-2 text-right text-gray-400 dark:border-white/4 dark:text-gray-600"
-												>{line.newNumber ?? ''}</span
-											>
-											<span class="select-none px-1 text-center {diffPrefixClass(line.type)}"
-												>{diffPrefix(line.type)}</span
-											>
-											<code class="whitespace-pre px-2 {diffTextClass(line.type)}"
-												>{line.content || ' '}</code
-											>
-										</div>
-									{/each}
-								</div>
-							{/each}
-						{/each}
-					{/each}
-				</div>
-			{/if}
-
-			<!-- ┌ Code editor (default) ───────────────────── -->
 		{:else}
+			<!-- ┌ Code editor (default) ───────────────────── -->
 			<div bind:this={editorEl} class="editor-el"></div>
 		{/if}
 
@@ -1324,10 +1275,20 @@
 		gap: 0.125rem;
 	}
 
+	.file-title {
+		display: flex;
+		align-items: center;
+		flex: 1 1 auto;
+		gap: 0.375rem;
+		min-width: 0;
+		overflow: hidden;
+	}
+
 	.file-name {
 		display: block;
-		flex: 1 1 auto;
+		flex: 0 1 auto;
 		min-width: 0;
+		max-width: 100%;
 		overflow-x: auto;
 		overflow-y: hidden;
 		white-space: nowrap;
@@ -1342,6 +1303,34 @@
 
 	:global(.dark) .file-name {
 		color: var(--color-gray-300);
+	}
+
+	.file-git-stats {
+		display: flex;
+		align-items: center;
+		flex: 0 0 auto;
+		gap: 0.25rem;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.file-git-additions {
+		color: #16a34a;
+	}
+
+	.file-git-deletions {
+		color: #ef4444;
+	}
+
+	:global(.dark) .file-git-additions {
+		color: #4ade80;
+	}
+
+	:global(.dark) .file-git-deletions {
+		color: #f87171;
 	}
 
 	.file-size {
@@ -1477,92 +1466,16 @@
 		height: 100%;
 		overflow: auto;
 		font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-		font-size: 0.75rem;
+		font-size: 0.6875rem;
 		line-height: 1.125rem;
 	}
 
-	.diff-hunk-header {
-		padding: 0.125rem 0.5rem;
-		color: var(--color-gray-400);
-		background: var(--color-gray-50);
+	.diff-content {
+		width: max-content;
+		min-width: 100%;
 	}
 
-	:global(.dark) .diff-hunk-header {
-		background: rgba(255, 255, 255, 0.03);
-		color: var(--color-gray-600);
-	}
-
-	.diff-line {
-		padding: 0 0.5rem;
-		white-space: pre-wrap;
-		word-break: break-all;
-	}
-
-	.diff-prefix {
-		display: inline-block;
-		width: 1rem;
-		user-select: none;
-	}
-
-	.diff-added {
-		background: #dcfce7;
-		color: #14532d;
-	}
-
-	:global(.dark) .diff-added {
-		background: rgba(34, 197, 94, 0.12);
-		color: #86efac;
-	}
-
-	.diff-added .diff-prefix {
-		color: #16a34a;
-	}
-	:global(.dark) .diff-added .diff-prefix {
-		color: #4ade80;
-	}
-
-	.diff-removed {
-		background: #fee2e2;
-		color: #7f1d1d;
-	}
-
-	:global(.dark) .diff-removed {
-		background: rgba(239, 68, 68, 0.12);
-		color: #fca5a5;
-	}
-
-	.diff-removed .diff-prefix {
-		color: #ef4444;
-	}
-	:global(.dark) .diff-removed .diff-prefix {
-		color: #f87171;
-	}
-
-	.diff-ctx {
-		color: var(--color-gray-600);
-	}
-
-	:global(.dark) .diff-ctx {
-		color: var(--color-gray-400);
-	}
-
-	.diff-ctx .diff-prefix {
-		color: var(--color-gray-400);
-	}
-
-	:global(.dark) .diff-ctx .diff-prefix {
-		color: var(--color-gray-600);
-	}
-
-	.diff-gutter-removed {
-		border-left: 0.1875rem solid transparent;
-		border-image: repeating-linear-gradient(
-				-45deg,
-				#ef4444 0,
-				#ef4444 1px,
-				transparent 1px,
-				transparent 0.1875rem
-			)
-			3;
+	.diff-content-split {
+		width: 100%;
 	}
 </style>

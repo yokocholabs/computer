@@ -95,6 +95,21 @@ async def status(root: str) -> dict[str, Any]:
         # Prefer the working-tree status for the row label when both sides exist.
         entry["status"] = status_text
 
+    async def add_numstat(*args: str) -> None:
+        code, numstat, _ = await _run("diff", "--numstat", *args, cwd=root, check=False)
+        if code != 0:
+            return
+        for line in numstat.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            added, deleted, path = parts[0], parts[1], parts[2]
+            entry = files_by_path.get(path)
+            if not entry or added == "-" or deleted == "-":
+                continue
+            entry["additions"] = entry.get("additions", 0) + int(added)
+            entry["deletions"] = entry.get("deletions", 0) + int(deleted)
+
     for line in out.splitlines():
         if line.startswith("# branch.head "):
             branch = line.split(" ", 2)[2]
@@ -126,6 +141,9 @@ async def status(root: str) -> dict[str, Any]:
             # Untracked
             path = line[2:]
             add_file(path, "untracked", unstaged=True)
+            entry = files_by_path[path]
+            entry["additions"] = _count_text_lines(os.path.join(root, path))
+            entry["deletions"] = 0
         elif line.startswith("u "):
             # Unmerged
             parts = line.split(" ", 10)
@@ -136,6 +154,9 @@ async def status(root: str) -> dict[str, Any]:
     # — treat as unpublished so the frontend shows "Publish"
     if upstream and not has_ab:
         upstream = ""
+
+    await add_numstat()
+    await add_numstat("--staged")
 
     # Get remote URL for "View on GitHub/GitLab" link
     code, remote_out, _ = await _run("remote", "get-url", "origin", cwd=root, check=False)
@@ -163,29 +184,40 @@ def _status_char(c: str) -> str:
     }.get(c, c)
 
 
+def _count_text_lines(path: str) -> int:
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        return 0
+    if b"\0" in data:
+        return 0
+    if not data:
+        return 0
+    return data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
+
+
 async def diff(
     root: str,
     file: str | None = None,
     staged: bool = False,
     untracked: bool = False,
+    ignore_whitespace: bool = False,
 ) -> dict[str, Any]:
     """Get diff output as structured data."""
     if untracked and file:
         # Untracked files: use --no-index to diff against empty
         null_device = "NUL" if sys.platform == "win32" else "/dev/null"
-        _, out, _ = await _run(
-            "diff",
-            "--no-index",
-            "--unified=3",
-            "--",
-            null_device,
-            file,
-            cwd=root,
-            check=False,
-        )
+        args = ["diff", "--no-index", "--unified=3"]
+        if ignore_whitespace:
+            args.append("--ignore-all-space")
+        args.extend(["--", null_device, file])
+        _, out, _ = await _run(*args, cwd=root, check=False)
         return _parse_diff(out)
 
     args = ["diff", "--unified=3"]
+    if ignore_whitespace:
+        args.append("--ignore-all-space")
     if staged:
         args.append("--staged")
     if file:
@@ -365,16 +397,13 @@ async def log(
     return commits
 
 
-async def show(root: str, ref: str) -> dict[str, Any]:
+async def show(root: str, ref: str, ignore_whitespace: bool = False) -> dict[str, Any]:
     """Show a commit's diff."""
     fmt = "%H%x00%h%x00%an%x00%aI%x00%s"
-    _, out, _ = await _run(
-        "show",
-        ref,
-        f"--format={fmt}",
-        "--patch",
-        cwd=root,
-    )
+    args = ["show", ref, f"--format={fmt}", "--patch"]
+    if ignore_whitespace:
+        args.append("--ignore-all-space")
+    _, out, _ = await _run(*args, cwd=root)
 
     # First line is the formatted header, rest is diff
     lines = out.split("\n", 1)
