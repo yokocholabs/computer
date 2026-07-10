@@ -44,6 +44,7 @@
 		unstaged?: boolean;
 		staged_status?: string;
 		unstaged_status?: string;
+		binary?: boolean;
 		additions?: number;
 		deletions?: number;
 	};
@@ -673,6 +674,25 @@
 		return `${Math.floor(s / 86400)}d`;
 	}
 
+	function statusChar(status: string): { char: string; color: string } {
+		switch (status) {
+			case 'added':
+				return { char: 'A', color: 'text-green-500' };
+			case 'untracked':
+				return { char: 'U', color: 'text-green-500' };
+			case 'modified':
+				return { char: 'M', color: 'text-amber-500' };
+			case 'deleted':
+				return { char: 'D', color: 'text-red-400' };
+			case 'renamed':
+				return { char: 'R', color: 'text-blue-400' };
+			case 'conflict':
+				return { char: '!', color: 'text-orange-500' };
+			default:
+				return { char: '?', color: 'text-gray-400' };
+		}
+	}
+
 	const syncAction = $derived.by(() => {
 		if (!gitStatus) return { label: $t('git.fetch'), icon: 'refresh', action: doFetch };
 		if (gitStatus.behind > 0)
@@ -788,25 +808,38 @@
 				<Icon name="chevron-down" size={9} class="text-gray-400 dark:text-gray-600" />
 			</button>
 
-			{#if gitStatus.ahead > 0}<span
+			{#if gitStatus.ahead > 0}
+				<span
 					class="ml-1.5 shrink-0 whitespace-nowrap text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
-					>↑{gitStatus.ahead}</span
-				>{/if}
-			{#if gitStatus.behind > 0}<span
-					class="text-[0.625rem] font-mono text-gray-400 dark:text-gray-600 ml-1"
-					>↓{gitStatus.behind}</span
-				>{/if}
-			{#if totalChanges > 0}<span
+				>
+					↑{gitStatus.ahead}
+				</span>
+			{/if}
+			{#if gitStatus.behind > 0}
+				<span class="text-[0.625rem] font-mono text-gray-400 dark:text-gray-600 ml-1">
+					↓{gitStatus.behind}
+				</span>
+			{/if}
+			{#if totalChanges > 0}
+				<span
 					class="mx-1.5 block min-w-0 max-w-20 shrink truncate whitespace-nowrap text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
-					>{$t('git.changedCount', { count: totalChanges })}</span
-				><span class="mx-1.5 flex shrink-0 items-center gap-1 text-[0.625rem] font-mono"
-					><span class="text-green-600 dark:text-green-400">+{totalAdditions}</span>
-					<span class="text-red-500 dark:text-red-400">-{totalDeletions}</span></span
-				>{/if}
-			{#if actionMsg}<span
+				>
+					{$t('git.changedCount', { count: totalChanges })}
+				</span>
+				{#if totalAdditions || totalDeletions}
+					<span class="mx-1.5 flex shrink-0 items-center gap-1 text-[0.625rem] font-mono">
+						<span class="text-green-600 dark:text-green-400">+{totalAdditions}</span>
+						<span class="text-red-500 dark:text-red-400">-{totalDeletions}</span>
+					</span>
+				{/if}
+			{/if}
+			{#if actionMsg}
+				<span
 					class="ml-auto min-w-0 max-w-32 truncate whitespace-nowrap text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
-					>{actionMsg}</span
-				>{/if}
+				>
+					{actionMsg}
+				</span>
+			{/if}
 
 			<div class="flex-1"></div>
 
@@ -1235,6 +1268,7 @@
 							<div class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 								{#each gitStatus?.files ?? [] as file (file.path)}
 									{@const fp = fPath(file.path)}
+									{@const sc = statusChar(file.status)}
 									<button
 										class="group flex min-w-0 items-center gap-1.5 w-full h-7 px-2.5 text-left transition-colors duration-75
 											{selectedFile === file.path
@@ -1273,12 +1307,20 @@
 												}}>{fp.name}</span
 											>
 										</span>
-										<span
-											class="flex shrink-0 items-center gap-1 text-[0.625rem] font-mono font-medium"
-										>
-											<span class="text-green-600 dark:text-green-400">+{file.additions ?? 0}</span>
-											<span class="text-red-500 dark:text-red-400">-{file.deletions ?? 0}</span>
-										</span>
+										{#if file.binary}
+											<span class="shrink-0 text-[0.625rem] font-mono font-bold {sc.color}"
+												>{sc.char}</span
+											>
+										{:else}
+											<span
+												class="flex shrink-0 items-center gap-1 text-[0.625rem] font-mono font-medium"
+											>
+												<span class="text-green-600 dark:text-green-400"
+													>+{file.additions ?? 0}</span
+												>
+												<span class="text-red-500 dark:text-red-400">-{file.deletions ?? 0}</span>
+											</span>
+										{/if}
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
 										<span
 											class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
