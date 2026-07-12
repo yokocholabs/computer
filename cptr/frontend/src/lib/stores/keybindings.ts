@@ -14,6 +14,7 @@ import { writable, get } from 'svelte/store';
 import {
 	openUntitledFileTab,
 	openTerminalTab,
+	openBrowserTab,
 	closeTab,
 	setActiveTab,
 	activeGroup,
@@ -31,6 +32,7 @@ export const ACTION_IDS = [
 	'newFile',
 	'newTerminal',
 	'newChat',
+	'newBrowser',
 	'closeTab',
 	'nextTab',
 	'prevTab',
@@ -50,6 +52,7 @@ export const ACTION_LABELS: Record<ActionId, string> = {
 	newFile: 'New File',
 	newTerminal: 'New Terminal',
 	newChat: 'New Chat',
+	newBrowser: 'New Browser',
 	closeTab: 'Close Tab',
 	nextTab: 'Next Tab',
 	prevTab: 'Previous Tab',
@@ -67,6 +70,7 @@ export const DEFAULT_KEYBINDINGS: Record<ActionId, string> = {
 	newFile: 'Cmd+N',
 	newTerminal: 'Ctrl+`',
 	newChat: 'Cmd+Shift+O',
+	newBrowser: 'Cmd+Shift+B',
 	closeTab: 'Cmd+W',
 	nextTab: 'Cmd+Shift+]',
 	prevTab: 'Cmd+Shift+[',
@@ -241,20 +245,45 @@ export function executeAction(
 		toggleVoiceMemo?: () => void;
 	}
 ): boolean {
+	const dispatchHomeAction = (
+		detail:
+			| 'newChat'
+			| 'newTerminal'
+			| 'newBrowser'
+			| 'closeTab'
+			| 'nextTab'
+			| 'prevTab'
+			| 'toggleSplit'
+	) => {
+		if (typeof window !== 'undefined')
+			window.dispatchEvent(new CustomEvent('cptr:home-action', { detail }));
+	};
+
 	switch (action) {
 		case 'newFile':
 			openUntitledFileTab();
 			return true;
 
 		case 'newTerminal':
-			openTerminalTab();
+			if (get(currentWorkspace)) openTerminalTab();
+			else dispatchHomeAction('newTerminal');
 			return true;
 
 		case 'newChat':
-			openChatTab();
+			if (get(currentWorkspace)) openChatTab();
+			else dispatchHomeAction('newChat');
+			return true;
+
+		case 'newBrowser':
+			if (get(currentWorkspace)) void openBrowserTab();
+			else dispatchHomeAction('newBrowser');
 			return true;
 
 		case 'closeTab': {
+			if (!get(currentWorkspace)) {
+				dispatchHomeAction('closeTab');
+				return true;
+			}
 			const group = get(activeGroup);
 			if (!group) return false;
 			const tab = group.tabs.find((t) => t.id === group.activeTabId);
@@ -266,6 +295,10 @@ export function executeAction(
 
 		case 'nextTab':
 		case 'prevTab': {
+			if (!get(currentWorkspace)) {
+				dispatchHomeAction(action);
+				return true;
+			}
 			const g = get(activeGroup);
 			if (!g || g.tabs.length < 2) return true;
 			const visibleTabs = g.tabs.filter((t) => t.type !== 'git');
@@ -291,7 +324,10 @@ export function executeAction(
 
 		case 'toggleSplit': {
 			const ws = get(currentWorkspace);
-			if (!ws) return false;
+			if (!ws) {
+				dispatchHomeAction('toggleSplit');
+				return true;
+			}
 			if (get(splitActive)) {
 				const otherGroup = ws.groups.find((g) => g.id !== ws.activeGroupId);
 				if (otherGroup) closeGroup(otherGroup.id);

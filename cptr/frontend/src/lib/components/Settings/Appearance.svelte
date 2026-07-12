@@ -2,7 +2,8 @@
 	import { toast } from 'svelte-sonner';
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
-	import { textScale, theme, themeConfig } from '$lib/stores';
+	import { expandToolDetails, textScale, theme, themeConfig, widescreenMode } from '$lib/stores';
+	import ToggleSwitch from '$lib/components/common/ToggleSwitch.svelte';
 	import type { Theme, ThemeConfig } from '$lib/stores';
 	import {
 		normalizeHexColor,
@@ -21,7 +22,9 @@
 
 	const resolvedTheme = $derived(resolveThemeMode($theme));
 	const resolvedConfig = $derived(resolveThemeConfig($theme, $themeConfig));
-	const hasCustomAppearance = $derived(Boolean($themeConfig || $textScale !== null));
+	const hasCustomAppearance = $derived(
+		Boolean($themeConfig || $textScale !== null || $widescreenMode)
+	);
 
 	$effect(() => {
 		colorDrafts = {
@@ -102,13 +105,15 @@
 		scaleEnabled = false;
 		scaleDraft = 1;
 		textScale.set(null);
+		widescreenMode.set(false);
 	}
 
 	function exportTheme() {
 		const payload = {
 			theme: $theme,
 			themeConfig: sanitizeThemeConfig($themeConfig),
-			textScale: $textScale
+			textScale: $textScale,
+			widescreenMode: $widescreenMode
 		};
 
 		try {
@@ -155,13 +160,21 @@
 				typeof parsed?.textScale === 'number' && Number.isFinite(parsed.textScale)
 					? normalizeTextScale(parsed.textScale)
 					: undefined;
+			const importedWidescreenMode =
+				typeof parsed?.widescreenMode === 'boolean' ? parsed.widescreenMode : undefined;
 
-			if (!importedConfig && !importedTheme && importedScale === undefined) {
+			if (
+				!importedConfig &&
+				!importedTheme &&
+				importedScale === undefined &&
+				importedWidescreenMode === undefined
+			) {
 				throw new Error('empty theme');
 			}
 			if (importedTheme) theme.set(importedTheme);
 			if (importedConfig) themeConfig.set(importedConfig);
 			if (importedScale !== undefined) textScale.set(importedScale === 1 ? null : importedScale);
+			if (importedWidescreenMode !== undefined) widescreenMode.set(importedWidescreenMode);
 			toast.success($t('appearance.imported'));
 		} catch {
 			toast.error($t('appearance.importFailed'));
@@ -262,10 +275,20 @@
 			/>
 		</label>
 
-		<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2 mt-5">
-			{$t('general.uiScale')}
-		</h3>
-		<div class="w-full">
+		<label class="flex items-center justify-between gap-3 mt-3">
+			<span class="text-xs text-gray-600 dark:text-gray-400">{$t('appearance.widescreenMode')}</span
+			>
+			<ToggleSwitch value={$widescreenMode} onchange={(value) => widescreenMode.set(value)} />
+		</label>
+
+		<label class="flex items-center justify-between gap-3 mt-3">
+			<span class="text-xs text-gray-600 dark:text-gray-400"
+				>{$t('appearance.expandToolDetails')}</span
+			>
+			<ToggleSwitch value={$expandToolDetails} onchange={(value) => expandToolDetails.set(value)} />
+		</label>
+
+		<div class="w-full mt-5">
 			<div class="flex items-center gap-2">
 				<span id="ui-scale-label" class="text-xs text-gray-600 dark:text-gray-400">
 					{$t('general.uiScale')}

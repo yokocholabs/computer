@@ -626,6 +626,12 @@ async def generate_chat_title(
         if not title:
             return
 
+        # Do not overwrite a title manually set while this request was running.
+        chat = await Chat.get_by_id(chat_id)
+        fallback = user_content[:50].strip() or "New Chat"
+        if not chat or chat.title != fallback:
+            return
+
         # Persist and notify
         await Chat.update_title(chat_id, title, now_ms())
         await emit_to_user(user_id, {"chat_id": chat_id, "title": title})
@@ -1459,6 +1465,7 @@ async def run_chat_task(
         from cptr.utils.agents.cursor import run_cursor_agent
         from cptr.utils.agents.grok import run_grok_agent
         from cptr.utils.agents.opencode import run_opencode_agent
+        from cptr.utils.agents.pi import run_pi_agent
 
         chat_obj = await Chat.get_by_id(chat_id)
         chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
@@ -1517,6 +1524,8 @@ async def run_chat_task(
             "grok": run_grok_agent,
             "opencode": run_opencode_agent,
             "cline": run_cline_agent,
+            "gemini": run_cline_agent,
+            "pi": run_pi_agent,
         }
         runner = runners.get(agent_target.agent)
         if runner is None:
@@ -1692,7 +1701,7 @@ async def run_chat_task(
                     "call_id": event.call_id,
                     "native_agent": True,
                     "output": _append_capped_output(
-                        str(existing_output.get("output") or ""),
+                        "" if event.replace else str(existing_output.get("output") or ""),
                         event.delta,
                         max_chars,
                     ),
@@ -1791,7 +1800,7 @@ async def run_chat_task(
             system += f"\n\n[CONVERSATION SUMMARY]\n{loaded_summary}"
         if regeneration_prompt:
             messages.append({"role": "user", "content": regeneration_prompt})
-        tools = await get_tool_list(builtin_tools=builtin_tools)
+        tools = await get_tool_list(builtin_tools=builtin_tools, workspace=workspace)
         if not skill_authoring_allowed:
             tools = [t for t in tools if t["name"] != "manage_skill"]
 

@@ -4,7 +4,6 @@
 
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import Bar from '$lib/components/Bar.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ShortcutBar from '$lib/components/ShortcutBar.svelte';
@@ -17,6 +16,7 @@
 	import { Toaster, toast } from 'svelte-sonner';
 	import {
 		activeTab,
+		activeHomeTab,
 		currentWorkspace,
 		stateLoaded,
 		initState,
@@ -453,9 +453,6 @@
 			class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden"
 			style="padding-top: env(safe-area-inset-top, 0); padding-bottom: var(--keyboard-inset-bottom, 0);"
 		>
-			{#if !$currentWorkspace && $page.url.pathname === '/'}
-				<Bar />
-			{/if}
 			<main class="relative flex-1 min-h-0 overflow-hidden">
 				{@render children()}
 			</main>
@@ -464,7 +461,7 @@
 				<GitBar />
 			{/if}
 
-			{#if $activeTab?.type === 'terminal'}
+			{#if $activeTab?.type === 'terminal' || (!$currentWorkspace && $activeHomeTab?.type === 'terminal')}
 				<ShortcutBar />
 			{/if}
 		</div>

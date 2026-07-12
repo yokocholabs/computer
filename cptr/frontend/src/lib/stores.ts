@@ -17,6 +17,7 @@
  */
 
 import { writable, derived, get } from 'svelte/store';
+import { toast } from 'svelte-sonner';
 import {
 	getPreferences,
 	savePreferences,
@@ -25,6 +26,7 @@ import {
 	saveWorkspaceState
 } from '$lib/apis/state';
 import { listSessions, createSession, deleteSession } from '$lib/apis/terminal';
+import { createBrowserSession, deleteBrowserSession, listBrowserSessions } from '$lib/apis/browser';
 import { changeLocale, i18next } from '$lib/i18n';
 import { streamingChatTabs } from '$lib/stores/chat';
 import { keybindings, loadKeybindings } from '$lib/stores/keybindings';
@@ -42,18 +44,27 @@ export type { AppearancePreferences, Theme, ThemeConfig };
 
 // ── Types ───────────────────────────────────────────────────────
 
+export interface FileSearchTarget {
+	line: number;
+	column: number;
+	length: number;
+	requestId: number;
+}
+
 export interface Tab {
 	id: string;
-	type: 'files' | 'terminal' | 'file' | 'git' | 'chat' | 'preview';
+	type: 'home' | 'files' | 'terminal' | 'file' | 'git' | 'chat' | 'preview' | 'browser'; // preview is migrated on load
 	label: string;
 	filePath?: string;
 	edit?: boolean;
 	path?: string; // generic path (e.g. for chat)
 	sessionId?: string;
-	port?: number;
+	port?: number; // legacy preview port, migrated on load
+	browserSessionId?: string;
 	unsaved?: boolean;
 	permanent?: boolean;
 	badge?: number;
+	searchTarget?: FileSearchTarget;
 }
 
 export type SplitDirection = 'horizontal' | 'vertical';
@@ -92,6 +103,13 @@ export interface WorkspaceState {
 	fileBrowserCwd: string;
 }
 
+export interface HomeState {
+	groups: EditorGroup[];
+	activeGroupId: string;
+	layout: EditorLayout;
+	splitDirection: SplitDirection;
+}
+
 export type ToolApprovalMode = 'ask' | 'auto' | 'full';
 
 export interface UserPreferences {
@@ -110,6 +128,10 @@ export interface UserPreferences {
 	showUpdateToast?: boolean; // show version update notifications (default true)
 	pwa?: PwaPreferences;
 	textScale?: number | null;
+	widescreenMode?: boolean;
+	expandToolDetails?: boolean;
+	homeGroup?: EditorGroup;
+	homeState?: HomeState;
 }
 
 // ── ID generation ───────────────────────────────────────────────
@@ -169,7 +191,11 @@ function splitLayout(
 	};
 }
 
-function replaceLayoutGroup(layout: EditorLayout, groupId: string, replacementId: string): EditorLayout {
+function replaceLayoutGroup(
+	layout: EditorLayout,
+	groupId: string,
+	replacementId: string
+): EditorLayout {
 	if (layout.type === 'group') {
 		return layout.groupId === groupId ? { type: 'group', groupId: replacementId } : layout;
 	}
@@ -201,14 +227,18 @@ function isEditorLayout(value: unknown): value is EditorLayout {
 	return node.type === 'group'
 		? typeof node.groupId === 'string'
 		: node.type === 'split' &&
-			typeof node.id === 'string' &&
-			(node.direction === 'horizontal' || node.direction === 'vertical') &&
-			typeof node.ratio === 'number' &&
-			isEditorLayout(node.first) &&
-			isEditorLayout(node.second);
+				typeof node.id === 'string' &&
+				(node.direction === 'horizontal' || node.direction === 'vertical') &&
+				typeof node.ratio === 'number' &&
+				isEditorLayout(node.first) &&
+				isEditorLayout(node.second);
 }
 
-function createLayout(groups: EditorGroup[], direction: SplitDirection, ratio: number): EditorLayout {
+function createLayout(
+	groups: EditorGroup[],
+	direction: SplitDirection,
+	ratio: number
+): EditorLayout {
 	let layout: EditorLayout = { type: 'group', groupId: groups[0].id };
 	for (const group of groups.slice(1)) {
 		layout = {
@@ -243,6 +273,18 @@ function normalizeLayout(
 
 /** The workspace currently displayed in THIS browser tab. Null = welcome page. */
 export const currentWorkspace = writable<WorkspaceState | null>(null);
+export const homeState = writable<HomeState>({
+	groups: [
+		{
+			id: 'home',
+			tabs: [{ id: 'home', type: 'home', label: 'Home', permanent: true }],
+			activeTabId: 'home'
+		}
+	],
+	activeGroupId: 'home',
+	layout: { type: 'group', groupId: 'home' },
+	splitDirection: 'horizontal'
+});
 
 /** List of all workspace summaries for the sidebar. */
 export const workspaceList = writable<{ path: string; name: string }[]>([]);
@@ -297,6 +339,8 @@ export const selectedModelId = writable<string>('');
 export const pwaPreferences = writable<PwaPreferences>(defaultPwaPreferences);
 export const themeConfig = writable<ThemeConfig | null>(null);
 export const textScale = writable<number | null>(null);
+export const widescreenMode = writable(false);
+export const expandToolDetails = writable(false);
 
 /** Saved workspace path order for sidebar drag-reorder. */
 export const workspaceOrder = writable<string[]>([]);
@@ -312,6 +356,16 @@ export const activeGroup = derived(currentWorkspace, ($ws) =>
 
 export const activeTab = derived(activeGroup, ($g) =>
 	$g ? ($g.tabs.find((t) => t.id === $g.activeTabId) ?? null) : null
+);
+
+export const activeHomeGroup = derived(
+	homeState,
+	($state) =>
+		$state.groups.find((group) => group.id === $state.activeGroupId) ?? $state.groups[0] ?? null
+);
+
+export const activeHomeTab = derived(activeHomeGroup, ($group) =>
+	$group ? ($group.tabs.find((tab) => tab.id === $group.activeTabId) ?? null) : null
 );
 
 export const splitActive = derived(currentWorkspace, ($ws) => ($ws?.groups.length ?? 0) > 1);
@@ -381,7 +435,7 @@ function persistPreferences(): void {
 			appearance: {
 				theme: get(theme),
 				themeConfig: sanitizeThemeConfig(get(themeConfig)),
-				textScale: get(textScale) ?? undefined
+				textScale: get(textScale)
 			},
 			sidebarOpen: get(sidebarOpen),
 			sidebarWidth: get(sidebarWidth),
@@ -395,7 +449,10 @@ function persistPreferences(): void {
 			requestParams: Object.keys(get(requestParams)).length ? get(requestParams) : undefined,
 			showUpdateToast: get(showUpdateToastPref),
 			pwa: get(pwaPreferences),
-			textScale: get(textScale) ?? undefined
+			textScale: get(textScale),
+			widescreenMode: get(widescreenMode),
+			expandToolDetails: get(expandToolDetails),
+			homeState: get(homeState)
 		};
 		savePreferences(prefs as unknown as Record<string, unknown>).catch(() => {});
 	}, 300);
@@ -407,6 +464,9 @@ function subscribeForPersistence() {
 	_subscribed = true;
 	currentWorkspace.subscribe(() => {
 		if (get(stateLoaded)) persistWorkspace();
+	});
+	homeState.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
 	});
 	theme.subscribe(() => {
 		if (get(stateLoaded)) persistPreferences();
@@ -450,6 +510,12 @@ function subscribeForPersistence() {
 	textScale.subscribe(() => {
 		if (get(stateLoaded)) persistPreferences();
 	});
+	widescreenMode.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
+	expandToolDetails.subscribe(() => {
+		if (get(stateLoaded)) persistPreferences();
+	});
 	i18next.on('languageChanged', () => {
 		if (get(stateLoaded)) persistPreferences();
 	});
@@ -490,6 +556,77 @@ export async function loadPreferences(): Promise<void> {
 					? (prefs.textScale as number)
 					: null
 		);
+		if (prefs.widescreenMode !== undefined) widescreenMode.set(prefs.widescreenMode as boolean);
+		if (prefs.expandToolDetails !== undefined)
+			expandToolDetails.set(prefs.expandToolDetails as boolean);
+		const savedHomeGroup = prefs.homeGroup as EditorGroup | undefined;
+		const savedHomeState =
+			(prefs.homeState as HomeState | undefined) ??
+			(savedHomeGroup
+				? {
+						groups: [savedHomeGroup],
+						activeGroupId: savedHomeGroup.id,
+						layout: { type: 'group' as const, groupId: savedHomeGroup.id },
+						splitDirection: 'horizontal' as const
+					}
+				: undefined);
+		if (savedHomeState && Array.isArray(savedHomeState.groups)) {
+			const [terminalIds, browserIds] = await Promise.all([
+				listSessions().catch(() => []),
+				listBrowserSessions().catch(() => [])
+			]);
+			const aliveTerminals = new Set(terminalIds);
+			const aliveBrowsers = new Set(browserIds);
+			let groups = savedHomeState.groups
+				.map((group) => {
+					const tabs = group.tabs.filter(
+						(tab) =>
+							tab.type !== 'terminal' ||
+							(tab.sessionId !== undefined && aliveTerminals.has(tab.sessionId))
+					);
+					const liveTabs = tabs.filter(
+						(tab) =>
+							tab.type !== 'browser' ||
+							(tab.browserSessionId !== undefined && aliveBrowsers.has(tab.browserSessionId))
+					);
+					return {
+						...group,
+						tabs: liveTabs,
+						activeTabId: liveTabs.some((tab) => tab.id === group.activeTabId)
+							? group.activeTabId
+							: (liveTabs[0]?.id ?? '')
+					};
+				})
+				.filter((group) => group.tabs.length > 0);
+			if (!groups.length) {
+				groups = [
+					{
+						id: 'home',
+						tabs: [{ id: 'home', type: 'home', label: 'Home', permanent: true }],
+						activeTabId: 'home'
+					}
+				];
+			}
+			if (!groups.some((group) => group.tabs.some((tab) => tab.type === 'home'))) {
+				groups[0] = {
+					...groups[0],
+					tabs: [{ id: 'home', type: 'home', label: 'Home', permanent: true }, ...groups[0].tabs]
+				};
+			}
+			homeState.set({
+				groups,
+				activeGroupId: groups.some((group) => group.id === savedHomeState.activeGroupId)
+					? savedHomeState.activeGroupId
+					: groups[0].id,
+				layout: normalizeLayout(
+					savedHomeState.layout,
+					groups,
+					savedHomeState.splitDirection ?? 'horizontal',
+					0.5
+				),
+				splitDirection: savedHomeState.splitDirection ?? 'horizontal'
+			});
+		}
 		const pwaPrefs = prefs.pwa;
 		if (pwaPrefs)
 			pwaPreferences.set({
@@ -532,18 +669,55 @@ export async function loadWorkspace(path: string): Promise<void> {
 		if (wsData && wsData.groups && (wsData.groups as EditorGroup[]).length > 0) {
 			// Validate terminal sessions are still alive
 			let aliveSessions: Set<string> = new Set();
+			let aliveBrowserSessions: Set<string> = new Set();
 			try {
 				const sessions = await listSessions();
 				aliveSessions = new Set(sessions.map((s) => s.session_id));
 			} catch {}
+			try {
+				aliveBrowserSessions = new Set(await listBrowserSessions());
+			} catch {}
 
 			const ws = wsData as unknown as WorkspaceState;
+			ws.groups = await Promise.all(
+				ws.groups.map(async (group) => ({
+					...group,
+					tabs: (
+						await Promise.all(
+							group.tabs.map(async (tab) => {
+								if (tab.type !== 'preview' || !tab.port) return tab;
+								try {
+									const previewUrl = `http://localhost:${tab.port}/`;
+									const session = await createBrowserSession(previewUrl);
+									aliveBrowserSessions.add(session.session_id);
+									const { port, ...browserTab } = tab;
+									return {
+										...browserTab,
+										type: 'browser' as const,
+										label: `localhost:${port}`,
+										browserSessionId: session.session_id,
+										path: previewUrl
+									};
+								} catch {
+									return null;
+								}
+							})
+						)
+					).filter((tab): tab is Tab => tab !== null)
+				}))
+			);
 
 			// Remove dead terminal tabs from all groups
 			const cleanedGroups = ws.groups
 				.map((g) => {
 					const filteredTabs = g.tabs.filter((t: Tab) => {
 						if (t.type === 'terminal' && t.sessionId && !aliveSessions.has(t.sessionId)) {
+							return false;
+						}
+						if (
+							t.type === 'browser' &&
+							(!t.browserSessionId || !aliveBrowserSessions.has(t.browserSessionId))
+						) {
 							return false;
 						}
 						return true;
@@ -567,7 +741,12 @@ export async function loadWorkspace(path: string): Promise<void> {
 				path: canonicalWorkspacePath,
 				groups,
 				activeGroupId,
-				layout: normalizeLayout(ws.layout, groups, ws.splitDirection ?? 'horizontal', ws.splitRatio ?? 0.5),
+				layout: normalizeLayout(
+					ws.layout,
+					groups,
+					ws.splitDirection ?? 'horizontal',
+					ws.splitRatio ?? 0.5
+				),
 				splitDirection: ws.splitDirection ?? 'horizontal',
 				splitRatio: ws.splitRatio ?? 0.5,
 				fileBrowserCwd: ws.fileBrowserCwd ?? canonicalWorkspacePath
@@ -769,10 +948,44 @@ export function reorderTabs(oldIndex: number, newIndex: number, groupId?: string
 	});
 }
 
+export function updateTabLabel(tabId: string, label: string): void {
+	const value = label.trim().slice(0, 120);
+	if (!value) return;
+	currentWorkspace.update((workspace) =>
+		workspace
+			? {
+					...workspace,
+					groups: workspace.groups.map((group) => ({
+						...group,
+						tabs: group.tabs.map((tab) => (tab.id === tabId ? { ...tab, label: value } : tab))
+					}))
+				}
+			: workspace
+	);
+}
+
+export function clearFileSearchTarget(tabId: string, requestId: number): void {
+	currentWorkspace.update((workspace) =>
+		workspace
+			? {
+					...workspace,
+					groups: workspace.groups.map((group) => ({
+						...group,
+						tabs: group.tabs.map((tab) =>
+							tab.id === tabId && tab.searchTarget?.requestId === requestId
+								? { ...tab, searchTarget: undefined }
+								: tab
+						)
+					}))
+				}
+			: workspace
+	);
+}
+
 export function openFileTab(
 	filePath: string,
 	targetGroupId?: string,
-	options: { edit?: boolean } = {}
+	options: { edit?: boolean; searchTarget?: FileSearchTarget } = {}
 ): void {
 	const ws = get(currentWorkspace);
 	if (!ws) return;
@@ -784,9 +997,13 @@ export function openFileTab(
 	// Reuse existing tab within this group
 	const existing = group.tabs.find((t) => t.type === 'file' && t.filePath === filePath);
 	if (existing) {
-		if (options.edit) {
+		if (options.edit || options.searchTarget) {
 			updateGroupTabs(gid, (tabs) => ({
-				tabs: tabs.map((t) => (t.id === existing.id ? { ...t, edit: true } : t)),
+				tabs: tabs.map((t) =>
+					t.id === existing.id
+						? { ...t, ...(options.edit ? { edit: true } : {}), searchTarget: options.searchTarget }
+						: t
+				),
 				activeTabId: existing.id
 			}));
 			return;
@@ -801,7 +1018,8 @@ export function openFileTab(
 		type: 'file',
 		label: name,
 		filePath,
-		edit: options.edit
+		edit: options.edit,
+		searchTarget: options.searchTarget
 	};
 
 	updateGroupTabs(gid, (tabs) => ({
@@ -861,7 +1079,7 @@ export async function openTerminalTab(targetGroupId?: string): Promise<void> {
 	}
 }
 
-export function openPreviewTab(port: number, targetGroupId?: string): void {
+export async function openPreviewTab(port: number, targetGroupId?: string): Promise<void> {
 	const ws = get(currentWorkspace);
 	if (!ws) return;
 
@@ -870,23 +1088,44 @@ export function openPreviewTab(port: number, targetGroupId?: string): void {
 	if (!group) return;
 
 	// Reuse existing tab within this group
-	const existing = group.tabs.find((t) => t.type === 'preview' && t.port === port);
+	const url = `http://localhost:${port}/`;
+	const existing = group.tabs.find((t) => t.type === 'browser' && t.path === url);
 	if (existing) {
 		setActiveTab(existing.id, gid);
 		return;
 	}
 
-	const newTab: Tab = {
-		id: nextId(),
-		type: 'preview',
-		label: `localhost:${port}`,
-		port
-	};
+	await openBrowserTab(gid, url, `localhost:${port}`);
+}
 
-	updateGroupTabs(gid, (tabs) => ({
-		tabs: [...tabs, newTab],
-		activeTabId: newTab.id
-	}));
+export async function openBrowserTab(
+	targetGroupId?: string,
+	url?: string,
+	label = 'Browser'
+): Promise<void> {
+	const ws = get(currentWorkspace);
+	if (!ws) return;
+	const gid = targetGroupId ?? ws.activeGroupId;
+	if (!ws.groups.some((group) => group.id === gid)) return;
+	const tabId = nextId();
+	const pendingTab: Tab = { id: tabId, type: 'browser', label, path: url };
+	updateGroupTabs(gid, (tabs) => ({ tabs: [...tabs, pendingTab], activeTabId: tabId }));
+	try {
+		const session = await createBrowserSession(url);
+		let attached = false;
+		updateGroupTabs(gid, (tabs) => ({
+			tabs: tabs.map((tab) => {
+				if (tab.id !== tabId) return tab;
+				attached = true;
+				return { ...tab, browserSessionId: session.session_id };
+			})
+		}));
+		if (!attached) deleteBrowserSession(session.session_id);
+	} catch (error) {
+		console.error('Failed to create browser session:', error);
+		toast.error(error instanceof Error ? error.message : 'Failed to open Browser');
+		closeTab(tabId, gid);
+	}
 }
 
 export function openChatTab(chatId?: string, targetGroupId?: string): void {
@@ -944,6 +1183,9 @@ export function closeTab(tabId: string, groupId?: string): void {
 	if (tab.type === 'terminal' && tab.sessionId) {
 		deleteSession(tab.sessionId);
 	}
+	if (tab.type === 'browser' && tab.browserSessionId) {
+		deleteBrowserSession(tab.browserSessionId);
+	}
 
 	// Clean up streaming indicator for closed chat tabs
 	if (tab.type === 'chat') {
@@ -998,7 +1240,7 @@ export function closeTab(tabId: string, groupId?: string): void {
 			groups: newGroups,
 			layout: closedGroupStillExists
 				? ws.layout
-				: removeLayoutGroup(ws.layout, gid) ?? { type: 'group', groupId: newGroups[0].id },
+				: (removeLayoutGroup(ws.layout, gid) ?? { type: 'group', groupId: newGroups[0].id }),
 			activeGroupId: activeGroupStillExists ? ws.activeGroupId : newGroups[0].id
 		};
 	});
@@ -1025,7 +1267,15 @@ export function setActiveTab(tabId: string, groupId?: string): void {
 }
 
 export function setActiveGroup(groupId: string): void {
-	currentWorkspace.update((ws) => (ws ? { ...ws, activeGroupId: groupId } : ws));
+	currentWorkspace.update((ws) =>
+		ws && ws.activeGroupId !== groupId ? { ...ws, activeGroupId: groupId } : ws
+	);
+}
+
+export function setHomeActiveGroup(groupId: string): void {
+	homeState.update((state) =>
+		state.activeGroupId === groupId ? state : { ...state, activeGroupId: groupId }
+	);
 }
 
 export function setFileBrowserCwd(cwd: string): void {
@@ -1142,6 +1392,24 @@ export function splitCurrentTab(direction?: SplitDirection): void {
 	});
 }
 
+export function splitHomeTab(direction?: SplitDirection): void {
+	homeState.update((state) => {
+		const group = state.groups.find((item) => item.id === state.activeGroupId);
+		const tab = group?.tabs.find((item) => item.id === group.activeTabId);
+		if (!group || !tab) return state;
+		const dir = direction ?? state.splitDirection;
+		const newTab: Tab = { ...tab, id: nextId(), permanent: false };
+		const newGroup: EditorGroup = { id: nextId(), tabs: [newTab], activeTabId: newTab.id };
+		return {
+			...state,
+			groups: [...state.groups, newGroup],
+			activeGroupId: newGroup.id,
+			layout: splitLayout(state.layout, group.id, newGroup.id, dir),
+			splitDirection: dir
+		};
+	});
+}
+
 /** Close an entire editor group */
 export function closeGroup(groupId: string): void {
 	currentWorkspace.update((ws) => {
@@ -1179,40 +1447,134 @@ export function closeGroup(groupId: string): void {
 	});
 }
 
-/** Move a tab from one group to another */
-export function moveTabToGroup(tabId: string, fromGroupId: string, toGroupId: string): void {
-	currentWorkspace.update((ws) => {
-		if (!ws) return ws;
-		const fromGroup = ws.groups.find((g) => g.id === fromGroupId);
-		if (!fromGroup) return ws;
-		const tab = fromGroup.tabs.find((t) => t.id === tabId);
-		if (!tab) return ws;
-
-		let newGroups = ws.groups.map((g) => {
-			if (g.id === fromGroupId) {
-				const newTabs = g.tabs.filter((t) => t.id !== tabId);
-				const newActiveId = g.activeTabId === tabId ? (newTabs[0]?.id ?? 'files') : g.activeTabId;
-				return { ...g, tabs: newTabs, activeTabId: newActiveId };
-			}
-			if (g.id === toGroupId) {
-				return { ...g, tabs: [...g.tabs, tab], activeTabId: tab.id };
-			}
-			return g;
-		});
-
-		// Remove empty non-primary groups
-		newGroups = newGroups.filter((g) => g.tabs.length > 0);
-		if (newGroups.length === 0) newGroups = [createDefaultGroup()];
-
-		const sourceGroupStillExists = newGroups.some((g) => g.id === fromGroupId);
-		const targetGroupStillExists = newGroups.some((g) => g.id === toGroupId);
+export function closeHomeGroup(groupId: string): void {
+	homeState.update((state) => {
+		if (state.groups.length < 2) return state;
+		const closingGroup = state.groups.find((group) => group.id === groupId);
+		const remainingGroups = state.groups.filter((group) => group.id !== groupId);
+		const targetGroup =
+			remainingGroups.find((group) => group.id === state.activeGroupId) ?? remainingGroups[0];
+		if (!closingGroup || !targetGroup) return state;
+		const existingTabIds = new Set(targetGroup.tabs.map((tab) => tab.id));
+		const tabs = [
+			...targetGroup.tabs,
+			...closingGroup.tabs.filter((tab) => !existingTabIds.has(tab.id))
+		];
+		const activeTabId =
+			state.activeGroupId === groupId && tabs.some((tab) => tab.id === closingGroup.activeTabId)
+				? closingGroup.activeTabId
+				: targetGroup.activeTabId;
 		return {
-			...ws,
-			groups: newGroups,
-			layout: sourceGroupStillExists ? ws.layout : removeLayoutGroup(ws.layout, fromGroupId) ?? ws.layout,
-			activeGroupId: targetGroupStillExists ? toGroupId : newGroups[0].id
+			...state,
+			groups: remainingGroups.map((group) =>
+				group.id === targetGroup.id ? { ...group, tabs, activeTabId } : group
+			),
+			activeGroupId: targetGroup.id,
+			layout: removeLayoutGroup(state.layout, groupId) ?? { type: 'group', groupId: targetGroup.id }
 		};
 	});
+}
+
+type SplitEditorState = Pick<
+	WorkspaceState,
+	'groups' | 'activeGroupId' | 'layout' | 'splitDirection'
+>;
+
+function moveTabToGroupInState<T extends SplitEditorState>(
+	state: T,
+	tabId: string,
+	fromGroupId: string,
+	toGroupId: string,
+	allowPermanent: boolean
+): T {
+	const fromGroup = state.groups.find((g) => g.id === fromGroupId);
+	if (!fromGroup || fromGroupId === toGroupId) return state;
+	const tab = fromGroup.tabs.find((t) => t.id === tabId);
+	if (!tab || (!allowPermanent && tab.permanent)) return state;
+
+	let newGroups = state.groups.map((g) => {
+		if (g.id === fromGroupId) {
+			const newTabs = g.tabs.filter((t) => t.id !== tabId);
+			const newActiveId = g.activeTabId === tabId ? (newTabs[0]?.id ?? 'files') : g.activeTabId;
+			return { ...g, tabs: newTabs, activeTabId: newActiveId };
+		}
+		if (g.id === toGroupId) {
+			return { ...g, tabs: [...g.tabs, tab], activeTabId: tab.id };
+		}
+		return g;
+	});
+
+	newGroups = newGroups.filter((g) => g.tabs.length > 0);
+
+	const sourceGroupStillExists = newGroups.some((g) => g.id === fromGroupId);
+	const targetGroupStillExists = newGroups.some((g) => g.id === toGroupId);
+	return {
+		...state,
+		groups: newGroups,
+		layout: sourceGroupStillExists
+			? state.layout
+			: (removeLayoutGroup(state.layout, fromGroupId) ?? state.layout),
+		activeGroupId: targetGroupStillExists ? toGroupId : newGroups[0].id
+	};
+}
+
+/** Move a tab from one group to another */
+export function moveTabToGroup(tabId: string, fromGroupId: string, toGroupId: string): void {
+	currentWorkspace.update((workspace) =>
+		workspace ? moveTabToGroupInState(workspace, tabId, fromGroupId, toGroupId, true) : workspace
+	);
+}
+
+export function moveHomeTabToGroup(tabId: string, fromGroupId: string, toGroupId: string): void {
+	homeState.update((state) => moveTabToGroupInState(state, tabId, fromGroupId, toGroupId, true));
+}
+
+function moveTabToNewSplitInState<T extends SplitEditorState>(
+	state: T,
+	tabId: string,
+	fromGroupId: string,
+	targetGroupId: string,
+	direction: SplitDirection,
+	placement: 'before' | 'after' = 'after'
+): T {
+	const fromGroup = state.groups.find((g) => g.id === fromGroupId);
+	if (!fromGroup) return state;
+	const tab = fromGroup.tabs.find((t) => t.id === tabId);
+	if (!tab || tab.permanent) return state;
+
+	const newGroup: EditorGroup = {
+		id: nextId(),
+		tabs: [tab],
+		activeTabId: tab.id
+	};
+	let groups = state.groups.map((g) => {
+		if (g.id !== fromGroupId) return g;
+		const tabs = g.tabs.filter((t) => t.id !== tabId);
+		return { ...g, tabs, activeTabId: tabs[0]?.id ?? '' };
+	});
+	const sourceGroupRemoved = groups.some(
+		(group) => group.id === fromGroupId && group.tabs.length === 0
+	);
+	groups = groups.filter((g) => g.tabs.length > 0);
+	groups.push(newGroup);
+	let layout = state.layout;
+	if (sourceGroupRemoved) {
+		layout =
+			fromGroupId === targetGroupId
+				? replaceLayoutGroup(layout, fromGroupId, newGroup.id)
+				: (removeLayoutGroup(layout, fromGroupId) ?? layout);
+	}
+	if (!(sourceGroupRemoved && fromGroupId === targetGroupId)) {
+		layout = splitLayout(layout, targetGroupId, newGroup.id, direction, placement);
+	}
+
+	return {
+		...state,
+		groups,
+		activeGroupId: newGroup.id,
+		layout,
+		splitDirection: direction
+	};
 }
 
 export function moveTabToNewSplit(
@@ -1222,46 +1584,23 @@ export function moveTabToNewSplit(
 	direction: SplitDirection,
 	placement: 'before' | 'after' = 'after'
 ): void {
-	currentWorkspace.update((ws) => {
-		if (!ws) return ws;
-		const fromGroup = ws.groups.find((g) => g.id === fromGroupId);
-		if (!fromGroup) return ws;
-		const tab = fromGroup.tabs.find((t) => t.id === tabId);
-		if (!tab || tab.permanent) return ws;
+	currentWorkspace.update((workspace) =>
+		workspace
+			? moveTabToNewSplitInState(workspace, tabId, fromGroupId, targetGroupId, direction, placement)
+			: workspace
+	);
+}
 
-		const newGroup: EditorGroup = {
-			id: nextId(),
-			tabs: [tab],
-			activeTabId: tab.id
-		};
-		let groups = ws.groups.map((g) => {
-			if (g.id !== fromGroupId) return g;
-			const tabs = g.tabs.filter((t) => t.id !== tabId);
-			return { ...g, tabs, activeTabId: tabs[0]?.id ?? '' };
-		});
-		const sourceGroupRemoved = groups.some((group) => group.id === fromGroupId && group.tabs.length === 0);
-		groups = groups.filter((g) => g.tabs.length > 0);
-		groups.push(newGroup);
-		let layout = ws.layout;
-		if (sourceGroupRemoved) {
-			layout =
-				fromGroupId === targetGroupId
-					? replaceLayoutGroup(layout, fromGroupId, newGroup.id)
-					: removeLayoutGroup(layout, fromGroupId) ?? layout;
-		}
-		if (!(sourceGroupRemoved && fromGroupId === targetGroupId)) {
-			layout = splitLayout(layout, targetGroupId, newGroup.id, direction, placement);
-		}
-
-		return {
-			...ws,
-			groups,
-			activeGroupId: newGroup.id,
-			layout,
-			splitDirection: direction,
-			splitRatio: ws.splitRatio ?? 0.5
-		};
-	});
+export function moveHomeTabToNewSplit(
+	tabId: string,
+	fromGroupId: string,
+	targetGroupId: string,
+	direction: SplitDirection,
+	placement: 'before' | 'after' = 'after'
+): void {
+	homeState.update((state) =>
+		moveTabToNewSplitInState(state, tabId, fromGroupId, targetGroupId, direction, placement)
+	);
 }
 
 export function setSplitDirection(direction: SplitDirection): void {
@@ -1277,6 +1616,13 @@ export function setSplitRatio(splitId: string, ratio: number): void {
 				}
 			: ws
 	);
+}
+
+export function setHomeSplitRatio(splitId: string, ratio: number): void {
+	homeState.update((state) => ({
+		...state,
+		layout: updateSplitRatio(state.layout, splitId, ratio)
+	}));
 }
 
 function updateSplitRatio(layout: EditorLayout, splitId: string, ratio: number): EditorLayout {

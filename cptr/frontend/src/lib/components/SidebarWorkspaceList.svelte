@@ -4,7 +4,12 @@
 	import { workspaceList, removeWorkspace, reorderWorkspaces, sidebarOpen } from '$lib/stores';
 	import { chatEnabled } from '$lib/stores/chat';
 	import { socketStore } from '$lib/stores/socket.svelte';
-	import { deleteChat as apiDeleteChat, getChats, type ChatInfo } from '$lib/apis/chat';
+	import {
+		deleteChat as apiDeleteChat,
+		getChats,
+		updateChatTitle,
+		type ChatInfo
+	} from '$lib/apis/chat';
 	import { t } from '$lib/i18n';
 	import { tooltip } from '$lib/tooltip';
 	import Sortable from 'sortablejs';
@@ -24,9 +29,11 @@
 	let wsListEl: HTMLDivElement | undefined = $state();
 	let sortable: Sortable | null = null;
 	let unbindSocketListener: (() => void) | null = null;
+	let workspacesExpanded = $state(true);
 
 	let expandedWorkspaces = $state<Set<string>>(new Set());
 	let wsChatsCache = $state<Map<string, ChatInfo[]>>(new Map());
+	let wsChatsHasMore = $state<Map<string, boolean>>(new Map());
 	let wsChatsLoading = $state<Set<string>>(new Set());
 	let currentPath = $derived($page.url.searchParams.get('workspace'));
 
@@ -41,14 +48,20 @@
 		expandedWorkspaces = next;
 	}
 
-	async function fetchWorkspaceChats(path: string) {
+	async function fetchWorkspaceChats(path: string, append = false) {
 		if (wsChatsLoading.has(path)) return;
 		wsChatsLoading = new Set([...wsChatsLoading, path]);
 		try {
-			const data = await getChats(path, 5, 0, 'updated_at', 'desc');
-			wsChatsCache = new Map([...wsChatsCache, [path, data.chats || []]]);
+			const existing = wsChatsCache.get(path) ?? [];
+			const data = await getChats(path, 5, append ? existing.length : 0, 'updated_at', 'desc');
+			wsChatsCache = new Map([
+				...wsChatsCache,
+				[path, append ? [...existing, ...(data.chats || [])] : data.chats || []]
+			]);
+			wsChatsHasMore = new Map([...wsChatsHasMore, [path, data.has_more]]);
 		} catch {
 			wsChatsCache = new Map([...wsChatsCache, [path, []]]);
+			wsChatsHasMore = new Map([...wsChatsHasMore, [path, false]]);
 		} finally {
 			const next = new Set(wsChatsLoading);
 			next.delete(path);
@@ -69,11 +82,6 @@
 
 	function openChat(chatId: string, wsPath: string) {
 		goto(`/?workspace=${encodeURIComponent(wsPath)}&chatId=${encodeURIComponent(chatId)}`);
-		closeMobileSidebar();
-	}
-
-	function showMoreChats(wsPath: string) {
-		goto(`/?workspace=${encodeURIComponent(wsPath)}&chatId`);
 		closeMobileSidebar();
 	}
 
@@ -123,6 +131,30 @@
 		}
 	}
 
+	async function handleRenameChat() {
+		if (!chatMenu) return;
+		const { chatId, wsPath } = chatMenu;
+		const chat = (wsChatsCache.get(wsPath) ?? []).find((item) => item.id === chatId);
+		const title = window.prompt($t('files.rename'), chat?.title)?.trim();
+		if (!title || title === chat?.title) return;
+		await updateChatTitle(chatId, title);
+		const chats = wsChatsCache.get(wsPath) ?? [];
+		wsChatsCache = new Map([
+			...wsChatsCache,
+			[wsPath, chats.map((item) => (item.id === chatId ? { ...item, title } : item))]
+		]);
+	}
+
+	function copyChatPath() {
+		if (!chatMenu) return;
+		const { chatId, wsPath } = chatMenu;
+		const chat = (wsChatsCache.get(wsPath) ?? []).find((item) => item.id === chatId);
+		if (!chat) return;
+		navigator.clipboard.writeText(
+			`${wsPath.replace(/\/$/, '')}/.cptr/chats/${chat.folder ? `${chat.folder}/` : ''}${chat.id}.json`
+		);
+	}
+
 	const seenChatIds = new Set<string>();
 
 	function handleChatEvent(data: {
@@ -137,6 +169,7 @@
 		if (!data.done && !data.title && !isNew) return;
 
 		wsChatsCache = new Map();
+		wsChatsHasMore = new Map();
 		for (const path of expandedWorkspaces) fetchWorkspaceChats(path);
 	}
 
@@ -172,7 +205,20 @@
 </script>
 
 <div class="flex items-center justify-between h-8 pl-3.5 pr-1.5 shrink-0">
-	<span class="text-xs text-gray-400 dark:text-gray-500">{$t('sidebar.workspaces')}</span>
+	<button
+		class="group flex flex-1 h-full items-center gap-1 text-left text-xs text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors duration-100"
+		onclick={() => (workspacesExpanded = !workspacesExpanded)}
+		aria-expanded={workspacesExpanded}
+		aria-controls="workspace-list"
+	>
+		<span>{$t('sidebar.workspaces')}</span>
+		<span
+			class="flex opacity-0 group-hover:opacity-100 transition-all duration-100"
+			style="transform: rotate({workspacesExpanded ? '90deg' : '0deg'})"
+		>
+			<Icon name="chevron-right" size={11} />
+		</span>
+	</button>
 	<button
 		class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors duration-100"
 		onclick={onaddworkspace}
@@ -183,10 +229,16 @@
 	</button>
 </div>
 
-<div bind:this={wsListEl} class="flex-1 overflow-y-auto px-1.5">
+<div
+	id="workspace-list"
+	bind:this={wsListEl}
+	class="flex-1 overflow-y-auto px-1.5"
+	class:invisible={!workspacesExpanded}
+>
 	{#each $workspaceList as ws (ws.path)}
 		{@const isExpanded = expandedWorkspaces.has(ws.path)}
 		{@const chats = wsChatsCache.get(ws.path)}
+		{@const hasMoreChats = wsChatsHasMore.get(ws.path)}
 		{@const isLoading = wsChatsLoading.has(ws.path)}
 		<div class="ws-item">
 			<div
@@ -266,9 +318,15 @@
 								onmenu={(e) => openChatMenu(e, chat.id, ws.path)}
 							/>
 						{/each}
-						<button class="ws-chat-show-more" onclick={() => showMoreChats(ws.path)}>
-							{$t('sidebar.showMore')}
-						</button>
+						{#if hasMoreChats}
+							<button
+								class="ws-chat-show-more"
+								disabled={isLoading}
+								onclick={() => fetchWorkspaceChats(ws.path, true)}
+							>
+								{$t('sidebar.showMore')}
+							</button>
+						{/if}
 					{/if}
 				</div>
 			{/if}
@@ -301,6 +359,16 @@
 		anchor={chatMenu.anchor}
 		align="end"
 		items={[
+			{
+				label: $t('files.copyPath'),
+				icon: 'copy',
+				onclick: copyChatPath
+			},
+			{
+				label: $t('files.rename'),
+				icon: 'pencil',
+				onclick: handleRenameChat
+			},
 			{
 				label: $t('chat.history.delete'),
 				icon: 'trash',
@@ -347,7 +415,7 @@
 	}
 
 	:global(.dark) .ws-icon-chevron {
-		color: #6b7280;
+		color: var(--app-fg-muted);
 	}
 
 	.ws-icon-toggle:hover .ws-icon-folder {
@@ -371,21 +439,13 @@
 		background: none;
 		cursor: pointer;
 		font-size: 0.6875rem;
-		color: #b0b5be;
+		color: var(--app-fg-subtle);
 		text-align: left;
 		transition: color 0.1s;
 	}
 
 	.ws-chat-show-more:hover {
-		color: #6b7280;
-	}
-
-	:global(.dark) .ws-chat-show-more {
-		color: #6b7280;
-	}
-
-	:global(.dark) .ws-chat-show-more:hover {
-		color: #9ca3af;
+		color: var(--app-fg);
 	}
 
 	.ws-chat-loading {

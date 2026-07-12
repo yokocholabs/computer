@@ -9,6 +9,7 @@
 		reorderTabs,
 		openUntitledFileTab,
 		openTerminalTab,
+		openBrowserTab,
 		openInSplit,
 		closeGroup,
 		moveTabToGroup,
@@ -32,13 +33,44 @@
 	import { TAB_DRAG_MIME } from '$lib/constants';
 
 	interface Props {
-	group: EditorGroup;
-	canClose?: boolean;
-	isPrimary?: boolean;
-	onTabDragOver?: () => void;
-}
+		group: EditorGroup;
+		home?: boolean;
+		canClose?: boolean;
+		isPrimary?: boolean;
+		onTabDragOver?: () => void;
+		onHomeSelect?: (tabId: string) => void;
+		onHomeClose?: (tabId: string) => void;
+		onHomeReorder?: (oldIndex: number, newIndex: number) => void;
+		onHomeMove?: (tabId: string, fromGroupId: string) => void;
+		onHomeNewChat?: () => void;
+		onHomeNewTerminal?: () => void;
+		onHomeNewBrowser?: () => void;
+		onHomeSplit?: (direction: 'horizontal' | 'vertical') => void;
+		onHomeCloseGroup?: () => void;
+		homeSplitDirection?: 'horizontal' | 'vertical';
+		homeSplitActive?: boolean;
+		homeActive?: boolean;
+	}
 
-	let { group, canClose = false, isPrimary = false, onTabDragOver }: Props = $props();
+	let {
+		group,
+		home = false,
+		canClose = false,
+		isPrimary = false,
+		onTabDragOver,
+		onHomeSelect,
+		onHomeClose,
+		onHomeReorder,
+		onHomeMove,
+		onHomeNewChat,
+		onHomeNewTerminal,
+		onHomeNewBrowser,
+		onHomeSplit,
+		onHomeCloseGroup,
+		homeSplitDirection = 'horizontal',
+		homeSplitActive = false,
+		homeActive = true
+	}: Props = $props();
 
 	let tabsEl: HTMLDivElement | undefined = $state();
 	let sortable: Sortable | null = null;
@@ -63,10 +95,12 @@
 
 	const displayTabs = $derived((group?.tabs ?? []).filter((t) => t.type !== 'git'));
 
-	const isActiveGroup = $derived($activeWorkspace?.activeGroupId === group?.id);
+	const isActiveGroup = $derived(home ? homeActive : $activeWorkspace?.activeGroupId === group?.id);
 
 	function tabIconName(tab: Tab): string {
 		switch (tab.type) {
+			case 'home':
+				return 'spark';
 			case 'files':
 				return 'folder';
 			case 'terminal':
@@ -79,22 +113,27 @@
 				return 'chat-bubble';
 			case 'preview':
 				return 'monitor';
+			case 'browser':
+				return 'browser';
 			default:
 				return 'page';
 		}
 	}
 
 	function handleTabClick(tab: Tab) {
+		if (home) return onHomeSelect?.(tab.id);
 		setActiveTab(tab.id, group.id);
 	}
 
 	function handleClose(e: Event, tabId: string) {
 		e.stopPropagation();
+		if (home) return onHomeClose?.(tabId);
 		closeTab(tabId, group.id);
 	}
 
 	function handleCloseGroup(e: Event) {
 		e.stopPropagation();
+		if (home) return onHomeCloseGroup?.();
 		closeGroup(group.id);
 	}
 
@@ -105,6 +144,7 @@
 	}
 
 	function handlePaneClick() {
+		if (home) return;
 		if (!isActiveGroup) {
 			setActiveGroup(group.id);
 		}
@@ -161,51 +201,85 @@
 		e.preventDefault();
 		e.stopPropagation();
 		if (payload.groupId === group.id) return; // same group, ignore
-		moveTabToGroup(payload.tabId, payload.groupId, group.id);
+		if (home) onHomeMove?.(payload.tabId, payload.groupId);
+		else moveTabToGroup(payload.tabId, payload.groupId, group.id);
 	}
 
-	const plusMenuItems = $derived([
-		{
-			label: $t('bar.newFile'),
-			icon: 'page',
-			shortcut: formatChord($keybindings.newFile),
-			onclick: () => {
-				openUntitledFileTab(group.id);
-			}
-		},
-		...($chatEnabled
+	const plusMenuItems = $derived(
+		home
 			? [
+					...($chatEnabled
+						? [
+								{
+									label: $t('bar.newChat'),
+									icon: 'chat-bubble',
+									shortcut: formatChord($keybindings.newChat),
+									onclick: () => onHomeNewChat?.()
+								}
+							]
+						: []),
 					{
-						label: $t('bar.newChat'),
-						icon: 'chat-bubble',
-						shortcut: formatChord($keybindings.newChat),
-						onclick: () => {
-							openChatTab(undefined, group.id);
-						}
+						label: $t('bar.newTerminal'),
+						icon: 'terminal',
+						shortcut: formatChord($keybindings.newTerminal),
+						onclick: () => onHomeNewTerminal?.()
+					},
+					{
+						label: $t('bar.newBrowser'),
+						icon: 'browser',
+						shortcut: formatChord($keybindings.newBrowser),
+						onclick: () => onHomeNewBrowser?.()
 					}
 				]
-			: []),
-		{
-			label: $t('bar.newTerminal'),
-			icon: 'terminal',
-			shortcut: formatChord($keybindings.newTerminal),
-			onclick: () => {
-				openTerminalTab(group.id);
-			}
-		},
-		...($voiceMemosEnabled
-			? [
+			: [
 					{
-						label: $t('bar.voiceMemo'),
-						icon: 'microphone',
-						shortcut: formatChord($keybindings.voiceMemo),
+						label: $t('bar.newFile'),
+						icon: 'page',
+						shortcut: formatChord($keybindings.newFile),
 						onclick: () => {
-							showVoiceMemo.set(true);
+							openUntitledFileTab(group.id);
 						}
-					}
+					},
+					...($chatEnabled
+						? [
+								{
+									label: $t('bar.newChat'),
+									icon: 'chat-bubble',
+									shortcut: formatChord($keybindings.newChat),
+									onclick: () => {
+										openChatTab(undefined, group.id);
+									}
+								}
+							]
+						: []),
+					{
+						label: $t('bar.newTerminal'),
+						icon: 'terminal',
+						shortcut: formatChord($keybindings.newTerminal),
+						onclick: () => {
+							openTerminalTab(group.id);
+						}
+					},
+					{
+						label: $t('bar.newBrowser'),
+						icon: 'browser',
+						shortcut: formatChord($keybindings.newBrowser),
+						onclick: () => openBrowserTab(group.id)
+					},
+					...($voiceMemosEnabled
+						? [
+								{
+									label: $t('bar.voiceMemo'),
+									icon: 'microphone',
+									shortcut: formatChord($keybindings.voiceMemo),
+									onclick: () => {
+										showVoiceMemo.set(true);
+									}
+								}
+							]
+						: [])
 				]
-			: [])
-	]);
+	);
 
 	const contextMenuItems = $derived.by(() => {
 		if (!contextMenu) return [];
@@ -230,7 +304,7 @@
 			items.push({
 				label: $t('bar.closeTab'),
 				icon: 'xmark',
-				onclick: () => closeTab(tab.id, group.id)
+				onclick: () => (home ? onHomeClose?.(tab.id) : closeTab(tab.id, group.id))
 			});
 		}
 
@@ -238,15 +312,20 @@
 	});
 
 	const splitMenuItems = $derived.by(() => {
-		const direction = $activeWorkspace?.splitDirection ?? 'horizontal';
+		const direction = home
+			? homeSplitDirection
+			: ($activeWorkspace?.splitDirection ?? 'horizontal');
 		return [
 			{
 				label: $t('bar.splitRight'),
 				icon: 'split-horizontal',
 				active: direction === 'horizontal',
 				onclick: () => {
-					setSplitDirection('horizontal');
-					splitCurrentTab('horizontal');
+					if (home) onHomeSplit?.('horizontal');
+					else {
+						setSplitDirection('horizontal');
+						splitCurrentTab('horizontal');
+					}
 				}
 			},
 			{
@@ -254,8 +333,11 @@
 				icon: 'split-vertical',
 				active: direction === 'vertical',
 				onclick: () => {
-					setSplitDirection('vertical');
-					splitCurrentTab('vertical');
+					if (home) onHomeSplit?.('vertical');
+					else {
+						setSplitDirection('vertical');
+						splitCurrentTab('vertical');
+					}
 				}
 			}
 		];
@@ -269,7 +351,7 @@
 		if (tabsEl) {
 			sortable = Sortable.create(tabsEl, {
 				animation: 150,
-				ghostClass: 'opacity-30',
+				ghostClass: 'tab-reorder-preview',
 				dragClass: 'cursor-grabbing',
 				direction: 'horizontal',
 				delay: 200,
@@ -283,7 +365,8 @@
 				},
 				onEnd: (evt) => {
 					if (evt.oldIndex != null && evt.newIndex != null && evt.oldIndex !== evt.newIndex) {
-						reorderTabs(evt.oldIndex, evt.newIndex, group.id);
+						if (home) onHomeReorder?.(evt.oldIndex, evt.newIndex);
+						else reorderTabs(evt.oldIndex, evt.newIndex, group.id);
 					}
 				}
 			});
@@ -300,9 +383,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="flex items-center h-9 px-1.5 gap-1 shrink-0 select-none border-b transition-colors duration-100
-		{dropHighlight
-		? 'border-blue-400 bg-blue-50 dark:bg-blue-500/5 dark:border-blue-500/40'
-		: 'border-gray-200 dark:border-white/6'}
+		{dropHighlight ? 'tab-reorder-drop-preview' : 'border-gray-200 dark:border-white/6'}
 		{isActiveGroup ? '' : 'opacity-50'}"
 	onclick={handlePaneClick}
 	ondragover={handleBarDragOver}
@@ -332,6 +413,7 @@
 						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
 						: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 					data-tab-id={tab.id}
+					onpointerdown={() => handleTabClick(tab)}
 					onclick={() => handleTabClick(tab)}
 					oncontextmenu={(e) => handleContextMenu(e, tab)}
 				>
@@ -348,6 +430,7 @@
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span
 							class="flex items-center justify-center w-4 h-4 rounded text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
+							onpointerdown={(e) => e.stopPropagation()}
 							onclick={(e) => handleClose(e, tab.id)}
 							onkeydown={(e) => {
 								if (e.key === 'Enter') handleClose(e, tab.id);
@@ -382,7 +465,7 @@
 			<button
 				bind:this={splitBtnEl}
 				class="flex items-center justify-center w-7 h-7 rounded-lg transition-colors duration-100 shrink-0
-					{$splitActive
+					{(home ? homeSplitActive : $splitActive)
 					? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
 					: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
 				onclick={() => (showSplitMenu = !showSplitMenu)}
@@ -390,7 +473,7 @@
 				use:tooltip={$t('a11y.splitEditor')}
 			>
 				<Icon
-					name={$activeWorkspace?.splitDirection === 'vertical'
+					name={(home ? homeSplitDirection : $activeWorkspace?.splitDirection) === 'vertical'
 						? 'split-vertical'
 						: 'split-horizontal'}
 					size={14}
@@ -437,7 +520,7 @@
 	/>
 {/if}
 
-{#if $showVoiceMemo}
+{#if !home && $showVoiceMemo}
 	<VoiceMemoModal
 		workspace={$activeWorkspace?.path ?? ''}
 		directory={$activeWorkspace?.fileBrowserCwd ?? $activeWorkspace?.path ?? ''}
@@ -454,5 +537,17 @@
 	}
 	.group-tabs-row::-webkit-scrollbar {
 		display: none;
+	}
+
+	.tab-reorder-preview {
+		background: color-mix(in oklab, var(--app-fg) 6%, transparent) !important;
+		box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--app-fg) 16%, transparent);
+		opacity: 1 !important;
+	}
+
+	.tab-reorder-drop-preview {
+		background: color-mix(in oklab, var(--app-fg) 6%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--app-fg) 16%, transparent);
+		border-color: transparent;
 	}
 </style>

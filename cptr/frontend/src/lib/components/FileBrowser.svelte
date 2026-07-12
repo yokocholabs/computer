@@ -15,7 +15,10 @@
 		deleteFiles,
 		moveFile,
 		uploadFiles as apiUpload,
-		createEntry
+		createEntry,
+		getFileMatches,
+		type FileMatch,
+		type ContentMatch
 	} from '$lib/apis/files';
 	import { fileIconName } from '$lib/utils/fileIcon';
 	import Icon from './Icon.svelte';
@@ -44,6 +47,16 @@
 	let dragExpandTimer: ReturnType<typeof setTimeout> | null = null;
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
+	let matchResults = $state<FileMatch[] | null>(null);
+	let matchLoading = $state(false);
+	let matchLoadingMore = $state(false);
+	let matchError = $state<string | null>(null);
+	let matchLoadMoreError = $state(false);
+	let nextMatchOffset = $state<number | null>(null);
+	let matchTimer: ReturnType<typeof setTimeout> | null = null;
+	let matchController: AbortController | null = null;
+	let matchRequestId = 0;
+	let searchTargetRequestId = 0;
 	let dragOverDir = $state<string | null>(null);
 	let draggedItem = $state<string | null>(null);
 	let showNewInput = $state<'file' | 'folder' | null>(null);
@@ -80,6 +93,10 @@
 
 	let cwd = $derived($activeWorkspace?.fileBrowserCwd ?? $activeWorkspace?.path ?? '/');
 	let workspacePath = $derived($activeWorkspace?.path ?? '/');
+	let searchText = $derived(searchQuery.trim());
+	let isSearching = $derived(Boolean(searchText));
+	let filenameMatches = $derived(matchResults?.filter((match) => match.name_match) ?? []);
+	let contentOnlyMatches = $derived(matchResults?.filter((match) => !match.name_match) ?? []);
 	let gitStatus = $derived(gitStatusStore.status);
 	let gitRoot = $derived(workspacePath.replace(/\/$/, ''));
 
@@ -283,6 +300,7 @@
 				const isNavigation = _prevCwd !== '';
 				_prevCwd = cwd;
 				if (isNavigation) {
+					searchQuery = '';
 					// Navigated to a new directory: reset tree state
 					expandedDirs = new Set();
 					dirContents = new Map();
@@ -299,6 +317,97 @@
 			}
 		}
 	});
+
+	$effect(() => {
+		const query = searchText;
+		const hidden = showHidden;
+		if (matchTimer) clearTimeout(matchTimer);
+		matchTimer = null;
+		matchController?.abort();
+		matchController = null;
+		matchError = null;
+		const requestId = ++matchRequestId;
+
+		if (!query) {
+			matchResults = null;
+			matchLoading = false;
+			matchLoadingMore = false;
+			matchLoadMoreError = false;
+			nextMatchOffset = null;
+			return;
+		}
+
+		showNewInput = null;
+		clearSelection();
+		contextMenu = null;
+		directoryMenu = null;
+		addMenuOpen = false;
+		sortMenuOpen = false;
+		matchLoading = true;
+		matchLoadingMore = false;
+		matchLoadMoreError = false;
+		nextMatchOffset = null;
+		matchTimer = setTimeout(async () => {
+			const controller = new AbortController();
+			matchController = controller;
+			try {
+				const data = await getFileMatches(query, cwd, hidden, 0, controller.signal);
+				if (requestId === matchRequestId) {
+					matchResults = data.results;
+					nextMatchOffset = data.next_offset;
+				}
+			} catch (e: any) {
+				if (e.name !== 'AbortError' && requestId === matchRequestId) {
+					matchError = e.message || $t('files.failedToSearch');
+					matchResults = [];
+				}
+			} finally {
+				if (requestId === matchRequestId) matchLoading = false;
+			}
+		}, 200);
+	});
+
+	async function loadMoreMatches() {
+		const offset = nextMatchOffset;
+		if (offset === null || !isSearching || matchLoading || matchLoadingMore || matchLoadMoreError)
+			return;
+
+		const query = searchText;
+		const hidden = showHidden;
+		const requestId = matchRequestId;
+		matchLoadingMore = true;
+		const controller = new AbortController();
+		matchController = controller;
+		try {
+			const data = await getFileMatches(query, cwd, hidden, offset, controller.signal);
+			if (requestId === matchRequestId) {
+				matchResults = [...(matchResults ?? []), ...data.results];
+				nextMatchOffset = data.next_offset;
+			}
+		} catch (e: any) {
+			if (e.name !== 'AbortError' && requestId === matchRequestId) {
+				matchLoadMoreError = true;
+			}
+		} finally {
+			if (requestId === matchRequestId) matchLoadingMore = false;
+		}
+	}
+
+	function retryMoreMatches() {
+		matchLoadMoreError = false;
+		void loadMoreMatches();
+	}
+
+	function loadMoreOnVisible(node: HTMLElement) {
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting) void loadMoreMatches();
+			},
+			{ rootMargin: '160px' }
+		);
+		observer.observe(node);
+		return { destroy: () => observer.disconnect() };
+	}
 
 	// Keep the websocket watch path in sync (separate effect so it doesn't
 	// re-trigger directory fetches via fsTick feedback loops)
@@ -464,7 +573,32 @@
 	}
 
 	function navigateTo(path: string) {
+		searchQuery = '';
 		setFileBrowserCwd(path);
+	}
+
+	function parentPath(relativePath: string): string {
+		const slash = relativePath.lastIndexOf('/');
+		return slash === -1 ? '' : relativePath.slice(0, slash);
+	}
+
+	function openFileMatch(match: FileMatch) {
+		if (match.type === 'directory') {
+			navigateTo(match.path);
+			return;
+		}
+		openFileTab(match.path);
+	}
+
+	function openContentMatch(match: FileMatch, contentMatch: ContentMatch) {
+		openFileTab(match.path, undefined, {
+			searchTarget: {
+				line: contentMatch.line,
+				column: contentMatch.column,
+				length: searchText.length,
+				requestId: ++searchTargetRequestId
+			}
+		});
 	}
 
 	// fileIconName imported from $lib/utils/fileIcon
@@ -955,9 +1089,9 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="flex flex-col h-full overflow-hidden relative"
-	ondragover={onDropzoneOver}
-	ondragleave={onDropzoneLeave}
-	ondrop={onDropzoneDrop}
+	ondragover={(e) => !isSearching && onDropzoneOver(e)}
+	ondragleave={(e) => !isSearching && onDropzoneLeave(e)}
+	ondrop={(e) => !isSearching && onDropzoneDrop(e)}
 >
 	<!-- Header: breadcrumb + actions -->
 	<div
@@ -1002,29 +1136,31 @@
 			<Icon name="refresh" size={11} />
 		</button>
 
-		<!-- Sort dropdown -->
-		<button
-			bind:this={sortBtnEl}
-			class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
-			onclick={() => {
-				sortMenuOpen = !sortMenuOpen;
-			}}
-			use:tooltip={$t('files.sort')}
-		>
-			<Icon name="sort" size={11} />
-		</button>
+		{#if !isSearching}
+			<!-- Sort dropdown -->
+			<button
+				bind:this={sortBtnEl}
+				class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
+				onclick={() => {
+					sortMenuOpen = !sortMenuOpen;
+				}}
+				use:tooltip={$t('files.sort')}
+			>
+				<Icon name="sort" size={11} />
+			</button>
 
-		<!-- Three-dot menu -->
-		<button
-			bind:this={addBtnEl}
-			class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
-			onclick={() => {
-				toggleAddMenu();
-			}}
-			use:tooltip={$t('files.actions')}
-		>
-			<Icon name="three-dots" size={11} />
-		</button>
+			<!-- Three-dot menu -->
+			<button
+				bind:this={addBtnEl}
+				class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-100 shrink-0"
+				onclick={() => {
+					toggleAddMenu();
+				}}
+				use:tooltip={$t('files.actions')}
+			>
+				<Icon name="three-dots" size={11} />
+			</button>
+		{/if}
 	</div>
 
 	<!-- Ports -->
@@ -1051,7 +1187,7 @@
 		<input
 			type="text"
 			class="flex-1 border-none outline-none bg-transparent text-xs text-gray-900 dark:text-white placeholder:text-gray-400"
-			placeholder={$t('files.filter')}
+			placeholder={$t('files.searchFilesAndContents')}
 			bind:value={searchQuery}
 		/>
 		{#if searchQuery}
@@ -1064,9 +1200,12 @@
 	<!-- Sort bar replaced with dropdown in toolbar -->
 
 	<!-- File list -->
-	<div class="flex-1 overflow-y-auto p-1" oncontextmenu={onDirectoryContextMenu}>
+	<div
+		class="flex-1 overflow-y-auto p-1"
+		oncontextmenu={(e) => !isSearching && onDirectoryContextMenu(e)}
+	>
 		<!-- New item input -->
-		{#if showNewInput}
+		{#if showNewInput && !isSearching}
 			<div class="flex items-center gap-2 h-7 px-2">
 				<Icon
 					name={showNewInput === 'folder' ? 'folder' : 'empty-page'}
@@ -1113,6 +1252,97 @@
 					onclick={() => fetchDirectory(cwd)}>{$t('files.retry')}</button
 				>
 			</div>
+		{:else if isSearching}
+			{#if matchLoading}
+				<div class="flex items-center justify-center py-12">
+					<Spinner size={16} />
+				</div>
+			{:else if matchError}
+				<div class="flex items-center justify-center py-12">
+					<p class="text-xs text-red-400">{matchError}</p>
+				</div>
+			{:else if !matchResults?.length}
+				<div class="flex items-center justify-center py-12">
+					<p class="text-xs text-gray-400 dark:text-gray-600">{$t('files.noMatches')}</p>
+				</div>
+			{:else}
+				{#snippet resultRows(matches: FileMatch[])}
+					{#each matches as match (match.path)}
+						<button
+							class="flex items-center gap-2 w-full h-7 px-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-white/4 transition-colors duration-75"
+							onclick={() => openFileMatch(match)}
+						>
+							<Icon
+								name={fileIconName(match.name, match.type)}
+								size={14}
+								strokeWidth={1.4}
+								class="shrink-0 {match.type === 'directory'
+									? 'text-gray-500 dark:text-gray-400'
+									: 'text-gray-400 dark:text-gray-500'}"
+							/>
+							<span class="min-w-0 flex-1 truncate text-xs text-gray-800 dark:text-gray-200">
+								{match.name}
+								{#if parentPath(match.relative_path)}
+									<span class="ml-1.5 text-[0.6875rem] text-gray-400 dark:text-gray-600"
+										>{parentPath(match.relative_path)}</span
+									>
+								{/if}
+							</span>
+						</button>
+						{#if match.content_matches.length > 0}
+							{@const preview = match.content_matches[0]}
+							<button
+								class="flex items-center gap-2 w-full h-6 pl-8 pr-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-white/4 transition-colors duration-75"
+								onclick={() => openContentMatch(match, preview)}
+							>
+								<span
+									class="w-6 shrink-0 text-right text-[0.625rem] font-mono text-gray-400 dark:text-gray-600"
+									>{preview.line}</span
+								>
+								<span
+									class="min-w-0 flex-1 truncate text-[0.6875rem] font-mono text-gray-500 dark:text-gray-500"
+									>{preview.text}</span
+								>
+								{#if match.content_matches.length > 1}
+									<span class="shrink-0 text-[0.625rem] text-gray-400 dark:text-gray-600"
+										>+{match.content_matches.length - 1}</span
+									>
+								{/if}
+							</button>
+						{/if}
+					{/each}
+				{/snippet}
+
+				{#if filenameMatches.length > 0}
+					<div
+						class="px-2 pt-1 pb-0.5 text-[0.625rem] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-600"
+					>
+						{$t('files.filenameMatches')}
+					</div>
+					{@render resultRows(filenameMatches)}
+				{/if}
+
+				{#if contentOnlyMatches.length > 0}
+					<div
+						class="px-2 pt-2 pb-0.5 text-[0.625rem] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-600"
+					>
+						{$t('files.contentMatches')}
+					</div>
+					{@render resultRows(contentOnlyMatches)}
+				{/if}
+				{#if nextMatchOffset !== null}
+					<div use:loadMoreOnVisible class="flex h-8 items-center justify-center">
+						{#if matchLoadingMore}
+							<Spinner size={12} />
+						{:else if matchLoadMoreError}
+							<button
+								class="text-[0.6875rem] text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors duration-75"
+								onclick={retryMoreMatches}>{$t('files.retry')}</button
+							>
+						{/if}
+					</div>
+				{/if}
+			{/if}
 		{:else if visibleEntries.length === 0 && !showNewInput}
 			<div class="flex items-center justify-center py-12">
 				<p class="text-xs text-gray-400 dark:text-gray-600">
@@ -1157,7 +1387,7 @@
 						: null}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<button
-						class="group flex items-center gap-1 w-full h-7 rounded-lg text-left transition-colors duration-75
+						class="group flex items-center gap-1 w-full h-7 pr-2 rounded-lg text-left transition-colors duration-75
 							{isSelected
 							? 'bg-blue-50 dark:bg-blue-500/10'
 							: isDragTarget
@@ -1165,7 +1395,6 @@
 									? 'bg-blue-100 dark:bg-blue-500/20'
 									: 'bg-blue-50/60 dark:bg-blue-500/8'
 								: 'hover:bg-gray-100 dark:hover:bg-white/4'}"
-						style="padding-left: {8 + entry.depth * 16}px; padding-right: 0.5rem;"
 						onclick={(e) => handleClick(e, entry, i)}
 						oncontextmenu={(e) => onContextMenu(e, entry)}
 						draggable="true"
@@ -1178,7 +1407,7 @@
 						{#if entry.type === 'directory'}
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<span
-								class="flex items-center justify-center w-4 shrink-0 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 cursor-pointer"
+								class="flex h-full shrink-0 cursor-pointer items-center text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400"
 								role="button"
 								tabindex="-1"
 								onclick={(e) => {
@@ -1192,13 +1421,25 @@
 									}
 								}}
 							>
-								<Icon
-									name={expandedDirs.has(entry.path) ? 'chevron-down' : 'chevron-right'}
-									size={10}
-								/>
+								<span class="w-2 shrink-0"></span>
+								{#each Array(entry.depth) as _}
+									<span class="w-4 shrink-0"></span>
+								{/each}
+								<span class="flex w-4 shrink-0 items-center justify-center">
+									<Icon
+										name={expandedDirs.has(entry.path) ? 'chevron-down' : 'chevron-right'}
+										size={10}
+									/>
+								</span>
 							</span>
 						{:else}
-							<span class="w-4 shrink-0"></span>
+							<span class="flex shrink-0">
+								<span class="w-2 shrink-0"></span>
+								{#each Array(entry.depth) as _}
+									<span class="w-4 shrink-0"></span>
+								{/each}
+								<span class="w-4 shrink-0"></span>
+							</span>
 						{/if}
 						<span
 							class="flex items-center justify-center w-4 shrink-0 {entry.type === 'directory'
@@ -1268,7 +1509,7 @@
 	</div>
 
 	<!-- Upload dropzone overlay -->
-	{#if dropzoneActive}
+	{#if dropzoneActive && !isSearching}
 		<div
 			class="absolute inset-0 bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-500 rounded-lg flex items-center justify-center z-10 pointer-events-none"
 		>
@@ -1277,7 +1518,7 @@
 	{/if}
 
 	<!-- Multi-select action bar -->
-	{#if selectedPaths.size > 0}
+	{#if selectedPaths.size > 0 && !isSearching}
 		<div
 			class="flex items-center justify-between h-8 px-2 border-t border-gray-200 dark:border-white/6 shrink-0 bg-blue-50 dark:bg-blue-500/5"
 		>

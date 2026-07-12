@@ -112,7 +112,9 @@
 			cursor: 'agent',
 			grok: 'grok',
 			opencode: 'opencode',
-			cline: 'cline'
+			cline: 'cline',
+			gemini: 'gemini',
+			pi: 'pi'
 		}[agent];
 	}
 
@@ -123,7 +125,9 @@
 			cursor: 'Cursor',
 			grok: 'Grok',
 			opencode: 'OpenCode',
-			cline: 'Cline'
+			cline: 'Cline',
+			gemini: 'Gemini',
+			pi: 'Pi'
 		}[agent];
 	}
 
