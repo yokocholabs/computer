@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { activeWorkspace, addWorkspace, openFileTab, selectedModelId } from '$lib/stores';
+	import { activeWorkspace, addWorkspace, openFileTab } from '$lib/stores';
+	import { defaultModel } from '$lib/stores/chat';
 	import {
 		getGitLog,
 		getGitDiff,
@@ -382,7 +383,7 @@
 		if (!stagedFiles.length || generatingCommitMessage) return;
 		generatingCommitMessage = true;
 		try {
-			const message = await generateGitCommitMessage(workspacePath, $selectedModelId || undefined);
+			const message = await generateGitCommitMessage(workspacePath, $defaultModel || undefined);
 			commitSummary = message.summary;
 			commitDescription = message.description;
 		} catch (e) {
@@ -1498,7 +1499,8 @@
 									{#each fileDiff as df}
 										{#if fileDiff.length > 1}
 											<div
-												class="px-2 py-1 text-[0.625rem] text-gray-500 dark:text-gray-400 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-white/4 sticky top-0 z-10 font-medium"
+											class="px-2 py-1 text-[0.625rem] text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-white/4 sticky top-0 z-10 font-medium"
+											style="background: var(--app-bg); border-color: var(--app-border);"
 											>
 												{df.path}
 											</div>
@@ -1714,6 +1716,6 @@
 
 	.git-resize-handle:hover,
 	.git-resize-handle.active {
-		background: rgba(150, 150, 150, 0.12);
+		background: var(--app-active);
 	}
 </style>

@@ -59,8 +59,10 @@ export interface SendMessageResult {
 	assistant_message?: ChatMessageRow;
 }
 
+export type ToolApprovalMode = 'ask' | 'auto' | 'full';
+
 export interface ChatSendParams {
-	tool_approval_mode?: string;
+	tool_approval_mode?: ToolApprovalMode;
 	plan_mode?: boolean;
 	request_params?: Record<string, unknown>;
 	voice_mode?: boolean;
@@ -104,6 +106,12 @@ export const updateChatTitle = (chatId: string, title: string) =>
 		body: JSON.stringify({ title })
 	});
 
+export const updateChatSettings = (chatId: string, modelId: string, params: ChatSendParams) =>
+	fetchJSON<{ ok: boolean }>(
+		`/api/chats/${chatId}/settings`,
+		jsonBody({ model_id: modelId, params })
+	);
+
 export const forkChat = (chatId: string, messageId?: string | null) =>
 	fetchJSON<{ ok: boolean; chat_id: string }>(
 		`/api/chats/${chatId}/fork`,
@@ -145,6 +153,18 @@ export const approveToolCall = (
 	fetchJSON(
 		`/api/chats/${chatId}/messages/${messageId}/approve`,
 		jsonBody({ call_id: callId, approved })
+	);
+
+export const answerAskUser = (
+	chatId: string,
+	messageId: string,
+	callId: string,
+	answers: Record<string, string>,
+	timedOut = false
+) =>
+	fetchJSON(
+		`/api/chats/${chatId}/messages/${messageId}/answer`,
+		jsonBody({ call_id: callId, answers, timed_out: timedOut })
 	);
 
 export const cancelTask = (chatId: string, messageId: string) =>

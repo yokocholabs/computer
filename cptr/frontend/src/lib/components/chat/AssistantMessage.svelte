@@ -158,6 +158,15 @@
 		collapsedFiles = { ...collapsedFiles, [key]: !collapsedFiles[key] };
 	}
 
+	function openArtifact(artifact: any) {
+		const workspace = get(currentWorkspace);
+		const path =
+			workspace && artifact.path
+				? `${workspace.path.replace(/\/$/, '')}/${artifact.path}`
+				: artifact.path;
+		if (path) openFileTab(path);
+	}
+
 	/** Human-readable label for a tool call */
 	function toolLabel(name: string, args: any): string {
 		const _t = $t;
@@ -201,6 +210,10 @@
 				return _t('chat.tool.killTask', { id: args.task_id || '?' });
 			case 'image_generate':
 				return args.image || args.images?.length ? 'Edit image' : 'Generate image';
+			case 'ask_user': {
+				const count = Array.isArray(args.questions) ? args.questions.length : 0;
+				return `Asked ${count} question${count === 1 ? '' : 's'}`;
+			}
 			case 'web_search':
 				return _t('chat.tool.webSearch', { query: args.query || '?' });
 			case 'read_url': {
@@ -343,9 +356,11 @@
 
 		for (const [index, item] of output.entries()) {
 			if (item.type === 'function_call') {
-				ensureGroup();
-				currentGroup!.entries.push(item);
-				currentGroup!.calls.push(item);
+				if (item.name !== 'ask_user' || item.status !== 'pending') {
+					ensureGroup();
+					currentGroup!.entries.push(item);
+					currentGroup!.calls.push(item);
+				}
 			} else if (item.type === 'reasoning') {
 				ensureGroup();
 				currentGroup!.entries.push(item);
@@ -458,13 +473,7 @@
 						hover:border-gray-300 dark:hover:border-white/12
 						hover:bg-gray-50/50 dark:hover:bg-white/[0.03]
 						transition-colors duration-150 {preview ? 'h-[4.375rem]' : 'h-[2.375rem]'}"
-							onclick={() => {
-								const ws = get(currentWorkspace);
-								if (ws && artifact.path) {
-									const fullPath = ws.path.replace(/\/$/, '') + '/' + artifact.path;
-									openFileTab(fullPath);
-								}
-							}}
+							onclick={() => openArtifact(artifact)}
 						>
 							<div class="h-full min-w-0 overflow-hidden px-3 py-2.5">
 								<div
