@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
-	import { workspaceList, removeWorkspace, reorderWorkspaces, sidebarOpen } from '$lib/stores';
-	import { chatEnabled } from '$lib/stores/chat';
+	import {
+		workspaceList,
+		removeWorkspace,
+		reorderWorkspaces,
+		sidebarOpen,
+		activeTab,
+		currentWorkspace
+	} from '$lib/stores';
+	import { chatEnabled, updateChatStatuses } from '$lib/stores/chat';
 	import { socketStore } from '$lib/stores/socket.svelte';
 	import {
 		deleteChat as apiDeleteChat,
@@ -35,7 +41,8 @@
 	let wsChatsCache = $state<Map<string, ChatInfo[]>>(new Map());
 	let wsChatsHasMore = $state<Map<string, boolean>>(new Map());
 	let wsChatsLoading = $state<Set<string>>(new Set());
-	let currentPath = $derived($page.url.searchParams.get('workspace'));
+	let currentPath = $derived($currentWorkspace?.path ?? null);
+	let currentChatId = $derived($activeTab?.type === 'chat' ? $activeTab.path : null);
 
 	function toggleWorkspaceExpand(path: string) {
 		const next = new Set(expandedWorkspaces);
@@ -58,6 +65,7 @@
 				...wsChatsCache,
 				[path, append ? [...existing, ...(data.chats || [])] : data.chats || []]
 			]);
+			updateChatStatuses(data.chats || [], path);
 			wsChatsHasMore = new Map([...wsChatsHasMore, [path, data.has_more]]);
 		} catch {
 			wsChatsCache = new Map([...wsChatsCache, [path, []]]);
@@ -126,7 +134,7 @@
 		await apiDeleteChat(chatId);
 		const chats = wsChatsCache.get(wsPath) ?? [];
 		wsChatsCache = new Map([...wsChatsCache, [wsPath, chats.filter((chat) => chat.id !== chatId)]]);
-		if (currentPath === wsPath && $page.url.searchParams.get('chatId') === chatId) {
+		if (currentPath === wsPath && currentChatId === chatId) {
 			goto(`/?workspace=${encodeURIComponent(wsPath)}`);
 		}
 	}
@@ -155,22 +163,61 @@
 		);
 	}
 
-	const seenChatIds = new Set<string>();
-
 	function handleChatEvent(data: {
+		type?: string;
 		chat_id: string;
 		done?: boolean;
 		title?: string;
 		delta?: string;
 		workspace?: string;
+		active?: boolean;
+		updated_at?: number;
+		last_read_at?: number;
+		workspace_unread_count?: number;
 	}) {
-		const isNew = !seenChatIds.has(data.chat_id);
-		seenChatIds.add(data.chat_id);
-		if (!data.done && !data.title && !isNew) return;
+		if (
+			!data.title &&
+			typeof data.active !== 'boolean' &&
+			typeof data.updated_at !== 'number' &&
+			typeof data.last_read_at !== 'number' &&
+			typeof data.workspace_unread_count !== 'number'
+		) {
+			return;
+		}
+		const unreadCount = data.workspace_unread_count;
+		if (data.workspace && typeof unreadCount === 'number') {
+			workspaceList.update((workspaces) =>
+				workspaces.map((workspace) =>
+					workspace.path === data.workspace
+						? { ...workspace, unread_count: unreadCount }
+						: workspace
+				)
+			);
+		}
 
-		wsChatsCache = new Map();
-		wsChatsHasMore = new Map();
-		for (const path of expandedWorkspaces) fetchWorkspaceChats(path);
+		let known = false;
+		wsChatsCache = new Map(
+			[...wsChatsCache].map(([path, chats]) => [
+				path,
+				chats.map((chat) => {
+					if (chat.id !== data.chat_id) return chat;
+					known = true;
+					return {
+						...chat,
+						...(data.title ? { title: data.title } : {}),
+						...(typeof data.updated_at === 'number' ? { updated_at: data.updated_at } : {}),
+						...(typeof data.last_read_at === 'number' ? { last_read_at: data.last_read_at } : {}),
+						...(typeof data.active === 'boolean' ? { is_active: data.active } : {})
+					};
+				})
+			])
+		);
+
+		// A chat created in another session is not yet in this sidebar's page.
+		// Refresh only that expanded workspace; all known rows update in place.
+		if (!known && data.workspace && expandedWorkspaces.has(data.workspace)) {
+			void fetchWorkspaceChats(data.workspace);
+		}
 	}
 
 	function isTouchDevice(): boolean {
@@ -275,9 +322,17 @@
 					{:else}
 						<Icon name="folder" size={14} />
 					{/if}
-					<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap"
-						>{ws.name}</span
-					>
+					<span class="min-w-0 truncate text-left">{ws.name}</span>
+					{#if ws.unread_count > 0}
+						<span
+							class="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-md bg-sky-500/10 px-1 text-[0.625rem] font-semibold text-sky-600 dark:bg-sky-400/10 dark:text-sky-300"
+						>
+							{new Intl.NumberFormat(undefined, {
+								notation: 'compact',
+								compactDisplay: 'short'
+							}).format(ws.unread_count)}
+						</span>
+					{/if}
 				</a>
 				<span
 					class="flex items-center justify-center w-4 h-4 shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-gray-600 dark:hover:text-gray-300 transition-all duration-75"
@@ -314,6 +369,7 @@
 						{#each chats as chat (chat.id)}
 							<ChatItem
 								{chat}
+								isSelected={chat.id === currentChatId}
 								onclick={() => openChat(chat.id, ws.path)}
 								onmenu={(e) => openChatMenu(e, chat.id, ws.path)}
 							/>

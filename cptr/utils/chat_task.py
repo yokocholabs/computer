@@ -382,6 +382,23 @@ def start_task(
     _tasks[message_id] = task
     _task_chat[message_id] = chat_id
 
+    async def emit_active():
+        unread_counts = await Chat.unread_counts_by_workspace(
+            user_id, [workspace], get_active_chat_ids()
+        )
+        await emit_to_user(
+            user_id,
+            {
+                "type": "chat:active",
+                "chat_id": chat_id,
+                "workspace": workspace,
+                "active": True,
+                "workspace_unread_count": unread_counts.get(workspace, 0),
+            },
+        )
+
+    asyncio.create_task(emit_active())
+
 
 async def cancel_task(message_id: str) -> bool:
     """Cancel a running task. Returns True if found."""
@@ -2625,6 +2642,26 @@ async def run_chat_task(
         _tasks.pop(message_id, None)
         _task_state.pop(message_id, None)
         _task_chat.pop(message_id, None)
+        if chat_id not in get_active_chat_ids():
+            try:
+                await Chat.touch(chat_id, now_ms())
+                chat = await Chat.get_by_id(chat_id)
+                unread_counts = await Chat.unread_counts_by_workspace(
+                    user_id, [workspace], get_active_chat_ids()
+                )
+                await emit_to_user(
+                    user_id,
+                    {
+                        "type": "chat:active",
+                        "chat_id": chat_id,
+                        "workspace": workspace,
+                        "active": False,
+                        "updated_at": chat.updated_at if chat else None,
+                        "workspace_unread_count": unread_counts.get(workspace, 0),
+                    },
+                )
+            except Exception:
+                logger.debug("[task %s] active-state emit failed", message_id[:8], exc_info=True)
         try:
             await export_chat_to_file(chat_id)
         except Exception:

@@ -180,6 +180,7 @@ async def list_chats(
                 "current_message_id": chat.current_message_id,
                 "created_at": chat.created_at,
                 "updated_at": listing_updated_at,
+                "last_read_at": chat.last_read_at,
                 "is_active": chat.id in active_ids,
             }
         )
@@ -390,6 +391,7 @@ async def get_chat(
 
     messages = await ChatMessage.get_all_by_chat(chat_id)
     context_usage = await _get_chat_context_usage(chat, model_id)
+    from cptr.utils.chat_task import get_active_chat_ids
     from cptr.utils.tools import _normalize_tasks
 
     tasks = _normalize_tasks((chat.meta or {}).get("tasks"))
@@ -402,6 +404,8 @@ async def get_chat(
             "current_message_id": chat.current_message_id,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
+            "last_read_at": chat.last_read_at,
+            "is_active": chat_id in get_active_chat_ids(),
         },
         "messages": [_message_dict(m) for m in messages],
         "tasks": tasks,
@@ -532,10 +536,25 @@ async def update_chat(chat_id: str, body: UpdateChatRequest, request: Request):
     if not title:
         raise HTTPException(422, "title cannot be empty")
 
-    await Chat.update_title(chat_id, title, now_ms())
+    updated_at = now_ms()
+    await Chat.update_title(chat_id, title, updated_at)
+    workspace = (chat.meta or {}).get("workspace", "")
+    from cptr.utils.chat_task import get_active_chat_ids
     from cptr.socket.main import emit_to_user
 
-    await emit_to_user(user_id, {"chat_id": chat_id, "title": title})
+    unread_counts = await Chat.unread_counts_by_workspace(
+        user_id, [workspace], get_active_chat_ids()
+    )
+    await emit_to_user(
+        user_id,
+        {
+            "chat_id": chat_id,
+            "title": title,
+            "workspace": workspace,
+            "updated_at": updated_at,
+            "workspace_unread_count": unread_counts.get(workspace, 0),
+        },
+    )
     return {"ok": True, "title": title}
 
 
@@ -568,6 +587,20 @@ async def delete_chat(chat_id: str, request: Request):
     await asyncio.to_thread(chat_file.unlink, True)  # missing_ok=True
 
     await Chat.delete(chat_id)
+    from cptr.socket.main import emit_to_user
+    from cptr.utils.chat_task import get_active_chat_ids
+
+    unread_counts = await Chat.unread_counts_by_workspace(
+        user_id, [workspace or ""], get_active_chat_ids()
+    )
+    await emit_to_user(
+        user_id,
+        {
+            "chat_id": chat_id,
+            "workspace": workspace or "",
+            "workspace_unread_count": unread_counts.get(workspace or "", 0),
+        },
+    )
     return {"ok": True}
 
 

@@ -5,7 +5,18 @@ from __future__ import annotations
 import re
 import uuid
 
-from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Text, delete, or_, select, update
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    ForeignKey,
+    Text,
+    delete,
+    func,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.sqlite import JSON
 
 from cptr.models.base import Base
@@ -29,6 +40,7 @@ class Chat(Base):
     meta = Column(JSON, nullable=True)  # {model_id, connection_id, pinned, archived, ...}
     created_at = Column(BigInteger, nullable=False)
     updated_at = Column(BigInteger, nullable=False)
+    last_read_at = Column(BigInteger, nullable=True)
 
     # ── Class methods ────────────────────────────────────────
 
@@ -61,6 +73,7 @@ class Chat(Base):
                 meta=meta,
                 created_at=created_at,
                 updated_at=created_at,
+                last_read_at=created_at,
             )
             db.add(chat)
             await db.commit()
@@ -105,6 +118,54 @@ class Chat(Base):
                 update(Chat)
                 .where(Chat.id == chat_id)
                 .values(current_message_id=message_id, updated_at=updated_at)
+            )
+            await db.commit()
+            return result.rowcount > 0
+
+    @staticmethod
+    async def touch(chat_id: str, updated_at: int) -> bool:
+        """Record a completed background update without changing chat content."""
+        async with await get_db() as db:
+            result = await db.execute(
+                update(Chat).where(Chat.id == chat_id).values(updated_at=updated_at)
+            )
+            await db.commit()
+            return result.rowcount > 0
+
+    @staticmethod
+    async def unread_counts_by_workspace(
+        user_id: str, workspace_paths: list[str], active_chat_ids: set[str]
+    ) -> dict[str, int]:
+        """Derive unread counts from chats; do not persist a second read-state."""
+        paths = list(dict.fromkeys(path for path in workspace_paths if path))
+        if not paths:
+            return {}
+
+        workspace = Chat.meta["workspace"].as_string()
+        statement = (
+            select(workspace, func.count(Chat.id))
+            .where(
+                Chat.user_id == user_id,
+                workspace.in_(paths),
+                Chat.updated_at > func.coalesce(Chat.last_read_at, 0),
+            )
+            .group_by(workspace)
+        )
+        if active_chat_ids:
+            statement = statement.where(Chat.id.not_in(active_chat_ids))
+
+        async with await get_db() as db:
+            result = await db.execute(statement)
+            return {workspace: count for workspace, count in result.all() if workspace}
+
+    @staticmethod
+    async def update_last_read_at(chat_id: str, user_id: str, last_read_at: int) -> bool:
+        """Mark a chat read without changing its activity timestamp."""
+        async with await get_db() as db:
+            result = await db.execute(
+                update(Chat)
+                .where(Chat.id == chat_id, Chat.user_id == user_id)
+                .values(last_read_at=last_read_at)
             )
             await db.commit()
             return result.rowcount > 0
